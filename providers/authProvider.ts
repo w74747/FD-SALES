@@ -14,7 +14,8 @@ import {
   clearDeviceFingerprintCache,
   validateFingerprint,
   DeviceFingerprint,
-} from './fingerprint';
+} from '../utils/fingerprint';
+import { User, UserDevice } from '../types';
 
 /**
  * SUPABASE CLIENT INITIALIZATION
@@ -41,23 +42,6 @@ const DEVICE_STORAGE_KEY = 'fd_sales_device';
 const TOKEN_STORAGE_KEY = 'fd_sales_token';
 
 /**
- * TYPES
- */
-interface AuthUser {
-  id: string;
-  email: string;
-  full_name: string;
-  role: 'sales_rep' | 'team_leader' | 'sales_director';
-  department?: string;
-}
-
-interface StoredDevice {
-  id: string;
-  device_fingerprint: string;
-  device_name: string;
-}
-
-/**
  * DEVICE BINDING VERIFICATION
  * ============================================================================
  * منطق التحقق من ربط الجهاز:
@@ -80,7 +64,7 @@ interface StoredDevice {
 async function registerOrVerifyDevice(
   userId: string,
   userRole: string
-): Promise<StoredDevice> {
+): Promise<UserDevice> {
   const deviceFingerprint = await getDeviceFingerprintWithDetails();
 
   // للمديرين وقادة الفريق: تسجيل جهاز جديد دون قيود
@@ -115,7 +99,6 @@ async function registerOrVerifyDevice(
       return newDevice;
     } catch (error) {
       console.warn('Error registering device for director/leader:', error);
-      // لا نفشل تسجيل الدخول بسبب خطأ في تسجيل الجهاز
       throw error;
     }
   }
@@ -165,7 +148,7 @@ async function registerOrVerifyDevice(
  * fetchUserProfile
  * جلب بيانات المستخدم من جدول users
  */
-async function fetchUserProfile(userId: string): Promise<AuthUser> {
+async function fetchUserProfile(userId: string): Promise<User> {
   const { data: user, error } = await supabase
     .from('users')
     .select('id, email, full_name, role, department')
@@ -176,7 +159,7 @@ async function fetchUserProfile(userId: string): Promise<AuthUser> {
     throw new Error('فشل جلب بيانات المستخدم');
   }
 
-  return user as AuthUser;
+  return user as User;
 }
 
 /**
@@ -305,7 +288,7 @@ export const authProvider: AuthProvider = {
         return { authenticated: false, redirectTo: '/login' };
       }
 
-      const user: AuthUser = JSON.parse(storedUser);
+      const user: User = JSON.parse(storedUser);
 
       // إعادة التحقق من جهاز مندوب المبيعات
       if (user.role === 'sales_rep') {
@@ -313,7 +296,7 @@ export const authProvider: AuthProvider = {
         const storedDevice = localStorage.getItem(DEVICE_STORAGE_KEY);
 
         if (storedDevice) {
-          const device: StoredDevice = JSON.parse(storedDevice);
+          const device: UserDevice = JSON.parse(storedDevice);
           if (device.device_fingerprint !== currentFingerprint) {
             // الجهاز تغير - سجل خروج فوري
             await supabase.auth.signOut();
@@ -345,7 +328,7 @@ export const authProvider: AuthProvider = {
       const storedUser = localStorage.getItem(USER_STORAGE_KEY);
       if (!storedUser) return null;
 
-      const user: AuthUser = JSON.parse(storedUser);
+      const user: User = JSON.parse(storedUser);
       return [user.role];
     } catch {
       return null;
@@ -361,7 +344,7 @@ export const authProvider: AuthProvider = {
       const storedUser = localStorage.getItem(USER_STORAGE_KEY);
       if (!storedUser) return null;
 
-      const user: AuthUser = JSON.parse(storedUser);
+      const user: User = JSON.parse(storedUser);
       return {
         id: user.id,
         name: user.full_name,
@@ -391,10 +374,10 @@ export const authProvider: AuthProvider = {
  * getCurrentUser
  * الحصول على المستخدم الحالي
  */
-export function getCurrentUser(): AuthUser | null {
+export function getCurrentUser(): User | null {
   try {
     const stored = localStorage.getItem(USER_STORAGE_KEY);
-    return stored ? (JSON.parse(stored) as AuthUser) : null;
+    return stored ? (JSON.parse(stored) as User) : null;
   } catch {
     return null;
   }
