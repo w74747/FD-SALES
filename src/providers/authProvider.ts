@@ -6,7 +6,6 @@
  * ============================================================================
  */
 
-import { AuthProvider } from '@refinedev/core';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   getDeviceFingerprint,
@@ -130,7 +129,7 @@ async function registerOrVerifyDevice(
 
   // الحالة ب: جهاز متطابق
   const boundDevice = registeredDevices.find(
-    (d) => d.device_fingerprint === deviceFingerprint.fingerprint
+    (d: UserDevice) => d.device_fingerprint === deviceFingerprint.fingerprint
   );
 
   if (boundDevice) {
@@ -167,7 +166,7 @@ async function fetchUserProfile(userId: string): Promise<User> {
  * ============================================================================
  */
 
-export const authProvider: AuthProvider = {
+export const authProvider = {
   /**
    * login
    * معالج تسجيل الدخول الرئيسي
@@ -178,7 +177,7 @@ export const authProvider: AuthProvider = {
    * 3. التحقق من ربط الجهاز (بناءً على الدور)
    * 4. تخزين بيانات الجلسة محليًا
    */
-  login: async (options) => {
+  login: async (options: any) => {
     try {
       if (!options || typeof options !== 'object') {
         return { success: false, error: { message: 'بيانات دخول غير صحيحة' } };
@@ -360,7 +359,7 @@ export const authProvider: AuthProvider = {
    * onError
    * معالج الأخطاء العامة
    */
-  onError: async (error) => {
+  onError: async (error: any) => {
     console.error('Auth error:', error);
     return { redirectTo: '/login' };
   },
