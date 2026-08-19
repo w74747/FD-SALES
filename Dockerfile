@@ -1,43 +1,41 @@
 # ============================================================================
-# FD-Sales: Multi-Stage Docker Build for Railway Deployment
-# Stage 1: Builder (Node.js LTS Alpine)
-# Stage 2: Production (Nginx Alpine)
+# FD-Sales: Multi-stage Docker Build
+# Stage 1: Build React/Vite app with Node.js
+# Stage 2: Serve with Nginx
 # ============================================================================
 
-# --- STAGE 1: BUILDER ---
+# --- STAGE 1: BUILD ---
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# نسخ ملفات المشروع
+# Copy package files
 COPY package*.json ./
-COPY tsconfig.json ./
-COPY vite.config.ts ./
-COPY index.html ./
 
-# تثبيت المكتبات
+# Install dependencies
 RUN npm ci
 
-# نسخ كود المصدر
-COPY src ./src
-COPY public ./public
+# Copy source code
+COPY . .
 
-# بناء التطبيق
+# Build the app
 RUN npm run build
 
 # --- STAGE 2: PRODUCTION ---
 FROM nginx:alpine
 
-WORKDIR /usr/share/nginx/html
-
-# نسخ ملف الإعدادات
+# Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# نسخ الملفات المبنية من مرحلة البناء
-COPY --from=builder /app/dist ./
+# Copy built app from builder stage to nginx html directory
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# فتح المنفذ
+# Expose port
 EXPOSE 3000
 
-# تشغيل Nginx
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:3000/ || exit 1
+
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
