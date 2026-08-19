@@ -1,0 +1,32 @@
+# Vite
+dist/
+.vite/
+
+# Node
+node_modules/
+npm-debug.log
+package-lock.json
+yarn.lock
+
+# Environment
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+build/
+out/
+
+# Logs
+logs/
+*.log
