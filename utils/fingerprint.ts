@@ -6,7 +6,8 @@
  * ============================================================================
  */
 
-import FingerprintJS, { GetResult } from '@fingerprintjs/fingerprintjs';
+import * as FingerprintJS from '@fingerprintjs/fingerprintjs';
+import type { GetResult } from '@fingerprintjs/fingerprintjs';
 
 /**
  * DeviceFingerprint
@@ -27,14 +28,14 @@ const CACHE_TTL_MS = 8 * 60 * 60 * 1000; // 8 ساعات
 /**
  * Module State
  */
-let fpInstance: FingerprintJS | null = null;
+let fpInstance: Awaited<ReturnType<typeof FingerprintJS.load>> | null = null;
 let cachedFingerprint: DeviceFingerprint | null = null;
 
 /**
  * initFingerprintJS
  * تهيئة مكتبة FingerprintJS بشكل آمن
  */
-async function initFingerprintJS(): Promise<FingerprintJS> {
+async function initFingerprintJS() {
   if (fpInstance) {
     return fpInstance;
   }
@@ -123,43 +124,24 @@ function setCachedFingerprint(fingerprint: DeviceFingerprint): void {
 /**
  * getDeviceFingerprint
  * الدالة الرئيسية: الحصول على بصمة جهاز فريدة
- *
- * المنطق:
- * 1. تحقق من الكاش المحلي أولاً
- * 2. إذا لم تكن موجودة، احسبها من FingerprintJS
- * 3. خزنها للاستخدام المستقبلي
- *
- * الاستخدام:
- * ```typescript
- * const fingerprint = await getDeviceFingerprint();
- * console.log(fingerprint.fingerprint); // البصمة الفريدة
- * console.log(fingerprint.deviceName); // اسم الجهاز
- * ```
  */
 export async function getDeviceFingerprint(): Promise<string> {
-  // محاولة جلب من الكاش أولاً
   const cached = getCachedFingerprint();
   if (cached) {
     return cached.fingerprint;
   }
 
   try {
-    // تهيئة FingerprintJS
     const fp = await initFingerprintJS();
-
-    // حساب البصمة
     const result: GetResult = await fp.get();
 
-    // إنشاء كائن البصمة
     const fingerprint: DeviceFingerprint = {
       fingerprint: result.visitorId,
       deviceName: getDeviceName(),
       timestamp: Date.now(),
     };
 
-    // تخزين مؤقت
     setCachedFingerprint(fingerprint);
-
     return fingerprint.fingerprint;
   } catch (error) {
     console.error('Error getting device fingerprint:', error);
