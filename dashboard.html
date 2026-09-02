@@ -4,780 +4,600 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام إدارة المبيعات الميدانية والتنفيذية الذكي | شركة تنمية الغذاء</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Cairo', sans-serif; background-color: #FBF9FE; color: #1A202C; }
         .brand-primary-bg { background-color: #3A056A; }
         .brand-primary-text { color: #3A056A; }
         .brand-border { border-color: #E4D9F5; }
         .brand-tint { background-color: #F5F0FC; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E4D9F5; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #C194FB; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- القائمة الجانبية المقسمة (Two-Tier Master Sidebar) -->
+    <!-- القائمة الجانبية المحدثة بالمسميات الإدارية المعتمدة -->
     <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl">
         <div class="flex flex-col h-full overflow-hidden">
-            <!-- هوية وشعار الشركة -->
+            <!-- هوية وشعار الشركة الرسمي -->
             <div class="p-4 border-b border-[#52128e] flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-[#C194FB] flex items-center justify-center text-[#3A056A] font-black text-xl shadow-md">ت</div>
+                <div class="w-10 h-10 rounded-xl bg-[#C194FB] flex items-center justify-center text-[#3A056A] font-black text-xl shadow-md border-2 border-white">ت</div>
                 <div>
                     <div class="font-extrabold text-sm tracking-wide leading-tight">شركة تنمية الغذاء</div>
-                    <div class="text-[10px] text-[#C194FB] font-medium tracking-wider uppercase">Food Development Co.</div>
+                    <div class="text-[10px] text-[#C194FB] font-medium tracking-wider uppercase">FOOD DEVELOPMENT CO.</div>
                 </div>
             </div>
 
-            <!-- القسم العلوي: إدارة المبيعات الميدانية -->
-            <div class="flex-1 overflow-y-auto custom-scrollbar px-3 py-4 space-y-1">
-                <div class="text-[10px] font-bold text-[#C194FB] mb-2 px-2 uppercase tracking-wider">إدارة العمليات والمبيعات</div>
+            <!-- أقسام التنقل -->
+            <div class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+                <div class="text-[10px] font-bold text-[#C194FB] mb-2 px-2 uppercase tracking-wider">العمليات والمبيعات</div>
                 
                 <button onclick="switchTab('overview')" id="nav-overview" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white transition text-right">
-                    <span class="text-base">📊</span> لوحة التحكم العامة
+                    <span>📊</span> لوحة التحكم العامة
                 </button>
 
-                <button onclick="switchTab('reps')" id="nav-reps" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] hover:text-white transition text-right">
-                    <span class="text-base">👔</span> المناديب والمستهدفات البيعية
+                <button onclick="switchTab('reps')" id="nav-reps" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>👔</span> فريق المبيعات والمستهدفات
                 </button>
 
-                <button onclick="switchTab('samples')" id="nav-samples" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] hover:text-white transition text-right">
-                    <span class="text-base">🧪</span> سجل العينات والتحويل (PO)
+                <button onclick="switchTab('customers')" id="nav-customers" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>🏢</span> دليل حسابات العملاء المعتمدة
                 </button>
 
-                <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] hover:text-white transition text-right">
-                    <span class="text-base">📅</span> تقويم المهام والزيارات الميدانية
+                <button onclick="switchTab('samples')" id="nav-samples" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>🧪</span> سجل العينات والتحويل (PO)
                 </button>
 
-                <button onclick="switchTab('whatsapp')" id="nav-whatsapp" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] hover:text-white transition text-right">
-                    <span class="text-base">💬</span> رادار المجموعات والمكالمات
+                <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>📅</span> تقويم العمليات والمسارات الميدانية
                 </button>
 
-                <div class="pt-3 pb-1">
-                    <div class="text-[10px] font-bold text-[#C194FB] mb-1 px-2 uppercase tracking-wider">الإدارة والتسليم</div>
-                </div>
-
-                <button onclick="switchTab('handover')" id="nav-handover" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] hover:text-white transition text-right">
-                    <span class="text-base">🔄</span> تدوير وتسليم المهام (Handover)
+                <button onclick="switchTab('whatsapp')" id="nav-whatsapp" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>💬</span> رادار المجموعات والمكالمات
                 </button>
 
-                <button onclick="openReportModal()" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-bold bg-[#C194FB]/20 text-purple-200 border border-[#C194FB]/40 hover:bg-[#C194FB]/30 transition text-right mt-2">
-                    <span class="text-base">📄</span> مركز التقارير الرسمية (PDF)
+                <div class="pt-3 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">الإدارة والتقارير</div>
+
+                <button onclick="openSaleModal()" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-bold bg-emerald-600/80 text-white hover:bg-emerald-600 text-right">
+                    <span>💰</span> + قيد مبيعات / نفقات ميدانية
                 </button>
-            </div>
 
-            <!-- القسم السفلي: صحة النظام والوكلاء الأذكياء -->
-            <div class="p-3 bg-[#2a024f] border-t border-[#480d80] space-y-2">
-                <div class="flex items-center justify-between text-[10px] font-bold text-[#C194FB] uppercase tracking-wider">
-                    <span>هرمية الوكلاء التفاعلية</span>
-                    <span class="flex items-center gap-1 text-[9px] text-emerald-400 font-mono">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> ACTIVE
-                    </span>
-                </div>
-
-                <div class="space-y-1.5 text-[10px]">
-                    <div class="p-1.5 bg-[#3A056A] rounded border border-[#52128e] flex items-center justify-between">
-                        <div>
-                            <span class="text-gray-300 font-bold block">Claude 3.7</span>
-                            <span class="text-purple-300 text-[9px]">Sales Director (الرؤى والتقارير)</span>
-                        </div>
-                        <span class="text-emerald-400 font-bold text-[9px]">جاهز</span>
-                    </div>
-
-                    <div class="p-1.5 bg-[#3A056A] rounded border border-[#52128e] flex items-center justify-between">
-                        <div>
-                            <span class="text-gray-300 font-bold block">Together AI (Llama 3.3)</span>
-                            <span class="text-purple-300 text-[9px]">Omnichannel Watcher (ردود سريعة)</span>
-                        </div>
-                        <span class="text-emerald-400 font-bold text-[9px]">&lt;65ms</span>
-                    </div>
-
-                    <div class="p-1.5 bg-[#3A056A] rounded border border-[#52128e] flex items-center justify-between">
-                        <div>
-                            <span class="text-gray-300 font-bold block">DeepSeek V3 / Coder</span>
-                            <span class="text-purple-300 text-[9px]">JSON &amp; KPI Engine (استخراج البيانات)</span>
-                        </div>
-                        <span class="text-emerald-400 font-bold text-[9px]">دقيق</span>
-                    </div>
-
-                    <div class="p-1.5 bg-[#3A056A] rounded border border-[#52128e] flex items-center justify-between text-gray-300">
-                        <span id="sre-checks-label">SRE Sentinel: 20s Pulse</span>
-                        <span class="text-emerald-400 font-mono text-[9px]" id="live-time-badge">00:00:00</span>
-                    </div>
-                </div>
+                <button onclick="openReportModal()" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-bold bg-[#C194FB]/20 text-purple-200 border border-[#C194FB]/40 hover:bg-[#C194FB]/30 text-right mt-1">
+                    <span>📄</span> مركز التقارير الرسمية المعتمدة
+                </button>
             </div>
         </div>
     </aside>
 
-    <!-- مساحة العمل الرئيسية (Main Application Workspace) -->
+    <!-- مساحة العمل الرئيسية -->
     <main class="flex-1 flex flex-col overflow-hidden bg-[#FBF9FE]">
-        <!-- الشريط العلوي (Header) -->
         <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs">
             <div class="flex items-center gap-3">
-                <span class="text-xs text-gray-400 font-medium">نظام المبيعات الميدانية والتنفيذية الذكي</span>
+                <span class="text-xs text-gray-400 font-medium">نظام المبيعات التنفيذي</span>
                 <span class="text-gray-300">/</span>
                 <span class="text-xs font-bold brand-primary-text" id="current-tab-title">لوحة التحكم العامة</span>
             </div>
 
             <div class="flex items-center gap-3">
-                <!-- كبسولة حالة اتصال الواتساب وزر إدارة المسح -->
-                <button onclick="openWhatsAppModal()" id="wa-header-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 shadow-xs">
-                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" id="wa-indicator-dot"></span>
-                    <span id="wa-status-text">واتساب: بانتظار مسح الرمز</span>
+                <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+                    <span>واتساب: بانتظار مسح الرمز</span>
                     <span class="text-[10px] text-gray-600 bg-white px-2 py-0.5 rounded-full border border-gray-200">مسح QR 📷</span>
                 </button>
 
-                <!-- زر إصدار تقرير رسمي -->
-                <button onclick="openReportModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 transition flex items-center gap-1.5">
-                    <span>📄</span> إصدار تقرير رسمي (PDF)
+                <button onclick="openReportModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 flex items-center gap-1.5">
+                    <span>📄</span> إصدار تقرير رسمي
                 </button>
             </div>
         </header>
 
-        <!-- منطقة المحتوى التفاعلي القابلة للتمرير -->
-        <div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
 
-            <!-- تبويب 1: لوحة التحكم العامة (Overview) -->
+            <!-- تبويب 1: لوحة التحكم العامة -->
             <div id="tab-overview" class="space-y-6">
-                <!-- بطاقات المؤشرات السريعة (KPI Overview Cards) -->
                 <div class="grid grid-cols-4 gap-4">
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
                         <div class="text-[11px] text-gray-500 font-bold">إجمالي المبيعات المحققة</div>
-                        <div class="text-2xl font-black brand-primary-text mt-1">622,000 ر.س</div>
-                        <div class="text-[10px] text-emerald-700 font-bold mt-1 flex items-center gap-1">
-                            <span>↑</span> 95.7% من إجمالي المستهدف العام
-                        </div>
+                        <div class="text-2xl font-black brand-primary-text mt-1" id="kpi-total-sales">622,000 ر.س</div>
+                        <div class="text-[10px] text-emerald-700 font-bold mt-1">↑ 95.7% من إجمالي المستهدف</div>
                     </div>
-
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
-                        <div class="text-[11px] text-gray-500 font-bold">معدل تحويل العينات لأوامر (PO)</div>
+                        <div class="text-[11px] text-gray-500 font-bold">معدل تحويل العينات (ROI)</div>
                         <div class="text-2xl font-black text-emerald-700 mt-1">66.7%</div>
                         <div class="text-[10px] text-gray-500 font-medium mt-1">عائد العينات: 193,000 ر.س</div>
                     </div>
-
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
                         <div class="text-[11px] text-gray-500 font-bold">كفاءة استهلاك الوقود الميداني</div>
                         <div class="text-2xl font-black text-purple-900 mt-1">1,135 / 1,130</div>
-                        <div class="text-[10px] text-amber-700 font-bold mt-1">انضباط عام مع تجاوز طفيف بالشرقية</div>
+                        <div class="text-[10px] text-amber-700 font-bold mt-1">انضباط عام في خطوط السير</div>
                     </div>
-
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
-                        <div class="text-[11px] text-gray-500 font-bold">متوسط سرعة الرد عبر الواتساب (SLA)</div>
+                        <div class="text-[11px] text-gray-500 font-bold">سرعة الاستجابة للواتساب (SLA)</div>
                         <div class="text-2xl font-black text-blue-700 mt-1">10.5 دقيقة</div>
                         <div class="text-[10px] text-emerald-700 font-bold mt-1">ضمن المعيار القياسي (&lt; 15 د)</div>
                     </div>
                 </div>
 
-                <!-- جدول المناديب والمستهدفات -->
                 <div class="bg-white rounded-xl border brand-border shadow-xs overflow-hidden">
                     <div class="p-4 border-b brand-border flex justify-between items-center bg-gray-50/60">
-                        <div>
-                            <h3 class="font-bold text-xs brand-primary-text">👔 كفاءة مناديب المبيعات وعائد التكلفة الميدانية (Cost-to-Sales Ratio)</h3>
-                            <div class="text-[10px] text-gray-500">تحليل فوري برعاية وكيل الإدارة (Claude 3.7 Sonnet)</div>
-                        </div>
-                        <span class="px-2.5 py-1 rounded bg-purple-50 text-[#3A056A] text-[10px] font-bold border brand-border">3 مناديب مسجلين</span>
+                        <h3 class="font-bold text-xs brand-primary-text">👔 فريق المبيعات التنفيذي وعائد التكلفة الميدانية</h3>
+                        <span class="text-[10px] text-gray-500">تحليل فوري للمبيعات ونفقات الوقود</span>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-right text-xs">
-                            <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
-                                <tr>
-                                    <th class="p-3">المندوب</th>
-                                    <th class="p-3">المنطقة</th>
-                                    <th class="p-3">المستهدف الشهري</th>
-                                    <th class="p-3">المبيعات المحققة</th>
-                                    <th class="p-3">نسبة الإنجاز</th>
-                                    <th class="p-3">الوقود (الفعلي / المخصص)</th>
-                                    <th class="p-3">المصاريف الكلية</th>
-                                    <th class="p-3">تقييم الكفاءة</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y brand-border" id="reps-table-body">
-                                <tr>
-                                    <td class="p-3 font-bold">أحمد الشمري</td>
-                                    <td class="p-3 text-gray-600">الرياض - الوسطى</td>
-                                    <td class="p-3">250,000 ر.س</td>
-                                    <td class="p-3 font-semibold text-emerald-700">272,000 ر.س</td>
-                                    <td class="p-3 font-bold text-emerald-700">108.8%</td>
-                                    <td class="p-3">380 / 400 لتر</td>
-                                    <td class="p-3 text-gray-700">3,200 ر.س</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">عالي الكفاءة</span></td>
-                                </tr>
-                                <tr>
-                                    <td class="p-3 font-bold">سالم الدوسري</td>
-                                    <td class="p-3 text-gray-600">الدمام - الشرقية</td>
-                                    <td class="p-3">180,000 ر.س</td>
-                                    <td class="p-3 font-semibold text-amber-700">135,000 ر.س</td>
-                                    <td class="p-3 font-bold text-amber-700">75.0%</td>
-                                    <td class="p-3 text-red-600 font-semibold">395 / 350 لتر</td>
-                                    <td class="p-3 text-gray-700">4,100 ر.س</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px]">هدر موارد</span></td>
-                                </tr>
-                                <tr>
-                                    <td class="p-3 font-bold">تركي الغامدي</td>
-                                    <td class="p-3 text-gray-600">جدة - الغربية</td>
-                                    <td class="p-3">220,000 ر.س</td>
-                                    <td class="p-3 font-semibold text-emerald-700">215,000 ر.س</td>
-                                    <td class="p-3 font-bold text-emerald-700">97.7%</td>
-                                    <td class="p-3">360 / 380 لتر</td>
-                                    <td class="p-3 text-gray-700">3,600 ر.س</td>
-                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">عالي الكفاءة</span></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- شبكة العمليات الميدانية ورادار الواتساب اللحظي -->
-                <div class="grid grid-cols-2 gap-6">
-                    <!-- تقويم العمليات الميدانية والزيارات -->
-                    <div class="bg-white rounded-xl border brand-border p-4 shadow-xs">
-                        <div class="flex justify-between items-center mb-3">
-                            <h4 class="font-bold text-xs brand-primary-text">📅 جدول العمليات الميدانية اليوم (Field Calendar)</h4>
-                            <span class="text-[10px] bg-purple-50 text-[#3A056A] px-2 py-0.5 rounded font-bold border brand-border">تذكيرات آلية</span>
-                        </div>
-                        <div class="space-y-2.5 text-xs">
-                            <div class="p-3 rounded-lg border brand-border brand-tint flex justify-between items-center">
-                                <div>
-                                    <div class="font-bold text-gray-800 text-xs">توقيع عقد توريد سنوي</div>
-                                    <div class="text-[10px] text-gray-500">سلسلة مطاعم الريف الحجازي | المندوب: أحمد الشمري | مسار R-10</div>
-                                </div>
-                                <span class="px-2 py-1 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">تم التأكيد (Ack)</span>
-                            </div>
-
-                            <div class="p-3 rounded-lg border border-amber-200 bg-amber-50/50 flex justify-between items-center">
-                                <div>
-                                    <div class="font-bold text-gray-800 text-xs">زيارة تقصي واسترجاع عينات</div>
-                                    <div class="text-[10px] text-gray-500">مؤسسة التموين الحديث | المندوب: سالم الدوسري | مسار R-14</div>
-                                </div>
-                                <span class="px-2 py-1 rounded text-[10px] font-bold bg-amber-100 text-amber-800">بانتظار التأكيد</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- رادار مجموعات الواتساب والمكالمات -->
-                    <div class="bg-white rounded-xl border brand-border p-4 shadow-xs">
-                        <div class="flex justify-between items-center mb-3">
-                            <h4 class="font-bold text-xs brand-primary-text">💬 رادار مجموعات العملاء والمكالمات (Sentinel Watcher)</h4>
-                            <span class="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> استماع حي
-                            </span>
-                        </div>
-                        <div class="space-y-2 text-xs">
-                            <div class="p-2.5 rounded bg-gray-50 border border-gray-200">
-                                <div class="flex justify-between text-[10px] text-gray-400 mb-1">
-                                    <span class="font-bold text-purple-900">م. فهد القرني (الريف الحجازي)</span>
-                                    <span>09:15</span>
-                                </div>
-                                <p class="text-gray-700 text-[11px]">السلام عليكم، متى تصل شحنة العينات الجديدة لفرع التخصصي؟</p>
-                            </div>
-
-                            <div class="p-2.5 rounded bg-purple-50/60 border brand-border">
-                                <div class="flex justify-between text-[10px] text-gray-400 mb-1">
-                                    <span class="font-bold text-emerald-800">أحمد الشمري (المندوب)</span>
-                                    <span class="text-emerald-700 font-semibold">رد خلال 7 دقائق</span>
-                                </div>
-                                <p class="text-gray-700 text-[11px]">أهلاً بك مهندس فهد، سيارتنا في الطريق وستكون عندكم قبل 11:00 صباحاً بإذن الله.</p>
-                            </div>
-
-                            <div class="p-2.5 rounded bg-amber-50/60 border border-amber-200">
-                                <div class="flex justify-between text-[10px] text-gray-400 mb-1">
-                                    <span class="font-bold text-amber-800">توثيق اتصال هاتفي ميداني 📞</span>
-                                    <span>11:45</span>
-                                </div>
-                                <p class="text-gray-700 text-[11px]">تم الاتصال مع مسؤول المستودعات لتأكيد التخزين في درجات التبريد المعتمدة.</p>
-                            </div>
-                        </div>
-                    </div>
+                    <table class="w-full text-right text-xs">
+                        <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
+                            <tr>
+                                <th class="p-3">مسؤول المبيعات</th>
+                                <th class="p-3">المنطقة</th>
+                                <th class="p-3">المستهدف الشهري</th>
+                                <th class="p-3">المبيعات المحققة</th>
+                                <th class="p-3">نسبة الإنجاز</th>
+                                <th class="p-3">الوقود (فعلي / مخصص)</th>
+                                <th class="p-3">المصاريف الكلية</th>
+                                <th class="p-3">الكفاءة</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y brand-border" id="overview-reps-tbody"></tbody>
+                    </table>
                 </div>
             </div>
 
-            <!-- تبويب 2: المناديب والمستهدفات البيعية -->
+            <!-- تبويب 2: فريق المبيعات والمستهدفات -->
             <div id="tab-reps" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <h3 class="font-bold text-sm brand-primary-text mb-2">إدارة فريق المبيعات الميداني ومخصصات الوقود</h3>
-                    <p class="text-xs text-gray-500 mb-4">متابعة دقيقة لمخصصات لترات الوقود، ونسب تحقيق الأهداف، والمصاريف التشغيلية لكل منطقة توزيع.</p>
-                    <div id="detailed-reps-list" class="grid grid-cols-3 gap-4">
-                        <!-- تُحقن البطاقات ديناميكياً بواسطة جافاسكربت -->
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">فريق المبيعات التنفيذي ومخصصات التكاليف</h3>
+                            <div class="text-xs text-gray-500">أرقام هواتف الفريق الرسمية والمستهدفات الشهرية المعتمدة</div>
+                        </div>
+                        <button onclick="openSaleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ قيد مبيعات / نفقات جديدة</button>
                     </div>
+                    <div id="reps-grid-cards" class="grid grid-cols-3 gap-4"></div>
                 </div>
             </div>
 
-            <!-- تبويب 3: سجل العينات والتحويل التجاري -->
+            <!-- تبويب 3: دليل حسابات العملاء المعتمدة -->
+            <div id="tab-customers" class="hidden space-y-4">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">🏢 دليل حسابات العملاء ومجموعات المراقبة</h3>
+                            <div class="text-xs text-gray-500">قائمة الشركات، مسؤولي التواصل، والمجموعات المربوطة بالرادار</div>
+                        </div>
+                        <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">طباعة دليل العملاء 🖨️</button>
+                    </div>
+                    <table class="w-full text-right text-xs">
+                        <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
+                            <tr>
+                                <th class="p-3">الشركة / الحساب</th>
+                                <th class="p-3">القطاع</th>
+                                <th class="p-3">الشخص المسؤول</th>
+                                <th class="p-3">رقم الهاتف</th>
+                                <th class="p-3">المسؤول المشرف</th>
+                                <th class="p-3">مجموعة الواتساب المراقبة</th>
+                                <th class="p-3">الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y brand-border" id="customers-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- تبويب 4: سجل العينات والتحويل التجاري -->
             <div id="tab-samples" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
                         <div>
-                            <h3 class="font-bold text-sm brand-primary-text">🧪 سجل حركة العينات المجانية ومعدل التحويل (Sample-to-PO ROI)</h3>
-                            <div class="text-xs text-gray-500">تتبع تقييمات الجودة الصادرة من العملاء وربطها بأوامر الشراء الفعلية.</div>
+                            <h3 class="font-bold text-sm brand-primary-text">🧪 سجل حركة العينات المجانية والتحويل التجاري</h3>
+                            <div class="text-xs text-gray-500">رصد يدوي ورصد آلي عبر محادثات الواتساب</div>
                         </div>
-                        <button class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-xs">+ تسليم عينة جديدة</button>
+                        <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-xs">+ تسليم عينة جديدة</button>
                     </div>
                     <table class="w-full text-right text-xs">
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
                             <tr>
                                 <th class="p-3">العميل</th>
-                                <th class="p-3">المندوب</th>
+                                <th class="p-3">المسؤول</th>
                                 <th class="p-3">المنتج المسلّم</th>
                                 <th class="p-3">الكمية</th>
                                 <th class="p-3">تاريخ التسليم</th>
+                                <th class="p-3">مصدر التسجيل</th>
                                 <th class="p-3">قرار الجودة</th>
                                 <th class="p-3">أمر الشراء (PO)</th>
                                 <th class="p-3">قيمة العقد</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y brand-border" id="samples-table-body">
-                            <!-- بيانات العينات -->
-                        </tbody>
+                        <tbody class="divide-y brand-border" id="samples-table-body"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- تبويب 4: تقويم المهام والزيارات الميدانية -->
+            <!-- تبويب 5: تقويم المهام الميدانية -->
             <div id="tab-calendar" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-sm brand-primary-text">📅 جدول المسارات الميدانية والزيارات (Field Operations)</h3>
-                        <button class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-xs">+ جدولة مهمة جديدة</button>
+                        <h3 class="font-bold text-sm brand-primary-text">📅 جدول المسارات والزيارات الميدانية المعتمدة</h3>
+                        <button onclick="openNewCalendarModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-xs">+ جدولة مهمة جديدة</button>
                     </div>
-                    <div class="space-y-3" id="calendar-events-list">
-                        <!-- بيانات التقويم الميداني -->
-                    </div>
+                    <div class="space-y-3" id="calendar-events-list"></div>
                 </div>
             </div>
 
-            <!-- تبويب 5: رادار مجموعات الواتساب -->
+            <!-- تبويب 6: رادار مجموعات الواتساب -->
             <div id="tab-whatsapp" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
                         <div>
-                            <h3 class="font-bold text-sm brand-primary-text">💬 المجموعات المربوطة والمحادثات الميدانية المباشرة</h3>
-                            <div class="text-xs text-gray-500">فلترة آمنة ومراقبة مستمرة لأزمنة الاستجابة (SLA) وتوثيق المكالمات الهاتفية.</div>
+                            <h3 class="font-bold text-sm brand-primary-text">💬 المجموعات المراقبة والمحادثات الميدانية</h3>
+                            <div class="text-xs text-gray-500">حصر المراقبة لمجموعات عملاء شركة تنمية الغذاء المحددة فقط</div>
                         </div>
-                        <button onclick="openWhatsAppModal()" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg shadow-xs">فحص الجلسة وإعادة الربط</button>
+                        <button onclick="openWhatsAppModal()" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">إدارة الربط والمجموعات</button>
                     </div>
-                    <div class="space-y-3" id="whatsapp-full-feed">
-                        <!-- تغذية محادثات الواتساب -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- تبويب 6: تدوير وتسليم المهام (Handover) -->
-            <div id="tab-handover" class="hidden space-y-4">
-                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-bold text-sm brand-primary-text">🔄 مذكرات الإحالة وتسليم المهام الطارئة (Task Handover Briefs)</h3>
-                        <span class="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded text-xs font-bold">1 مذكرة نافذة المفعول</span>
-                    </div>
-                    <div class="p-4 rounded-xl border brand-border brand-tint space-y-3 text-xs">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <span class="font-bold text-[#3A056A] text-sm">العميل: سلسلة مطاعم الريف الحجازي</span>
-                                <span class="text-gray-500 block text-[11px]">من الموظف: سالم الدوسري ⬅️ إلى الموظف: أحمد الشمري</span>
-                            </div>
-                            <span class="px-2.5 py-1 bg-red-600 text-white rounded font-bold text-[10px]">أولوية قصوى (HIGH)</span>
-                        </div>
-                        <div class="bg-white p-3 rounded-lg border brand-border space-y-1">
-                            <div class="font-bold text-gray-800">آخر ما تم الاتفاق عليه:</div>
-                            <p class="text-gray-600 text-[11px]">تم تسليم عينة صدور متبلة واعتمدت الجودة بنجاح وننتظر إصدار أمر الشراء النهائي بقيمة 78 ألف ريال.</p>
-                        </div>
-                        <div class="bg-white p-3 rounded-lg border brand-border space-y-1">
-                            <div class="font-bold text-gray-800">المتطلب الحرج وخطة الـ 24-48 ساعة:</div>
-                            <p class="text-gray-600 text-[11px]">تأكيد جدول التوريد يوم السبت القادم بحد أقصى 8:00 صباحاً والاتصال بمدير المشتريات اليوم.</p>
-                        </div>
-                        <button onclick="downloadHandoverPdfDirectly()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg hover:opacity-95 text-xs flex items-center gap-1.5">
-                            <span>📄</span> طباعة مذكرة الإحالة التنفيذية الفورية (PDF)
-                        </button>
-                    </div>
+                    <div class="space-y-2.5 text-xs" id="whatsapp-feed-list"></div>
                 </div>
             </div>
 
         </div>
     </main>
 
-    <!-- نافذة إدارة ومسح رمز الواتساب (WhatsApp QR Modal) -->
-    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 backdrop-blur-xs hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl border brand-border w-[440px] shadow-2xl overflow-hidden text-right">
-            <div class="p-4 brand-primary-bg text-white flex justify-between items-center">
-                <div>
-                    <h3 class="font-bold text-sm">ربط بوابة الواتساب الميدانية</h3>
-                    <div class="text-[10px] text-purple-200">مسح رمز الاستجابة السريعة (QR Code) المباشر</div>
-                </div>
-                <button onclick="closeWhatsAppModal()" class="text-purple-200 hover:text-white text-lg">✕</button>
+    <!-- مودال: إضافة عينة جديدة -->
+    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينة مجانية جديدة</h3>
+            <div>
+                <label class="block font-bold mb-1">اسم العميل:</label>
+                <input type="text" id="sample-client-name" class="w-full p-2 border rounded-lg" value="سلسلة مطاعم الريف الحجازي">
             </div>
-
-            <div class="p-5 text-center space-y-3">
-                <div id="modal-wa-badge" class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300">
-                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                    <span id="modal-wa-text">بانتظار مسح الرمز من تطبيق الواتساب</span>
+            <div>
+                <label class="block font-bold mb-1">مسؤول المبيعات المسلّم:</label>
+                <input type="text" id="sample-rep-name" class="w-full p-2 border rounded-lg" value="أحمد الشمري">
+            </div>
+            <div>
+                <label class="block font-bold mb-1">المنتج المسلّم:</label>
+                <input type="text" id="sample-product-name" class="w-full p-2 border rounded-lg" placeholder="مثال: دجاج طازج 1100g">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">الكمية المجانية:</label>
+                    <input type="number" id="sample-qty" class="w-full p-2 border rounded-lg" value="10">
                 </div>
-
-                <div class="p-3 bg-[#F5F0FC] rounded-xl border brand-border inline-block shadow-inner relative">
-                    <img id="wa-qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=FOOD-DEV-CO-INIT" alt="WhatsApp QR" class="w-52 h-52 mx-auto rounded-lg bg-white p-2 border brand-border">
-                    <div id="qr-loading-overlay" class="absolute inset-0 bg-white/85 rounded-xl hidden flex items-center justify-center text-xs text-[#3A056A] font-bold">
-                        جاري تحديث الرمز...
-                    </div>
+                <div>
+                    <label class="block font-bold mb-1">تاريخ التسليم:</label>
+                    <input type="date" id="sample-date" class="w-full p-2 border rounded-lg" value="2026-09-03">
                 </div>
-
-                <div class="text-right bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs text-gray-600 space-y-1">
-                    <div class="font-bold text-[#3A056A]">طريقة المسح من الهاتف:</div>
-                    <div>1. افتح تطبيق <strong>واتساب</strong> في هاتفك.</div>
-                    <div>2. اختر <strong>الإعدادات</strong> ⬅️ <strong>الأجهزة المرتبطة (Linked Devices)</strong>.</div>
-                    <div>3. اضغط <strong>ربط جهاز</strong> ووجّه الكاميرا نحو الرمز أعلاه.</div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 pt-1">
-                    <button onclick="fetchNewQR()" class="px-3 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg hover:opacity-95 transition">
-                        🔄 تحديث الرمز
-                    </button>
-                    <button onclick="disconnectWhatsApp()" class="px-3 py-2 border border-red-200 text-red-600 bg-red-50 text-xs font-bold rounded-lg hover:bg-red-100 transition">
-                        🔌 قطع الاتصال الحالي
-                    </button>
-                </div>
-
-                <button onclick="simulateConnect()" class="w-full text-center text-[11px] text-purple-700 hover:underline pt-1">
-                    [محاكاة] تأكيد الاتصال فوراً للتجربة السريعة
-                </button>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العينة في السجل</button>
             </div>
         </div>
     </div>
 
-    <!-- نافذة تخصيص وإصدار التقارير التنفيذية الخمسة (Reports Modal) -->
-    <div id="report-modal" class="fixed inset-0 bg-black/60 backdrop-blur-xs hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl border brand-border w-[560px] shadow-2xl overflow-hidden text-right">
-            <div class="p-4 brand-primary-bg text-white flex justify-between items-center">
-                <div>
-                    <h3 class="font-bold text-sm">مركز إصدار التقارير التنفيذية الرسمية</h3>
-                    <div class="text-[10px] text-purple-200">هوية شركة تنمية الغذاء الرسمية (WeasyPrint Engine)</div>
-                </div>
-                <button onclick="closeReportModal()" class="text-purple-200 hover:text-white text-lg">✕</button>
+    <!-- مودال: جدولة مهمة ميدانية جديدة -->
+    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة مهمة أو زيارة ميدانية جديدة</h3>
+            <div>
+                <label class="block font-bold mb-1">اسم العميل:</label>
+                <input type="text" id="cal-client-name" class="w-full p-2 border rounded-lg" value="شركة الضيافة الفندقية">
             </div>
-
-            <div class="p-5 space-y-4 text-xs">
+            <div>
+                <label class="block font-bold mb-1">مسؤول المبيعات:</label>
+                <input type="text" id="cal-rep-name" class="w-full p-2 border rounded-lg" value="تركي الغامدي">
+            </div>
+            <div>
+                <label class="block font-bold mb-1">نوع المهمة:</label>
+                <input type="text" id="cal-task-type" class="w-full p-2 border rounded-lg" value="زيارة فحص جودة وتفاوض">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
                 <div>
-                    <label class="block font-bold text-gray-700 mb-1">اختر القالب المعتمد:</label>
-                    <select id="report-template-select" class="w-full p-2.5 border rounded-lg brand-border bg-gray-50 text-gray-800 text-xs font-medium">
-                        <option value="01_rep_performance_scorecard.html">01. بطاقة أداء المندوب الشامل وعائد التكلفة</option>
-                        <option value="02_executive_sales_report.html">02. التقرير التنفيذي العام لإدارة المبيعات والتسويق</option>
-                        <option value="03_key_account_review.html">03. ملف مراجعة ومتابعة حساب العميل الرئيسي</option>
-                        <option value="04_field_operations_sheet.html">04. الجدول التشغيلي للمهام الميدانية والزيارات</option>
-                        <option value="05_task_handover_brief.html">05. مذكرة الإحالة الفورية وتسليم المهام (Handover)</option>
+                    <label class="block font-bold mb-1">الموعد:</label>
+                    <input type="text" id="cal-scheduled-at" class="w-full p-2 border rounded-lg" value="2026-09-05 11:00">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">الموقع ورمز المسار:</label>
+                    <input type="text" id="cal-location" class="w-full p-2 border rounded-lg" value="فرع الكورنيش (R-22)">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeNewCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تأكيد الجدولة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال: قيد مبيعات ونفقات (يدعم الجهد المشترك) -->
+    <div id="sale-transaction-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">قيد مبيعات فعلية ومصاريف ميدانية</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block font-bold mb-1">العميل:</label>
+                    <select id="tx-customer-id" class="w-full p-2 border rounded-lg bg-gray-50">
+                        <option value="1">سلسلة مطاعم الريف الحجازي</option>
+                        <option value="2">مؤسسة التموين الحديث</option>
+                        <option value="3">شركة الضيافة الفندقية العالمية</option>
                     </select>
                 </div>
-
                 <div>
-                    <label class="block font-bold text-gray-700 mb-1">ترويسة التوجيه (Recipient):</label>
-                    <input type="text" id="report-recipient" value="سعادة رئيس مجلس الإدارة / المدير العام" class="w-full p-2 border rounded-lg brand-border bg-gray-50 text-gray-800 text-xs font-medium">
-                </div>
-
-                <div class="space-y-2 pt-2 border-t brand-border">
-                    <label class="block font-bold text-gray-700">الأقسام الشرطية والتحليلات:</label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="inc-samples" checked class="rounded text-[#3A056A]">
-                        <span>تضمين سجل العينات الميدانية ومعدل التحويل لأوامر شراء</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="inc-sla" checked class="rounded text-[#3A056A]">
-                        <span>تضمين مؤشرات الاستجابة للواتساب (SLA) والمكالمات الهاتفية</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="inc-stagnant" checked class="rounded text-[#3A056A]">
-                        <span>تضمين كشف الحسابات الراكدة وتوصيات Claude 3.7 التنفيذية</span>
-                    </label>
+                    <label class="block font-bold mb-1">قيمة المبيعات المحققة (ر.س):</label>
+                    <input type="number" id="tx-amount" class="w-full p-2 border rounded-lg font-bold" value="50000">
                 </div>
             </div>
-
-            <div class="p-4 bg-gray-50 border-t brand-border flex justify-between items-center">
-                <button onclick="previewReportHtml()" class="px-4 py-2 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50 transition">
-                    معاينة في المتصفح 👁️
-                </button>
-                <div class="flex gap-2">
-                    <button onclick="closeReportModal()" class="px-4 py-2 border rounded-lg text-gray-600 text-xs hover:bg-gray-100">إلغاء</button>
-                    <button onclick="triggerPdfDownload()" id="btn-download-pdf" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs shadow hover:opacity-95 transition">
-                        تحميل المستند الرسمي (PDF) 📥
-                    </button>
+            <div class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-2">
+                <div class="font-bold text-[#3A056A]">تخصيص الإنجاز (مسؤول فردي أو جهد مشترك):</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block mb-1">المسؤول الرئيسي:</label>
+                        <select id="tx-rep1" class="w-full p-1.5 border rounded bg-white">
+                            <option value="1">أحمد الشمري</option>
+                            <option value="2">سالم الدوسري</option>
+                            <option value="3">تركي الغامدي</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block mb-1">شريك الإنجاز (إن وجد):</label>
+                        <select id="tx-rep2" class="w-full p-1.5 border rounded bg-white">
+                            <option value="">-- لا يوجد (إنجاز فردي) --</option>
+                            <option value="1">أحمد الشمري</option>
+                            <option value="2">سالم الدوسري</option>
+                            <option value="3">تركي الغامدي</option>
+                        </select>
+                    </div>
                 </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">مصاريف وقود إضافية (ر.س):</label>
+                    <input type="number" id="tx-fuel" class="w-full p-2 border rounded-lg" value="0">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">مصاريف ضيافة / أخرى (ر.س):</label>
+                    <input type="number" id="tx-other" class="w-full p-2 border rounded-lg" value="0">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeSaleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitSaleTransaction()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">ترحيل إلى حساب الإنجاز</button>
             </div>
         </div>
     </div>
 
-    <!-- المحرك البرمجي للتفاعل وتدفق البيانات -->
+    <!-- مودال: مركز التقارير الرسمية -->
+    <div id="report-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">مركز إصدار التقارير التنفيذية الرسمية</h3>
+            <div>
+                <label class="block font-bold mb-1">اختر التقرير المعتمد:</label>
+                <select id="report-template-select" class="w-full p-2 border rounded-lg bg-gray-50">
+                    <option value="02_executive_sales_report.html">التقرير التنفيذي الشامل للمبيعات والعمليات</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">ترويسة التوجيه الرسمية (Recipient):</label>
+                <input type="text" id="report-recipient" value="سعادة رئيس مجلس الإدارة / المدير العام" class="w-full p-2 border rounded-lg">
+            </div>
+            <div class="flex justify-between items-center pt-3 border-t">
+                <button onclick="previewReportOfficial()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow">
+                    معاينة وطباعة التقرير الرسمي المعتمد 🖨️
+                </button>
+                <button onclick="closeReportModal()" class="px-4 py-2 border rounded-lg">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال: مسح رمز الواتساب -->
+    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-5 w-[420px] text-center space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text">ربط بوابة الواتساب الميدانية</h3>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=FDC-WHATSAPP-AUTH-SECURE" class="w-52 h-52 mx-auto p-2 border rounded-xl">
+            <p class="text-gray-500">امسح الرمز من: واتساب ⬅️ الأجهزة المرتبطة ⬅️ ربط جهاز</p>
+            <div class="flex gap-2">
+                <button onclick="closeWhatsAppModal()" class="w-full py-2 border rounded-lg">إغلاق</button>
+                <button onclick="closeWhatsAppModal()" class="w-full py-2 brand-primary-bg text-white font-bold rounded-lg">تأكيد الاتصال</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        const tabList = ['overview', 'reps', 'samples', 'calendar', 'whatsapp', 'handover'];
-        const tabTitles = {
-            'overview': 'لوحة التحكم العامة',
-            'reps': 'فريق المبيعات والمستهدفات البيعية',
-            'samples': 'سجل حركة العينات المجانية والتحويل التجاري',
-            'calendar': 'تقويم العمليات والمسارات الميدانية',
-            'whatsapp': 'رادار مجموعات العملاء والمحادثات المباشرة',
-            'handover': 'تدوير وتسليم المهام ومذكرات الإحالة'
+        const tabs = ['overview', 'reps', 'customers', 'samples', 'calendar', 'whatsapp'];
+        const titles = {
+            overview: 'لوحة التحكم العامة',
+            reps: 'فريق المبيعات وإدارة المستهدفات',
+            customers: 'دليل حسابات العملاء المعتمدة',
+            samples: 'سجل العينات والتحويل التجاري',
+            calendar: 'تقويم العمليات والمسارات الميدانية',
+            whatsapp: 'رادار مجموعات العملاء والمكالمات'
         };
 
-        function switchTab(tabId) {
-            tabList.forEach(t => {
+        function switchTab(id) {
+            tabs.forEach(t => {
                 const el = document.getElementById(`tab-${t}`);
                 const nav = document.getElementById(`nav-${t}`);
                 if (el) el.classList.add('hidden');
-                if (nav) {
-                    nav.classList.remove('bg-[#52128e]', 'text-white', 'font-semibold');
-                    nav.classList.add('text-purple-200', 'font-medium');
-                }
+                if (nav) nav.className = "w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
             });
-
-            const targetEl = document.getElementById(`tab-${tabId}`);
-            const targetNav = document.getElementById(`nav-${tabId}`);
-            if (targetEl) targetEl.classList.remove('hidden');
-            if (targetNav) {
-                targetNav.classList.add('bg-[#52128e]', 'text-white', 'font-semibold');
-                targetNav.classList.remove('text-purple-200');
-            }
-            document.getElementById('current-tab-title').innerText = tabTitles[tabId] || 'لوحة التحكم';
+            document.getElementById(`tab-${id}`).classList.remove('hidden');
+            document.getElementById(`nav-${id}`).className = "w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
+            document.getElementById('current-tab-title').innerText = titles[id];
         }
 
-        function openWhatsAppModal() {
-            document.getElementById('whatsapp-modal').classList.remove('hidden');
-            checkWhatsAppStatus();
-            fetchNewQR();
-        }
+        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
+        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
+        function openWhatsAppModal() { document.getElementById('whatsapp-modal').classList.remove('hidden'); }
+        function closeWhatsAppModal() { document.getElementById('whatsapp-modal').classList.add('hidden'); }
+        
+        function openNewSampleModal() { document.getElementById('new-sample-modal').classList.remove('hidden'); }
+        function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
+        
+        function openNewCalendarModal() { document.getElementById('new-calendar-modal').classList.remove('hidden'); }
+        function closeNewCalendarModal() { document.getElementById('new-calendar-modal').classList.add('hidden'); }
 
-        function closeWhatsAppModal() {
-            document.getElementById('whatsapp-modal').classList.add('hidden');
-        }
+        function openSaleModal() { document.getElementById('sale-transaction-modal').classList.remove('hidden'); }
+        function closeSaleModal() { document.getElementById('sale-transaction-modal').classList.add('hidden'); }
 
-        function openReportModal() {
-            document.getElementById('report-modal').classList.remove('hidden');
-        }
-
-        function closeReportModal() {
-            document.getElementById('report-modal').classList.add('hidden');
-        }
-
-        async function checkWhatsAppStatus() {
-            try {
-                const res = await fetch('/api/whatsapp/status');
-                const data = await res.json();
-                updateWhatsAppUI(data.status, data.phone_connected);
-            } catch (e) {
-                console.error("WA Status fetch error", e);
-            }
-        }
-
-        async function fetchNewQR() {
-            const overlay = document.getElementById('qr-loading-overlay');
-            if (overlay) overlay.classList.remove('hidden');
-            try {
-                const res = await fetch('/api/whatsapp/qr');
-                const data = await res.json();
-                if (data.qr_image_url) {
-                    document.getElementById('wa-qr-img').src = data.qr_image_url;
-                }
-                updateWhatsAppUI(data.status);
-            } catch (e) {
-                console.error("Error fetching QR", e);
-            } finally {
-                if (overlay) overlay.classList.add('hidden');
-            }
-        }
-
-        async function simulateConnect() {
-            await fetch('/api/whatsapp/confirm-pairing', { method: 'POST' });
-            updateWhatsAppUI("CONNECTED", "+966 50 111 2233");
-            setTimeout(closeWhatsAppModal, 1000);
-        }
-
-        async function disconnectWhatsApp() {
-            if (!confirm("هل ترغب بفصل جلسة الواتساب وإعادة الربط؟")) return;
-            await fetch('/api/whatsapp/disconnect', { method: 'POST' });
-            updateWhatsAppUI("DISCONNECTED");
-            fetchNewQR();
-        }
-
-        function updateWhatsAppUI(status, phone) {
-            const headerBtn = document.getElementById('wa-header-btn');
-            const headerText = document.getElementById('wa-status-text');
-            const dot = document.getElementById('wa-indicator-dot');
-            const modalBadge = document.getElementById('modal-wa-badge');
-            const modalText = document.getElementById('modal-wa-text');
-
-            if (status === "CONNECTED") {
-                headerBtn.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 shadow-xs";
-                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
-                headerText.innerText = `واتساب: متصل (${phone || 'نشط'})`;
-
-                modalBadge.className = "inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200";
-                modalBadge.querySelector('span').className = "w-2 h-2 rounded-full bg-emerald-500";
-                modalText.innerText = `الجلسة نشطة ومتصلة برقم (${phone || 'الشركة'})`;
-            } else {
-                headerBtn.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 shadow-xs";
-                dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping";
-                headerText.innerText = "واتساب: بانتظار مسح الرمز";
-
-                modalBadge.className = "inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300";
-                modalBadge.querySelector('span').className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
-                modalText.innerText = "امسح الرمز من تطبيق واتساب لربط الجلسة";
-            }
-        }
-
-        function getReportPayload() {
-            return {
-                template_id: document.getElementById('report-template-select').value,
-                report_recipient: document.getElementById('report-recipient').value,
-                include_samples: document.getElementById('inc-samples').checked,
-                include_sla: document.getElementById('inc-sla').checked,
-                include_stagnant: document.getElementById('inc-stagnant').checked
+        async function submitNewSample() {
+            const payload = {
+                customer_name: document.getElementById('sample-client-name').value,
+                rep_name: document.getElementById('sample-rep-name').value,
+                product_name: document.getElementById('sample-product-name').value,
+                qty_free: parseInt(document.getElementById('sample-qty').value),
+                delivery_date: document.getElementById('sample-date').value
             };
+            await fetch('/api/samples', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            closeNewSampleModal();
+            loadAllData();
         }
 
-        async function previewReportHtml() {
-            const payload = getReportPayload();
+        async function submitNewCalendarEvent() {
+            const payload = {
+                customer_name: document.getElementById('cal-client-name').value,
+                rep_name: document.getElementById('cal-rep-name').value,
+                task_type: document.getElementById('cal-task-type').value,
+                scheduled_at: document.getElementById('cal-scheduled-at').value,
+                location: document.getElementById('cal-location').value
+            };
+            await fetch('/api/calendar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            closeNewCalendarModal();
+            loadAllData();
+        }
+
+        async function submitSaleTransaction() {
+            const payload = {
+                customer_id: parseInt(document.getElementById('tx-customer-id').value),
+                sale_amount: parseFloat(document.getElementById('tx-amount').value),
+                primary_rep_id: parseInt(document.getElementById('tx-rep1').value),
+                secondary_rep_id: document.getElementById('tx-rep2').value ? parseInt(document.getElementById('tx-rep2').value) : null,
+                expense_fuel: parseFloat(document.getElementById('tx-fuel').value) || 0,
+                expense_other: parseFloat(document.getElementById('tx-other').value) || 0
+            };
+            await fetch('/api/transactions/sale', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            closeSaleModal();
+            loadAllData();
+        }
+
+        async function previewReportOfficial() {
+            const payload = {
+                template_id: document.getElementById('report-template-select').value,
+                report_recipient: document.getElementById('report-recipient').value
+            };
             const res = await fetch('/api/reports/preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            if (res.ok) {
-                const html = await res.text();
-                const w = window.open('', '_blank');
-                w.document.write(html);
-                w.document.close();
-            } else {
-                alert('تعذر معاينة التقرير.');
-            }
+            const html = await res.text();
+            const w = window.open('', '_blank');
+            w.document.write(html);
+            w.document.close();
+            closeReportModal();
         }
 
-        async function triggerPdfDownload() {
-            const btn = document.getElementById('btn-download-pdf');
-            btn.innerText = "جاري التوليد... ⏳";
-            btn.disabled = true;
+        async function loadAllData() {
+            // تحميل فريق المبيعات
+            const repsRes = await fetch('/api/reps');
+            const reps = await repsRes.json();
+            
+            document.getElementById('overview-reps-tbody').innerHTML = reps.map(r => `
+                <tr>
+                    <td class="p-3 font-bold">${r.name}</td>
+                    <td class="p-3 text-gray-600">${r.region}</td>
+                    <td class="p-3">${r.monthly_target.toLocaleString()} ر.س</td>
+                    <td class="p-3 font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.س</td>
+                    <td class="p-3 font-bold">${r.achievement_rate.toFixed(1)}%</td>
+                    <td class="p-3">${r.fuel_liters} / ${r.fuel_allowance_liters} لتر</td>
+                    <td class="p-3">${r.total_expenses.toLocaleString()} ر.س</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">${r.efficiency}</span></td>
+                </tr>
+            `).join('');
 
-            const payload = getReportPayload();
-            try {
-                const res = await fetch('/api/reports/download-pdf', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (res.ok) {
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `FDC_Official_Report_${Date.now()}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    closeReportModal();
-                } else {
-                    const err = await res.json();
-                    alert(`تنبيه: ${err.detail || 'تعذر إصدار PDF، يمكنك استخدام المعاينة والطباعة المباشرة'}`);
-                }
-            } catch (e) {
-                alert('حدث خطأ بالاتصال بمحرك التقارير.');
-            } finally {
-                btn.innerText = "تحميل المستند الرسمي (PDF) 📥";
-                btn.disabled = false;
-            }
+            document.getElementById('reps-grid-cards').innerHTML = reps.map(r => `
+                <div class="p-4 rounded-xl border brand-border brand-tint space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                    </div>
+                    <div class="text-xs text-gray-600">${r.region} | الهاتف: ${r.phone_number}</div>
+                    <div class="pt-2 border-t brand-border space-y-1 text-xs">
+                        <div class="flex justify-between"><span>المستهدف الشهري:</span><span class="font-bold">${r.monthly_target.toLocaleString()} ر.س</span></div>
+                        <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.س</span></div>
+                        <div class="flex justify-between"><span>المصاريف الكلية:</span><span>${r.total_expenses.toLocaleString()} ر.س</span></div>
+                    </div>
+                </div>
+            `).join('');
+
+            // تحميل العملاء
+            const custRes = await fetch('/api/customers');
+            const custs = await custRes.json();
+            document.getElementById('customers-table-body').innerHTML = custs.map(c => `
+                <tr>
+                    <td class="p-3 font-bold">${c.company_name}</td>
+                    <td class="p-3 text-gray-600">${c.sector}</td>
+                    <td class="p-3">${c.contact_person}</td>
+                    <td class="p-3 font-mono">${c.phone}</td>
+                    <td class="p-3 font-bold text-[#3A056A]">${c.assigned_rep_name}</td>
+                    <td class="p-3 font-mono text-[10px] text-gray-500">${c.whatsapp_group_id}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${c.status === 'نشط' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">${c.status}</span></td>
+                </tr>
+            `).join('');
+
+            // تحميل العينات
+            const sRes = await fetch('/api/samples');
+            const samples = await sRes.json();
+            document.getElementById('samples-table-body').innerHTML = samples.map(s => `
+                <tr>
+                    <td class="p-3 font-bold">${s.customer_name}</td>
+                    <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name}</td>
+                    <td class="p-3 font-semibold">${s.product_name}</td>
+                    <td class="p-3">${s.qty_free} وحدة</td>
+                    <td class="p-3 text-gray-500">${s.delivery_date}</td>
+                    <td class="p-3 text-[10px] text-gray-500">${s.source || 'يدوي'}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.status==='APPROVED'?'bg-emerald-100 text-emerald-800':'bg-amber-100 text-amber-800'}">${s.status}</span></td>
+                    <td class="p-3 font-mono">${s.converted_po_id || '—'}</td>
+                    <td class="p-3 font-bold ${s.po_value>0?'text-emerald-700':'text-gray-400'}">${s.po_value?s.po_value.toLocaleString()+' ر.س':'—'}</td>
+                </tr>
+            `).join('');
+
+            // تحميل التقويم
+            const cRes = await fetch('/api/calendar');
+            const cal = await cRes.json();
+            document.getElementById('calendar-events-list').innerHTML = cal.map(e => `
+                <div class="p-3.5 rounded-xl border brand-border brand-tint flex justify-between items-center text-xs">
+                    <div>
+                        <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
+                        <div class="text-gray-500 mt-0.5">العميل: ${e.customer_name} | المسؤول: ${e.rep_name} | الموعد: ${e.scheduled_at}</div>
+                        <div class="text-[11px] text-purple-700 mt-1">الموقع: ${e.location}</div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded text-xs font-bold ${e.execution_status==='DONE'?'bg-emerald-100 text-emerald-800':'bg-amber-100 text-amber-800'}">${e.execution_status}</span>
+                </div>
+            `).join('');
+
+            // تحميل الواتساب
+            const wRes = await fetch('/api/whatsapp/logs');
+            const wLogs = await wRes.json();
+            document.getElementById('whatsapp-feed-list').innerHTML = wLogs.map(l => `
+                <div class="p-3 rounded-xl border ${l.is_external_call?'border-amber-200 bg-amber-50/50':'brand-border bg-white'} space-y-1">
+                    <div class="flex justify-between items-center text-[10px] text-gray-400">
+                        <span class="font-bold ${l.is_external_call?'text-amber-800':'brand-primary-text'}">${l.sender_name}</span>
+                        <span>${l.created_at}</span>
+                    </div>
+                    <p class="text-gray-800 text-xs">${l.message_body}</p>
+                </div>
+            `).join('');
         }
 
-        function downloadHandoverPdfDirectly() {
-            document.getElementById('report-template-select').value = "05_task_handover_brief.html";
-            openReportModal();
-        }
-
-        async function populateData() {
-            try {
-                const rRes = await fetch('/api/reps');
-                const reps = await rRes.json();
-                const repsContainer = document.getElementById('detailed-reps-list');
-                if (repsContainer) {
-                    repsContainer.innerHTML = reps.map(r => `
-                        <div class="p-4 rounded-xl border brand-border brand-tint space-y-2">
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-sm text-gray-800">${r.name}</span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${r.efficiency === 'عالي الكفاءة' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${r.efficiency}</span>
-                            </div>
-                            <div class="text-xs text-gray-500">${r.region} | كود: ${r.employee_code}</div>
-                            <div class="pt-2 border-t brand-border space-y-1 text-xs">
-                                <div class="flex justify-between"><span>المستهدف:</span><span class="font-bold">${r.monthly_target.toLocaleString()} ر.س</span></div>
-                                <div class="flex justify-between"><span>المحقق:</span><span class="font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.س</span></div>
-                                <div class="flex justify-between"><span>الوقود المستخدم:</span><span>${r.fuel_liters} / ${r.fuel_allowance_liters} لتر</span></div>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-
-                const sRes = await fetch('/api/samples');
-                const samples = await sRes.json();
-                const samplesBody = document.getElementById('samples-table-body');
-                if (samplesBody) {
-                    samplesBody.innerHTML = samples.map(s => `
-                        <tr>
-                            <td class="p-3 font-bold">${s.customer_name}</td>
-                            <td class="p-3 text-gray-600">مندوب رقم #${s.rep_id}</td>
-                            <td class="p-3 font-semibold">${s.product_name}</td>
-                            <td class="p-3">${s.qty_free} وحدة</td>
-                            <td class="p-3 text-gray-500">${s.delivery_date}</td>
-                            <td class="p-3">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${s.status}</span>
-                            </td>
-                            <td class="p-3 font-mono">${s.converted_po_id || '—'}</td>
-                            <td class="p-3 font-bold ${s.po_value > 0 ? 'text-emerald-700' : 'text-gray-400'}">${s.po_value ? s.po_value.toLocaleString() + ' ر.س' : '—'}</td>
-                        </tr>
-                    `).join('');
-                }
-
-                const cRes = await fetch('/api/calendar');
-                const events = await cRes.json();
-                const calList = document.getElementById('calendar-events-list');
-                if (calList) {
-                    calList.innerHTML = events.map(ev => `
-                        <div class="p-3.5 rounded-xl border brand-border brand-tint flex justify-between items-center text-xs">
-                            <div>
-                                <div class="font-bold text-gray-800 text-sm">${ev.task_type}</div>
-                                <div class="text-gray-500 mt-0.5">العميل: ${ev.customer_name} | المندوب: ${ev.rep_name} | الموعد: ${ev.scheduled_at}</div>
-                                <div class="text-[11px] text-purple-700 mt-1">الموقع: ${ev.location} (${ev.route_code})</div>
-                            </div>
-                            <span class="px-2.5 py-1 rounded text-xs font-bold ${ev.ack_status ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${ev.ack_status ? 'تم التأكيد (Ack)' : 'بانتظار التأكيد'}</span>
-                        </div>
-                    `).join('');
-                }
-
-                const wRes = await fetch('/api/whatsapp/logs');
-                const logs = await wRes.json();
-                const waFeed = document.getElementById('whatsapp-full-feed');
-                if (waFeed) {
-                    waFeed.innerHTML = logs.map(l => `
-                        <div class="p-3 rounded-xl border ${l.is_external_call ? 'border-amber-200 bg-amber-50/50' : 'brand-border bg-white'} space-y-1 text-xs">
-                            <div class="flex justify-between items-center text-[10px] text-gray-400">
-                                <span class="font-bold ${l.is_external_call ? 'text-amber-800' : 'brand-primary-text'}">${l.sender_name}</span>
-                                <span>${l.created_at} ${l.is_external_call ? '• مكالمة هاتفية' : '• واتساب'}</span>
-                            </div>
-                            <p class="text-gray-800 text-xs">${l.message_body}</p>
-                        </div>
-                    `).join('');
-                }
-            } catch (e) {
-                console.error("Populate data error", e);
-            }
-        }
-
-        const evtSource = new EventSource("/api/stream/events");
-        evtSource.onmessage = function(e) {
-            try {
-                const data = JSON.parse(e.data);
-                const sreEl = document.getElementById("sre-checks-label");
-                const timeEl = document.getElementById("live-time-badge");
-                if (sreEl) sreEl.innerText = `SRE Checks: ${data.sre_checks}`;
-                if (timeEl) timeEl.innerText = data.timestamp;
-            } catch (err) {}
-        };
-
-        window.addEventListener('DOMContentLoaded', () => {
-            populateData();
-            checkWhatsAppStatus();
-        });
+        window.addEventListener('DOMContentLoaded', loadAllData);
     </script>
 </body>
 </html>
