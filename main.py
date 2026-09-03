@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + Flawless Responsive A4 Print Engine
+FastAPI Backend + PostgreSQL Persistence + Live Reporting Engine
 """
 
 import os
@@ -20,7 +20,7 @@ from psycopg2.extras import RealDictCursor
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="3.6.0")
+app = FastAPI(title="FDC Sales CRM", version="3.8.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,7 +32,7 @@ app.add_middleware(
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
-# ----------------- وظائف الاتصال والتهيئة التلقائية لقاعدة البيانات -----------------
+# ----------------- وظائف الاتصال والتهيئة لقاعدة البيانات -----------------
 def get_db_connection():
     if not DATABASE_URL:
         return None
@@ -46,7 +46,7 @@ def get_db_connection():
 def init_database():
     conn = get_db_connection()
     if not conn:
-        logger.warning("DATABASE_URL not found. Running in In-Memory fallback mode.")
+        logger.warning("DATABASE_URL not found. Running in local state.")
         return
 
     try:
@@ -173,18 +173,17 @@ def init_database():
 def startup_event():
     init_database()
 
-# ----------------- شعار الشركة الرسمي المقاوم للتداخل -----------------
-OFFICIAL_COMPANY_LOGO = """
-<div style="display: inline-flex; align-items: center; gap: 10px; direction: rtl; text-align: right;">
-    <div style="background: #3A056A; color: #FFFFFF; font-weight: 900; font-size: 20px; width: 42px; height: 42px; min-width: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 2px solid #C194FB;">ت</div>
-    <div>
-        <div style="color: #3A056A; font-weight: 900; font-size: 15px; line-height: 1.15; white-space: nowrap;">شركة تنمية الغذاء</div>
-        <div style="color: #7E22CE; font-size: 8px; font-weight: 800; letter-spacing: 1px; white-space: nowrap;">FOOD DEVELOPMENT CO.</div>
-    </div>
-</div>
-"""
+# ----------------- شعار شركة تنمية الغذاء الرسمي كـ Image Data URI -----------------
+OFFICIAL_COMPANY_LOGO = (
+    '<img src="data:image/svg+xml;utf8,'
+    '<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 260 60\' width=\'240\' height=\'55\'>'
+    '<rect x=\'205\' y=\'5\' width=\'50\' height=\'50\' rx=\'12\' fill=\'%233A056A\' stroke=\'%23C194FB\' stroke-width=\'2\'/>'
+    '<text x=\'230\' y=\'39\' fill=\'%23FFFFFF\' font-family=\'Cairo, sans-serif\' font-size=\'24\' font-weight=\'900\' text-anchor=\'middle\'>ت</text>'
+    '<text x=\'195\' y=\'28\' fill=\'%233A056A\' font-family=\'Cairo, sans-serif\' font-size=\'16\' font-weight=\'900\' text-anchor=\'end\'>شركة تنمية الغذاء</text>'
+    '<text x=\'195\' y=\'45\' fill=\'%237E22CE\' font-family=\'Cairo, sans-serif\' font-size=\'8.5\' font-weight=\'700\' letter-spacing=\'1\' text-anchor=\'end\'>FOOD DEVELOPMENT CO.</text>'
+    '</svg>" alt="شعار شركة تنمية الغذاء" style="display:block; max-height:55px; width:auto; border:none;" />'
+)
 
-# ----------------- CSS الطباعة الدقيق المتطابق مع قياس ورقة A4 بنسبة 100% -----------------
 PRINT_ENGINE_CSS = """
 @page {
     size: A4 portrait;
@@ -200,9 +199,7 @@ PRINT_ENGINE_CSS = """
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
-    .no-print {
-        display: none !important;
-    }
+    .no-print { display: none !important; }
     .print-container {
         width: 100% !important;
         max-width: 100% !important;
@@ -212,9 +209,7 @@ PRINT_ENGINE_CSS = """
         border: none !important;
     }
 }
-* {
-    box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 :root {
     --brand: #3A056A;
     --accent: #C194FB;
@@ -257,17 +252,8 @@ body {
     padding: 8px 6px;
     text-align: center;
 }
-.kpi-lbl {
-    font-size: 7.5pt;
-    color: #64748B;
-    font-weight: 700;
-}
-.kpi-val {
-    font-size: 11.5pt;
-    font-weight: 900;
-    color: var(--brand);
-    margin-top: 3px;
-}
+.kpi-lbl { font-size: 7.5pt; color: #64748B; font-weight: 700; }
+.kpi-val { font-size: 11.5pt; font-weight: 900; color: var(--brand); margin-top: 3px; }
 table.data-table {
     width: 100%;
     border-collapse: collapse;
@@ -292,9 +278,7 @@ table.data-table td {
     font-size: 8pt;
     word-break: break-word;
 }
-table.data-table tr:nth-child(even) {
-    background: #FAFAFC;
-}
+table.data-table tr:nth-child(even) { background: #FAFAFC; }
 .badge {
     display: inline-block;
     padding: 1.5px 6px;
@@ -316,13 +300,10 @@ table.data-table tr:nth-child(even) {
     line-height: 1.5;
     font-size: 8.5pt;
 }
-.editable-box:focus {
-    border-style: solid;
-    background: #FFFFFF;
-}
+.editable-box:focus { border-style: solid; background: #FFFFFF; }
 """
 
-# ----------------- نماذج Pydantic للبيانات المدخلة -----------------
+# ----------------- نماذج Pydantic للطلبات -----------------
 class NewSamplePayload(BaseModel):
     customer_name: str
     rep_name: str
@@ -548,14 +529,14 @@ def preview_report(req: dict):
     </div>
 
     <div class="print-container">
-        <!-- ترويسة متطابقة ومستقرة بدون أي تداخل -->
-        <table style="width: 100%; border-bottom: 2px solid #3A056A; padding-bottom: 10px; margin-bottom: 12px; border-collapse: collapse;">
+        <!-- ترويسة التقرير الرسمية باستخدام Image Data URI لتفادي التداخل في الطباعة -->
+        <table style="width: 100%; border-bottom: 2px solid #3A056A; padding-bottom: 8px; margin-bottom: 12px; border-collapse: collapse;">
             <tr>
                 <td style="text-align: right; vertical-align: middle;">
                     <h1 style="margin: 0 0 3px 0; color: #3A056A; font-size: 15pt; font-weight: 900; line-height: 1.2;">التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
                     <div style="color: #64748B; font-size: 8pt; font-weight: 600;">الفترة: الربع الثالث 2026 &nbsp;|&nbsp; توجيه المستند: {recipient}</div>
                 </td>
-                <td style="text-align: left; vertical-align: middle; width: 220px;">
+                <td style="text-align: left; vertical-align: middle; width: 250px;">
                     {OFFICIAL_COMPANY_LOGO}
                 </td>
             </tr>
