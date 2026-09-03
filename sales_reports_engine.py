@@ -1,204 +1,343 @@
 """
 sales_reports_engine.py
-محرك معالجة وتوليد تقارير المبيعات وتحليل البيانات المالية.
+محرك التقارير التنفيذية والرسمية لشركة تنمية الغذاء (Food Development Company)
+يعتمد Jinja2 و WeasyPrint لتوليد مستندات PDF فائقة الجودة.
 """
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
-import numpy as np
-import pandas as pd
+import os
+from jinja2 import Environment, DictLoader
+from weasyprint import HTML
 
+# استيراد الشعار الفعلي الموحد لشركة تنمية الغذاء
+try:
+    from logo_data import LOGO_BASE64
+    if LOGO_BASE64.startswith("data:image"):
+        COMPANY_LOGO_SRC = LOGO_BASE64
+    else:
+        COMPANY_LOGO_SRC = f"data:image/png;base64,{LOGO_BASE64}"
+except ImportError:
+    COMPANY_LOGO_SRC = (
+        "data:image/svg+xml;utf8,"
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 80' width='320' height='80'>"
+        "<path d='M 40,12 A 28,28 0 1,1 12,40' fill='none' stroke='%233A056A' stroke-width='10' stroke-linecap='round'/>"
+        "<text x='82' y='36' fill='%233A056A' font-family='Cairo, sans-serif' font-size='18' font-weight='900'>شركة تنمية الغذاء</text>"
+        "<text x='82' y='56' fill='%237E22CE' font-family='Cairo, sans-serif' font-size='11' font-weight='700'>Food Development Company</text>"
+        "</svg>"
+    )
 
-class SalesReportsEngine:
+CSS_BASE = """
+@page {
+    size: A4 portrait;
+    margin: 10mm 10mm 12mm 10mm;
+    @bottom-left {
+        content: "نظام المبيعات التنفيذي - شركة تنمية الغذاء";
+        font-family: 'Cairo', sans-serif;
+        font-size: 8pt;
+        color: #718096;
+    }
+    @bottom-right {
+        content: "صفحة " counter(page) " من " counter(pages);
+        font-family: 'Cairo', sans-serif;
+        font-size: 8pt;
+        color: #718096;
+    }
+}
 
-    def __init__(self, data: Optional[pd.DataFrame] = None):
-        """
-        تهيئة محرك التقارير مع إمكانية تمرير DataFrame مباشرة.
-        الأعمدة المتوقعة في البيانات:
-        - date: تاريخ المعاملة
-        - order_id: رقم الطلب
-        - customer_id: رقم العميل
-        - product: اسم أو كود المنتج
-        - category: تصنيف المنتج
-        - quantity: الكمية
-        - unit_price: سعر الوحدة
-        - discount: الخصم الإجمالي أو النسبي
-        - cost: تكلفة البضاعة المباعة (اختياري لحساب الأرباح)
-        """
-        self.df = data if data is not None else pd.DataFrame()
+:root {
+    --brand-primary: #3A056A;
+    --brand-accent: #C194FB;
+    --tint: #F5F0FC;
+    --line: #E4D9F5;
+    --alt: #FBF9FE;
+    --text-main: #1A202C;
+    --text-muted: #4A5568;
+    --ok: #1E7A5A;
+    --ok-bg: #EDF7F2;
+    --ok-line: #B7DECD;
+    --warn: #8A5D06;
+    --warn-bg: #FDF6E7;
+    --warn-line: #E8D4A0;
+    --bad: #9E2222;
+    --bad-bg: #FBEEEE;
+    --bad-line: #E7C2C2;
+}
 
-    def load_from_csv(self, file_path: str, **kwargs) -> "SalesReportsEngine":
-        """تحميل البيانات من ملف CSV."""
-        self.df = pd.read_csv(file_path, **kwargs)
-        self._prepare_data()
-        return self
+body {
+    direction: rtl;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
+    color: var(--text-main);
+    margin: 0;
+    padding: 0;
+    font-size: 8.5pt;
+    line-height: 1.4;
+}
 
-    def load_from_dict(
-        self, records: List[Dict[str, Any]]
-    ) -> "SalesReportsEngine":
-        """تحميل البيانات من قائمة قواميس (JSON/API response)."""
-        self.df = pd.DataFrame(records)
-        self._prepare_data()
-        return self
+.report-header {
+    border-bottom: 2px solid var(--brand-primary);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 
-    def _prepare_data(self) -> None:
-        """تنظيف البيانات وحساب الحقول المالية التلقائية."""
-        if self.df.empty:
-            return
+.report-title-box h1 {
+    margin: 0 0 4px 0;
+    color: var(--brand-primary);
+    font-size: 15pt;
+    font-weight: 800;
+}
 
-        # توحيد صيغة التاريخ
-        if "date" in self.df.columns:
-            self.df["date"] = pd.to_datetime(self.df["date"])
+.report-meta {
+    font-size: 8pt;
+    color: var(--text-muted);
+}
 
-        # التأكد من صحة الأعمدة الرقمية
-        numeric_cols = ["quantity", "unit_price", "discount", "cost"]
-        for col in numeric_cols:
-            if col in self.df.columns:
-                self.df[col] = pd.to_numeric(self.df[col], errors="coerce").fillna(0)
-            else:
-                self.df[col] = 0.0
+.recipient-banner {
+    background-color: var(--tint);
+    border-right: 4px solid var(--brand-primary);
+    padding: 6px 10px;
+    margin-bottom: 12px;
+    font-size: 8.5pt;
+    display: flex;
+    justify-content: space-between;
+}
 
-        # حساب إجمالي المبيعات، الصافي، والأرباح
-        self.df["gross_sales"] = self.df["quantity"] * self.df["unit_price"]
-        self.df["net_sales"] = self.df["gross_sales"] - self.df["discount"]
-        self.df["total_cost"] = self.df["quantity"] * self.df["cost"]
-        self.df["gross_profit"] = self.df["net_sales"] - self.df["total_cost"]
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
 
-    def get_kpis(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """استخراج المؤشرات الرئيسية للأداء (KPIs) للفترة المحددة."""
-        filtered_df = self._filter_by_date(start_date, end_date)
+.kpi-card {
+    background-color: var(--alt);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px;
+    text-align: center;
+}
 
-        if filtered_df.empty:
-            return {
-                "total_revenue": 0.0,
-                "total_orders": 0,
-                "total_units_sold": 0,
-                "gross_profit": 0.0,
-                "average_order_value": 0.0,
-                "profit_margin_pct": 0.0
-            }
+.kpi-card .val {
+    font-size: 12pt;
+    font-weight: bold;
+    color: var(--brand-primary);
+    margin-top: 3px;
+}
 
-        total_rev = float(filtered_df["net_sales"].sum())
-        total_profit = float(filtered_df["gross_profit"].sum())
-        orders_count = (
-            int(filtered_df["order_id"].nunique())
-            if "order_id" in filtered_df.columns
-            else len(filtered_df)
-        )
-        units_sold = int(filtered_df["quantity"].sum())
+.kpi-card .lbl {
+    font-size: 7.5pt;
+    color: var(--text-muted);
+}
 
-        return {
-            "total_revenue": round(total_rev, 2),
-            "total_orders": orders_count,
-            "total_units_sold": units_sold,
-            "gross_profit": round(total_profit, 2),
-            "average_order_value": round(total_rev / orders_count, 2) if orders_count else 0.0,
-            "profit_margin_pct": round((total_profit / total_rev * 100), 2) if total_rev else 0.0
-        }
+table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12px;
+    font-size: 8pt;
+    table-layout: fixed;
+}
 
-    def generate_periodic_report(
-        self,
-        freq: str = "ME"
-    ) -> pd.DataFrame:
-        """
-        تجميع المبيعات زمنياً:
-        freq: 'D' (يومي), 'W' (أسبوعي), 'ME' (شهري), 'QE' (ربع سنوي), 'YE' (سنوي)
-        """
-        if self.df.empty or "date" not in self.df.columns:
-            return pd.DataFrame()
+table.data-table th {
+    background-color: var(--brand-primary);
+    color: #FFFFFF;
+    text-align: right;
+    padding: 6px 8px;
+    font-weight: 700;
+    white-space: nowrap;
+}
 
-        report = (
-            self.df.set_index("date")
-            .resample(freq)
-            .agg(
-                orders_count=("order_id", "nunique"),
-                units_sold=("quantity", "sum"),
-                gross_revenue=("gross_sales", "sum"),
-                total_discounts=("discount", "sum"),
-                net_revenue=("net_sales", "sum"),
-                gross_profit=("gross_profit", "sum")
-            )
-            .reset_index()
-        )
-        return report
+table.data-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--line);
+    word-break: break-word;
+}
 
-    def breakdown_by_dimension(
-        self,
-        dimension: str = "category",
-        top_n: Optional[int] = None
-    ) -> pd.DataFrame:
-        """
-        تقسيم المبيعات حسب بعد معين (مثل category, product, customer_id).
-        """
-        if self.df.empty or dimension not in self.df.columns:
-            return pd.DataFrame()
+table.data-table tr:nth-child(even) {
+    background-color: var(--alt);
+}
 
-        breakdown = (
-            self.df.groupby(dimension)
-            .agg(
-                orders_count=("order_id", "nunique"),
-                units_sold=("quantity", "sum"),
-                net_revenue=("net_sales", "sum"),
-                gross_profit=("gross_profit", "sum")
-            )
-            .reset_index()
-            .sort_values(by="net_revenue", ascending=False)
-        )
+.badge {
+    display: inline-block;
+    padding: 1.5px 6px;
+    border-radius: 4px;
+    font-size: 7pt;
+    font-weight: bold;
+}
+.badge-ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok-line); }
+.badge-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line); }
+.badge-bad { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-line); }
 
-        total_rev = breakdown["net_revenue"].sum()
-        breakdown["revenue_share_pct"] = (
-            (breakdown["net_revenue"] / total_rev * 100).round(2) if total_rev else 0.0
-        )
+.ai-box {
+    background-color: #FAF5FF;
+    border: 1px dashed var(--brand-accent);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+}
+.ai-box-title {
+    font-weight: bold;
+    color: var(--brand-primary);
+    font-size: 8.5pt;
+    margin-bottom: 4px;
+}
+"""
 
-        if top_n:
-            return breakdown.head(top_n)
-        return breakdown
+REPORT_TEMPLATES = {
+    # 01. بطاقة أداء المندوب الشامل وعائد التكلفة
+    "01_rep_performance_scorecard.html": """
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head><meta charset="utf-8"><style>{{ css }}</style></head>
+    <body>
+        <div class="report-header">
+            <div class="report-title-box">
+                <h1>بطاقة أداء مسؤول المبيعات وعائد التكلفة</h1>
+                <div class="report-meta">الموظف: {{ rep.name }} | الكود: {{ rep.employee_code }} | المنطقة: {{ rep.region }}</div>
+            </div>
+            <img src="{{ logo }}" alt="Logo" style="max-height: 48px; max-width: 220px; object-fit: contain;">
+        </div>
 
-    def _filter_by_date(
-        self,
-        start_date: Optional[str],
-        end_date: Optional[str]
-    ) -> pd.DataFrame:
-        """تصفية البيانات داخلياً بناءً على نطاق زمني."""
-        if self.df.empty or "date" not in self.df.columns:
-            return self.df
+        <div class="recipient-banner">
+            <div><strong>توجيه التقرير:</strong> {{ report_recipient }}</div>
+            <div><strong>تاريخ التوليد:</strong> {{ generated_at }}</div>
+        </div>
 
-        sub_df = self.df.copy()
-        if start_date:
-            sub_df = sub_df[sub_df["date"] >= pd.to_datetime(start_date)]
-        if end_date:
-            sub_df = sub_df[sub_df["date"] <= pd.to_datetime(end_date)]
-        return sub_df
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="lbl">المستهدف الشهري</div>
+                <div class="val">{{ "{:,.1f}".format(rep.monthly_target) }} ر.ع</div>
+            </div>
+            <div class="kpi-card">
+                <div class="lbl">المبيعات المحققة</div>
+                <div class="val">{{ "{:,.1f}".format(rep.achieved_sales) }} ر.ع</div>
+            </div>
+            <div class="kpi-card">
+                <div class="lbl">نسبة الإنجاز</div>
+                <div class="val" style="color: {{ 'var(--ok)' if rep.achievement_rate >= 100 else 'var(--warn)' }}">{{ "%.1f"|format(rep.achievement_rate) }}%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="lbl">استهلاك الوقود الفعلي</div>
+                <div class="val">{{ rep.fuel_liters }} / {{ rep.fuel_allowance_liters }} لتر</div>
+            </div>
+        </div>
 
-    def export_summary(self, export_path: str, file_format: str = "csv") -> None:
-        """تصدير تقرير شهري موجز إلى ملف CSV أو Excel."""
-        report = self.generate_periodic_report(freq="ME")
-        if file_format.lower() == "excel":
-            report.to_excel(export_path, index=False)
-        else:
-            report.to_csv(export_path, index=False)
+        {% if include_samples %}
+        <div style="font-weight: bold; color: var(--brand-primary); margin-bottom: 6px;">🧪 حركة العينات المجانية ومعدل التحويل لأوامر شراء</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">العميل</th>
+                    <th style="width: 25%;">المنتج المسلّم</th>
+                    <th style="width: 12%;">الكمية</th>
+                    <th style="width: 13%;">حالة الاعتماد</th>
+                    <th style="width: 12%;">أمر الشراء (PO)</th>
+                    <th style="width: 13%;">القيمة المحققة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in samples %}
+                <tr>
+                    <td><strong>{{ s.customer_name }}</strong></td>
+                    <td>{{ s.product_name }}</td>
+                    <td>{{ s.qty_free }} وحدة</td>
+                    <td>
+                        <span class="badge {% if s.status == 'APPROVED' %}badge-ok{% elif s.status == 'REJECTED' %}badge-bad{% else %}badge-warn{% endif %}">
+                            {{ s.status }}
+                        </span>
+                    </td>
+                    <td>{{ s.converted_po_id or '—' }}</td>
+                    <td>{{ "{:,.1f}".format(s.po_value) if s.po_value else '0.0' }} ر.ع</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
 
+        <div class="ai-box">
+            <div class="ai-box-title">👔 التوصية التنفيذية والإدارية المعتمدة:</div>
+            <div>{{ ai_recommendation }}</div>
+        </div>
+    </body>
+    </html>
+    """,
 
-# --- مثال استخدام مباشر للتجربة ---
-if __name__ == "__main__":
-    sample_data = [
-        {"date": "2026-01-05", "order_id": 101, "customer_id": "C1", "product": "Laptop", "category": "Electronics", "quantity": 1, "unit_price": 1200.0, "discount": 50.0, "cost": 900.0},
-        {"date": "2026-01-12", "order_id": 102, "customer_id": "C2", "product": "Mouse", "category": "Accessories", "quantity": 2, "unit_price": 25.0, "discount": 0.0, "cost": 10.0},
-        {"date": "2026-02-01", "order_id": 103, "customer_id": "C1", "product": "Keyboard", "category": "Accessories", "quantity": 1, "unit_price": 75.0, "discount": 5.0, "cost": 35.0},
-        {"date": "2026-02-18", "order_id": 104, "customer_id": "C3", "product": "Monitor", "category": "Electronics", "quantity": 1, "unit_price": 300.0, "discount": 20.0, "cost": 210.0}
-    ]
+    # 02. التقرير التنفيذي العام لإدارة المبيعات
+    "02_executive_sales_report.html": """
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head><meta charset="utf-8"><style>{{ css }}</style></head>
+    <body>
+        <div class="report-header">
+            <div class="report-title-box">
+                <h1>التقرير التنفيذي الشامل لإدارة المبيعات والعمليات</h1>
+                <div class="report-meta">نطاق التقرير: الإدارة العامة وفروع التوزيع | الفترة الحالية</div>
+            </div>
+            <img src="{{ logo }}" alt="Logo" style="max-height: 48px; max-width: 220px; object-fit: contain;">
+        </div>
 
-    engine = SalesReportsEngine().load_from_dict(sample_data)
+        <div class="recipient-banner">
+            <div><strong>توجيه المستند:</strong> {{ report_recipient }}</div>
+            <div><strong>إجمالي المبيعات المحققة:</strong> {{ "{:,.1f}".format(total_revenue) }} ر.ع</div>
+            <div><strong>نسبة كفاءة التكلفة:</strong> {{ cost_to_sales_ratio }}%</div>
+        </div>
 
-    print("=== مؤشرات الأداء الأساسية (KPIs) ===")
-    print(engine.get_kpis())
+        <div style="font-weight: bold; color: var(--brand-primary); margin-bottom: 6px;">📊 كشف إنجازات فريق المبيعات التنفيذي الميداني</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>المسؤول</th>
+                    <th>المنطقة</th>
+                    <th>المستهدف</th>
+                    <th>المحقق</th>
+                    <th>نسبة الإنجاز</th>
+                    <th>المصاريف</th>
+                    <th>تصنيف الكفاءة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reps_performance %}
+                <tr>
+                    <td><strong>{{ r.name }}</strong></td>
+                    <td>{{ r.region }}</td>
+                    <td>{{ "{:,.1f}".format(r.monthly_target) }} ر.ع</td>
+                    <td>{{ "{:,.1f}".format(r.achieved_sales) }} ر.ع</td>
+                    <td><strong>{{ "%.1f"|format(r.achievement_rate) }}%</strong></td>
+                    <td>{{ "{:,.1f}".format(r.total_expenses) }} ر.ع</td>
+                    <td>
+                        <span class="badge {% if r.efficiency == 'عالي الكفاءة' %}badge-ok{% elif r.efficiency == 'مقبول' %}badge-warn{% else %}badge-bad{% endif %}">
+                            {{ r.efficiency }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-    print("\n=== المبيعات حسب التصنيف (Category Breakdown) ===")
-    print(engine.breakdown_by_dimension("category"))
+        <div class="ai-box">
+            <div class="ai-box-title">🧠 ملخص الرؤى الاستراتيجية والتحليل الميداني:</div>
+            <div>{{ strategic_summary }}</div>
+        </div>
+    </body>
+    </html>
+    """
+}
 
-    print("\n=== التقرير الشهري ===")
-    print(engine.generate_periodic_report(freq="ME"))
+jinja_env = Environment(loader=DictLoader(REPORT_TEMPLATES), autoescape=True)
+
+def render_report_html(template_name: str, context_data: dict) -> str:
+    """يدمج بيانات السياق داخل قالب Jinja2 مع حقن الهوية والـ CSS الموحد."""
+    template = jinja_env.get_template(template_name)
+    payload = {
+        **context_data,
+        "css": CSS_BASE,
+        "logo": COMPANY_LOGO_SRC,
+        "report_recipient": context_data.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام"),
+        "generated_at": context_data.get("generated_at", "2026-09-03")
+    }
+    return template.render(**payload)
+
+def generate_report_pdf(template_name: str, context_data: dict) -> bytes:
+    """يقوم بتوليد ملف PDF متوافق مع WeasyPrint بناءً على القالب المختار."""
+    html_content = render_report_html(template_name, context_data)
+    return HTML(string=html_content).write_pdf()
