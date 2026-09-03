@@ -20,7 +20,7 @@ from psycopg2.extras import RealDictCursor
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="3.8.0")
+app = FastAPI(title="FDC Sales CRM", version="4.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -173,14 +173,20 @@ def init_database():
 def startup_event():
     init_database()
 
-# ----------------- شعار شركة تنمية الغذاء الرسمي كـ Image Data URI -----------------
+# ----------------- شعار شركة تنمية الغذاء الرسمي المتجهي النقي (Vector Logo) -----------------
+# يطابق الصورة المعتمدة للشركة: الحلقة المتدرجة + شركة تنمية الغذاء + Food Development Company
 OFFICIAL_COMPANY_LOGO = (
     '<img src="data:image/svg+xml;utf8,'
-    '<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 260 60\' width=\'240\' height=\'55\'>'
-    '<rect x=\'205\' y=\'5\' width=\'50\' height=\'50\' rx=\'12\' fill=\'%233A056A\' stroke=\'%23C194FB\' stroke-width=\'2\'/>'
-    '<text x=\'230\' y=\'39\' fill=\'%23FFFFFF\' font-family=\'Cairo, sans-serif\' font-size=\'24\' font-weight=\'900\' text-anchor=\'middle\'>ت</text>'
-    '<text x=\'195\' y=\'28\' fill=\'%233A056A\' font-family=\'Cairo, sans-serif\' font-size=\'16\' font-weight=\'900\' text-anchor=\'end\'>شركة تنمية الغذاء</text>'
-    '<text x=\'195\' y=\'45\' fill=\'%237E22CE\' font-family=\'Cairo, sans-serif\' font-size=\'8.5\' font-weight=\'700\' letter-spacing=\'1\' text-anchor=\'end\'>FOOD DEVELOPMENT CO.</text>'
+    '<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 320 80\' width=\'240\' height=\'60\'>'
+    '<defs>'
+    '<linearGradient id=\'fdc_ring\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'>'
+    '<stop offset=\'0%\' stop-color=\'%23C194FB\'/>'
+    '<stop offset=\'100%\' stop-color=\'%233A056A\'/>'
+    '</linearGradient>'
+    '</defs>'
+    '<path d=\'M 40,12 A 28,28 0 1,1 12,40\' fill=\'none\' stroke=\'url(%23fdc_ring)\' stroke-width=\'10\' stroke-linecap=\'round\'/>'
+    '<text x=\'82\' y=\'36\' fill=\'%233A056A\' font-family=\'Cairo, sans-serif\' font-size=\'18\' font-weight=\'900\'>شركة تنمية الغذاء</text>'
+    '<text x=\'82\' y=\'56\' fill=\'%237E22CE\' font-family=\'Cairo, sans-serif\' font-size=\'11\' font-weight=\'700\' letter-spacing=\'0.5\'>Food Development Company</text>'
     '</svg>" alt="شعار شركة تنمية الغذاء" style="display:block; max-height:55px; width:auto; border:none;" />'
 )
 
@@ -529,7 +535,7 @@ def preview_report(req: dict):
     </div>
 
     <div class="print-container">
-        <!-- ترويسة التقرير الرسمية باستخدام Image Data URI لتفادي التداخل في الطباعة -->
+        <!-- ترويسة التقرير الرسمية بالشعار الحقيقي المعتمد -->
         <table style="width: 100%; border-bottom: 2px solid #3A056A; padding-bottom: 8px; margin-bottom: 12px; border-collapse: collapse;">
             <tr>
                 <td style="text-align: right; vertical-align: middle;">
