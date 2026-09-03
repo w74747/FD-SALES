@@ -1,10 +1,11 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Live Reporting Engine
+FastAPI Backend + PostgreSQL Persistence + 2FA Security + Live Reporting
 """
 
 import os
+import io
 import json
 import uuid
 import base64
@@ -13,12 +14,13 @@ from datetime import datetime
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import pyotp
+import qrcode
 
-# استيراد الشعار من الملف المخصص لمنع تضخم الكود
 try:
     from logo_data import LOGO_BASE64
 except ImportError:
@@ -27,7 +29,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="4.1.0")
+app = FastAPI(title="FDC Sales CRM", version="4.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,6 +60,25 @@ def init_database():
 
     try:
         with conn.cursor() as cur:
+            # 1. جدول الحماية الثنائية 2FA
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS system_auth (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(100) UNIQUE NOT NULL,
+                totp_secret VARCHAR(64) NOT NULL,
+                is_2fa_enabled BOOLEAN DEFAULT FALSE
+            );
+            """)
+
+            cur.execute("SELECT COUNT(*) FROM system_auth WHERE username = 'admin';")
+            if cur.fetchone()["count"] == 0:
+                default_secret = pyotp.random_base32()
+                cur.execute(
+                    "INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES (%s, %s, %s);",
+                    ('admin', default_secret, False)
+                )
+
+            # 2. جدول مسؤولي المبيعات
             cur.execute("""
             CREATE TABLE IF NOT EXISTS sales_executives (
                 id SERIAL PRIMARY KEY,
@@ -74,6 +95,7 @@ def init_database():
             );
             """)
 
+            # 3. جدول حسابات العملاء
             cur.execute("""
             CREATE TABLE IF NOT EXISTS customer_accounts (
                 id SERIAL PRIMARY KEY,
@@ -89,6 +111,7 @@ def init_database():
             );
             """)
 
+            # 4. جدول العينات
             cur.execute("""
             CREATE TABLE IF NOT EXISTS sample_deliveries (
                 id SERIAL PRIMARY KEY,
@@ -104,6 +127,7 @@ def init_database():
             );
             """)
 
+            # 5. جدول التقويم الميداني
             cur.execute("""
             CREATE TABLE IF NOT EXISTS calendar_events (
                 id SERIAL PRIMARY KEY,
@@ -117,6 +141,7 @@ def init_database():
             );
             """)
 
+            # 6. جدول سجلات الواتساب
             cur.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_logs (
                 id SERIAL PRIMARY KEY,
@@ -127,6 +152,7 @@ def init_database():
             );
             """)
 
+            # حقن البيانات الأولية عند أول تشغيل
             cur.execute("SELECT COUNT(*) FROM sales_executives;")
             if cur.fetchone()["count"] == 0:
                 cur.execute("""
@@ -180,19 +206,18 @@ def init_database():
 def startup_event():
     init_database()
 
-# ----------------- مسار تقديم الشعار مباشرة وبأقصى سرعة -----------------
+# ----------------- تقديم الشعار الرسمي كمسار صورة سريع ومستقر -----------------
 @app.get("/logo.png")
 def get_logo():
     if LOGO_BASE64:
         clean_b64 = LOGO_BASE64.split(",")[-1]
         image_data = base64.b64decode(clean_b64)
         return Response(content=image_data, media_type="image/png")
-    # احتياطي في حال عدم وجود السلسلة
-    svg_fallback = """<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 60' width='240' height='55'>
-        <rect x='205' y='5' width='50' height='50' rx='12' fill='#3A056A' stroke='#C194FB' stroke-width='2'/>
-        <text x='230' y='39' fill='#FFFFFF' font-family='Cairo, sans-serif' font-size='24' font-weight='900' text-anchor='middle'>ت</text>
-        <text x='195' y='28' fill='#3A056A' font-family='Cairo, sans-serif' font-size='16' font-weight='900' text-anchor='end'>شركة تنمية الغذاء</text>
-        <text x='195' y='45' fill='#7E22CE' font-family='Cairo, sans-serif' font-size='8.5' font-weight='700' letter-spacing='1' text-anchor='end'>FOOD DEVELOPMENT CO.</text>
+    
+    svg_fallback = """<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 80' width='320' height='80'>
+        <path d='M 40,12 A 28,28 0 1,1 12,40' fill='none' stroke='#3A056A' stroke-width='10' stroke-linecap='round'/>
+        <text x='82' y='36' fill='#3A056A' font-family='Cairo, sans-serif' font-size='18' font-weight='900'>شركة تنمية الغذاء</text>
+        <text x='82' y='56' fill='#7E22CE' font-family='Cairo, sans-serif' font-size='11' font-weight='700'>Food Development Company</text>
     </svg>"""
     return Response(content=svg_fallback, media_type="image/svg+xml")
 
@@ -316,6 +341,9 @@ table.data-table tr:nth-child(even) { background: #FAFAFC; }
 """
 
 # ----------------- نماذج Pydantic للطلبات -----------------
+class Verify2FAPayload(BaseModel):
+    code: str
+
 class NewSamplePayload(BaseModel):
     customer_name: str
     rep_name: str
@@ -340,7 +368,59 @@ class NewSaleTransactionPayload(BaseModel):
     expense_fuel: Optional[float] = 0.0
     expense_other: Optional[float] = 0.0
 
-# ----------------- مسارات واجهة برمجة التطبيقات (APIs) -----------------
+# ----------------- مسارات التحقق الثنائي (Google Authenticator) -----------------
+@app.get("/api/auth/2fa/qr")
+def get_2fa_qr():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
+            row = cur.fetchone()
+            if not row:
+                secret = pyotp.random_base32()
+                cur.execute("INSERT INTO system_auth (username, totp_secret) VALUES ('admin', %s);", (secret,))
+                conn.commit()
+            else:
+                secret = row["totp_secret"]
+
+        totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+            name="admin@fdc.om",
+            issuer_name="Food Development Co - CRM"
+        )
+        img = qrcode.make(totp_uri)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return StreamingResponse(buf, media_type="image/png")
+    finally:
+        conn.close()
+
+@app.post("/api/auth/2fa/verify")
+def verify_2fa(payload: Verify2FAPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=400, detail="إعدادات المصادقة غير متوفرة")
+            
+            secret = row["totp_secret"]
+            totp = pyotp.TOTP(secret)
+            if totp.verify(payload.code, valid_window=1):
+                cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
+                conn.commit()
+                return {"status": "SUCCESS", "message": "تم التحقق بنجاح"}
+            else:
+                raise HTTPException(status_code=401, detail="رمز التحقق غير صحيح أو منتهي الصلاحية")
+    finally:
+        conn.close()
+
+# ----------------- مسارات البيانات والعمليات -----------------
 @app.get("/health")
 def health():
     return {"status": "UP", "timestamp": datetime.now().isoformat(), "db_configured": bool(DATABASE_URL)}
@@ -485,7 +565,7 @@ def record_sale(payload: NewSaleTransactionPayload):
                             (payload.sale_amount, total_exp_added, payload.primary_rep_id))
 
             conn.commit()
-            return {"status": "SUCCESS", "message": "تم حفظ العملية وتحديث رصيد الإنجاز في قاعدة البيانات"}
+            return {"status": "SUCCESS", "message": "تم تقييد المبيعات والمصاريف بنجاح في قاعدة البيانات"}
     finally:
         conn.close()
 
@@ -514,7 +594,7 @@ def get_whatsapp_qr():
         "status": "QR_READY"
     }
 
-# ----------------- مسار معاينة وطباعة التقرير بدون قص أو تشويه -----------------
+# ----------------- معاينة وطباعة التقرير الرسمي -----------------
 @app.post("/api/reports/preview")
 def preview_report(req: dict):
     recipient = req.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام")
@@ -541,7 +621,6 @@ def preview_report(req: dict):
     </div>
 
     <div class="print-container">
-        <!-- ترويسة التقرير الرسمية متكيفة الأبعاد -->
         <table style="width: 100%; border-bottom: 2px solid #3A056A; padding-bottom: 8px; margin-bottom: 12px; border-collapse: collapse;">
             <tr>
                 <td style="text-align: right; vertical-align: middle;">
