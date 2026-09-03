@@ -7,6 +7,7 @@ FastAPI Backend + PostgreSQL Persistence + Live Reporting Engine
 import os
 import json
 import uuid
+import base64
 import logging
 from datetime import datetime
 from typing import Optional, List
@@ -17,10 +18,16 @@ from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+# استيراد الشعار من الملف المخصص لمنع تضخم الكود
+try:
+    from logo_data import LOGO_BASE64
+except ImportError:
+    LOGO_BASE64 = ""
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="4.0.0")
+app = FastAPI(title="FDC Sales CRM", version="4.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -173,22 +180,21 @@ def init_database():
 def startup_event():
     init_database()
 
-# ----------------- شعار شركة تنمية الغذاء الرسمي المتجهي النقي (Vector Logo) -----------------
-# يطابق الصورة المعتمدة للشركة: الحلقة المتدرجة + شركة تنمية الغذاء + Food Development Company
-OFFICIAL_COMPANY_LOGO = (
-    '<img src="data:image/svg+xml;utf8,'
-    '<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 320 80\' width=\'240\' height=\'60\'>'
-    '<defs>'
-    '<linearGradient id=\'fdc_ring\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'>'
-    '<stop offset=\'0%\' stop-color=\'%23C194FB\'/>'
-    '<stop offset=\'100%\' stop-color=\'%233A056A\'/>'
-    '</linearGradient>'
-    '</defs>'
-    '<path d=\'M 40,12 A 28,28 0 1,1 12,40\' fill=\'none\' stroke=\'url(%23fdc_ring)\' stroke-width=\'10\' stroke-linecap=\'round\'/>'
-    '<text x=\'82\' y=\'36\' fill=\'%233A056A\' font-family=\'Cairo, sans-serif\' font-size=\'18\' font-weight=\'900\'>شركة تنمية الغذاء</text>'
-    '<text x=\'82\' y=\'56\' fill=\'%237E22CE\' font-family=\'Cairo, sans-serif\' font-size=\'11\' font-weight=\'700\' letter-spacing=\'0.5\'>Food Development Company</text>'
-    '</svg>" alt="شعار شركة تنمية الغذاء" style="display:block; max-height:55px; width:auto; border:none;" />'
-)
+# ----------------- مسار تقديم الشعار مباشرة وبأقصى سرعة -----------------
+@app.get("/logo.png")
+def get_logo():
+    if LOGO_BASE64:
+        clean_b64 = LOGO_BASE64.split(",")[-1]
+        image_data = base64.b64decode(clean_b64)
+        return Response(content=image_data, media_type="image/png")
+    # احتياطي في حال عدم وجود السلسلة
+    svg_fallback = """<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 60' width='240' height='55'>
+        <rect x='205' y='5' width='50' height='50' rx='12' fill='#3A056A' stroke='#C194FB' stroke-width='2'/>
+        <text x='230' y='39' fill='#FFFFFF' font-family='Cairo, sans-serif' font-size='24' font-weight='900' text-anchor='middle'>ت</text>
+        <text x='195' y='28' fill='#3A056A' font-family='Cairo, sans-serif' font-size='16' font-weight='900' text-anchor='end'>شركة تنمية الغذاء</text>
+        <text x='195' y='45' fill='#7E22CE' font-family='Cairo, sans-serif' font-size='8.5' font-weight='700' letter-spacing='1' text-anchor='end'>FOOD DEVELOPMENT CO.</text>
+    </svg>"""
+    return Response(content=svg_fallback, media_type="image/svg+xml")
 
 PRINT_ENGINE_CSS = """
 @page {
@@ -535,15 +541,15 @@ def preview_report(req: dict):
     </div>
 
     <div class="print-container">
-        <!-- ترويسة التقرير الرسمية بالشعار الحقيقي المعتمد -->
+        <!-- ترويسة التقرير الرسمية متكيفة الأبعاد -->
         <table style="width: 100%; border-bottom: 2px solid #3A056A; padding-bottom: 8px; margin-bottom: 12px; border-collapse: collapse;">
             <tr>
                 <td style="text-align: right; vertical-align: middle;">
                     <h1 style="margin: 0 0 3px 0; color: #3A056A; font-size: 15pt; font-weight: 900; line-height: 1.2;">التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
                     <div style="color: #64748B; font-size: 8pt; font-weight: 600;">الفترة: الربع الثالث 2026 &nbsp;|&nbsp; توجيه المستند: {recipient}</div>
                 </td>
-                <td style="text-align: left; vertical-align: middle; width: 250px;">
-                    {OFFICIAL_COMPANY_LOGO}
+                <td style="text-align: left; vertical-align: middle; width: 220px; height: 55px;">
+                    <img src="/logo.png" alt="شركة تنمية الغذاء" style="max-width: 100%; max-height: 55px; width: auto; height: auto; object-fit: contain; display: block; border: none;" />
                 </td>
             </tr>
         </table>
