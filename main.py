@@ -18,7 +18,7 @@ from pydantic import BaseModel
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="3.2.0")
+app = FastAPI(title="FDC Sales CRM", version="3.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,18 +28,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----------------- شعار الشركة الرسمي المتجهي (Corporate SVG) -----------------
+# ----------------- شعار شركة تنمية الغذاء الرسمي (Pure Vector SVG) -----------------
 OFFICIAL_COMPANY_LOGO = """
-<div style="display: flex; align-items: center; gap: 12px; direction: rtl;">
-    <div style="background: #3A056A; color: #FFFFFF; font-weight: 900; font-size: 24px; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 2px solid #C194FB; box-shadow: 0 2px 6px rgba(58,5,106,0.15);">ت</div>
-    <div style="text-align: right;">
-        <div style="color: #3A056A; font-weight: 800; font-size: 17px; line-height: 1.2;">شركة تنمية الغذاء</div>
-        <div style="color: #7E22CE; font-size: 9px; letter-spacing: 1.5px; font-weight: 700; text-transform: uppercase;">FOOD DEVELOPMENT CO.</div>
-    </div>
-</div>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 70" width="260" height="60" style="display: block;">
+    <rect x="235" y="5" width="58" height="58" rx="14" fill="#3A056A" stroke="#C194FB" stroke-width="2.5"/>
+    <text x="264" y="44" fill="#FFFFFF" font-family="'Cairo', sans-serif" font-size="28" font-weight="900" text-anchor="middle">ت</text>
+    <text x="220" y="32" fill="#3A056A" font-family="'Cairo', sans-serif" font-size="19" font-weight="800" text-anchor="end">شركة تنمية الغذاء</text>
+    <text x="220" y="50" fill="#7E22CE" font-family="'Cairo', sans-serif" font-size="9.5" font-weight="700" letter-spacing="1.5" text-anchor="end">FOOD DEVELOPMENT CO.</text>
+</svg>
 """
 
-# ----------------- CSS الطباعة الصارم والمعتمد (بدون ترويسات المتصفح) -----------------
+# ----------------- CSS الطباعة الصارم والمعتمد (إخفاء ترويسات المتصفح الافتراضية) -----------------
 PRINT_ENGINE_CSS = """
 @page {
     size: A4 portrait;
@@ -62,6 +61,7 @@ PRINT_ENGINE_CSS = """
     .print-container {
         padding: 0 !important;
         box-shadow: none !important;
+        border: none !important;
     }
 }
 :root {
@@ -90,24 +90,6 @@ body {
     padding: 24px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-.header-box {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 2px solid var(--brand);
-    padding-bottom: 14px;
-    margin-bottom: 18px;
-}
-.title-box h1 {
-    margin: 0 0 4px 0;
-    color: var(--brand);
-    font-size: 16pt;
-    font-weight: 800;
-}
-.title-meta {
-    color: #64748B;
-    font-size: 9pt;
 }
 .kpi-grid {
     display: grid;
@@ -172,6 +154,7 @@ table.data-table tr:nth-child(even) {
     padding: 12px 16px;
     margin-top: 14px;
     outline: none;
+    line-height: 1.6;
 }
 .editable-box:focus {
     border-style: solid;
@@ -179,7 +162,7 @@ table.data-table tr:nth-child(even) {
 }
 """
 
-# ----------------- قاعدة البيانات المحلية (OMR Currency) -----------------
+# ----------------- بنك البيانات المعتمد بالريال العماني (OMR) -----------------
 sales_executives_db = [
     {
         "id": 1,
@@ -334,7 +317,7 @@ whatsapp_logs_db = [
     {"created_at": "11:45", "sender_name": "أحمد الشمري", "is_external_call": True, "message_body": "تم إجراء مكالمة مع مدير المشتريات وتأكيد استلام المواصفات القياسية."}
 ]
 
-# ----------------- نماذج الطلبات -----------------
+# ----------------- نماذج Pydantic للطلبات -----------------
 class NewSamplePayload(BaseModel):
     customer_name: str
     rep_name: str
@@ -359,7 +342,7 @@ class NewSaleTransactionPayload(BaseModel):
     expense_fuel: Optional[float] = 0.0
     expense_other: Optional[float] = 0.0
 
-# ----------------- المسارات -----------------
+# ----------------- مسارات واجهة برمجة التطبيقات (APIs) -----------------
 @app.get("/health")
 def health():
     return {"status": "UP", "timestamp": datetime.now().isoformat()}
@@ -453,7 +436,7 @@ def get_whatsapp_qr():
         "status": "QR_READY"
     }
 
-# ----------------- صفحة التقرير التنفيذي للطباعة والمعاينة -----------------
+# ----------------- مسار معاينة وطباعة التقرير الرسمي -----------------
 @app.post("/api/reports/preview")
 def preview_report(req: dict):
     recipient = req.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام")
@@ -479,13 +462,18 @@ def preview_report(req: dict):
     </div>
 
     <div class="print-container">
-        <div class="header-box">
-            <div class="title-box">
-                <h1>التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
-                <div class="title-meta">الفترة: الربع الثالث 2026 &nbsp;|&nbsp; توجيه المستند: {recipient}</div>
-            </div>
-            {OFFICIAL_COMPANY_LOGO}
-        </div>
+        <!-- ترويسة التقرير الرسمية المعتمدة عبر جدول محاذاة صارم -->
+        <table style="width: 100%; border-bottom: 2.5px solid #3A056A; padding-bottom: 12px; margin-bottom: 18px; border-collapse: collapse;">
+            <tr>
+                <td style="text-align: right; vertical-align: middle;">
+                    <h1 style="margin: 0 0 6px 0; color: #3A056A; font-size: 17pt; font-weight: 800;">التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
+                    <div style="color: #64748B; font-size: 9pt;">الفترة: الربع الثالث 2026 &nbsp;|&nbsp; توجيه المستند: {recipient}</div>
+                </td>
+                <td style="text-align: left; vertical-align: middle; width: 270px;">
+                    {OFFICIAL_COMPANY_LOGO}
+                </td>
+            </tr>
+        </table>
 
         <div class="kpi-grid">
             <div class="kpi-card">
