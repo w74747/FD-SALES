@@ -3,75 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام إدارة المبيعات الميدانية والتنفيذية الذكي | شركة تنمية الغذاء</title>
+    <title>شركة تنمية الغذاء | نظام إدارة المبيعات الميدانية والتنفيذية</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Cairo', sans-serif; background-color: #FBF9FE; color: #1A202C; }
+        body { font-family: 'Cairo', sans-serif; background-color: #F8FAFC; color: #1E293B; }
         .brand-primary-bg { background-color: #3A056A; }
         .brand-primary-text { color: #3A056A; }
         .brand-border { border-color: #E4D9F5; }
         .brand-tint { background-color: #F5F0FC; }
+
+        /* عزل الطباعة لدليل العملاء وكامل النظام */
+        @media print {
+            aside, header, .no-print {
+                display: none !important;
+            }
+            body, main {
+                background: #FFFFFF !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            #printable-customers-section {
+                display: block !important;
+                width: 100% !important;
+                padding: 10mm !important;
+            }
+            #tab-customers {
+                display: block !important;
+            }
+        }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- القائمة الجانبية المحدثة بالمسميات الإدارية المعتمدة -->
-    <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl">
+    <!-- القائمة الجانبية الرسمية (أيقونات أحادية اللون Monochrome SVG) -->
+    <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
-            <!-- هوية وشعار الشركة الرسمي -->
+            <!-- الشعار الرسمي -->
             <div class="p-4 border-b border-[#52128e] flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-[#C194FB] flex items-center justify-center text-[#3A056A] font-black text-xl shadow-md border-2 border-white">ت</div>
                 <div>
                     <div class="font-extrabold text-sm tracking-wide leading-tight">شركة تنمية الغذاء</div>
-                    <div class="text-[10px] text-[#C194FB] font-medium tracking-wider uppercase">FOOD DEVELOPMENT CO.</div>
+                    <div class="text-[10px] text-[#C194FB] font-bold tracking-wider uppercase">FOOD DEVELOPMENT CO.</div>
                 </div>
             </div>
 
-            <!-- أقسام التنقل -->
+            <!-- أقسام التنقل الرئيسية -->
             <div class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-                <div class="text-[10px] font-bold text-[#C194FB] mb-2 px-2 uppercase tracking-wider">العمليات والمبيعات</div>
+                <div class="text-[10px] font-bold text-[#C194FB] mb-2 px-2 uppercase tracking-wider">العمليات والمبيعات الميدانية</div>
                 
-                <button onclick="switchTab('overview')" id="nav-overview" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white transition text-right">
-                    <span>📊</span> لوحة التحكم العامة
+                <button onclick="switchTab('overview')" id="nav-overview" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white transition text-right">
+                    <svg class="w-4 h-4 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                    <span>لوحة التحكم العامة</span>
                 </button>
 
-                <button onclick="switchTab('reps')" id="nav-reps" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>👔</span> فريق المبيعات والمستهدفات
+                <button onclick="switchTab('reps')" id="nav-reps" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <svg class="w-4 h-4 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    <span>فريق المبيعات والمستهدفات</span>
                 </button>
 
-                <button onclick="switchTab('customers')" id="nav-customers" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>🏢</span> دليل حسابات العملاء المعتمدة
+                <button onclick="switchTab('customers')" id="nav-customers" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <svg class="w-4 h-4 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <span>دليل حسابات العملاء المعتمدة</span>
                 </button>
 
-                <button onclick="switchTab('samples')" id="nav-samples" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>🧪</span> سجل العينات والتحويل (PO)
+                <button onclick="switchTab('samples')" id="nav-samples" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <svg class="w-4 h-4 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                    <span>سجل حركة العينات (PO)</span>
                 </button>
 
-                <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>📅</span> تقويم العمليات والمسارات الميدانية
+                <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <svg class="w-4 h-4 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span>تقويم العمليات والمسارات الميدانية</span>
                 </button>
 
-                <button onclick="switchTab('whatsapp')" id="nav-whatsapp" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>💬</span> رادار المجموعات والمكالمات
+                <button onclick="switchTab('whatsapp')" id="nav-whatsapp" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <svg class="w-4 h-4 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                    <span>رادار المجموعات والمكالمات</span>
                 </button>
 
-                <div class="pt-3 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">الإدارة والتقارير</div>
+                <div class="pt-4 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">الإدارة التنفيذية والتقارير</div>
 
-                <button onclick="openSaleModal()" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-bold bg-emerald-600/80 text-white hover:bg-emerald-600 text-right">
-                    <span>💰</span> + قيد مبيعات / نفقات ميدانية
+                <button onclick="openSaleModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-emerald-600/90 text-white hover:bg-emerald-600 text-right">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                    <span>قيد مبيعات / نفقات ميدانية</span>
                 </button>
 
-                <button onclick="openReportModal()" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-bold bg-[#C194FB]/20 text-purple-200 border border-[#C194FB]/40 hover:bg-[#C194FB]/30 text-right mt-1">
-                    <span>📄</span> مركز التقارير الرسمية المعتمدة
+                <button onclick="openReportModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-[#C194FB]/20 text-purple-100 border border-[#C194FB]/40 hover:bg-[#C194FB]/30 text-right mt-1.5">
+                    <svg class="w-4 h-4 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span>مركز التقارير الرسمية المعتمدة</span>
                 </button>
             </div>
         </div>
     </aside>
 
     <!-- مساحة العمل الرئيسية -->
-    <main class="flex-1 flex flex-col overflow-hidden bg-[#FBF9FE]">
-        <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs">
+    <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
+        <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs no-print">
             <div class="flex items-center gap-3">
                 <span class="text-xs text-gray-400 font-medium">نظام المبيعات التنفيذي</span>
                 <span class="text-gray-300">/</span>
@@ -82,11 +111,12 @@
                 <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100">
                     <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
                     <span>واتساب: بانتظار مسح الرمز</span>
-                    <span class="text-[10px] text-gray-600 bg-white px-2 py-0.5 rounded-full border border-gray-200">مسح QR 📷</span>
+                    <span class="text-[10px] text-gray-600 bg-white px-2 py-0.5 rounded-full border border-gray-200">مسح QR</span>
                 </button>
 
-                <button onclick="openReportModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 flex items-center gap-1.5">
-                    <span>📄</span> إصدار تقرير رسمي
+                <button onclick="openReportModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    <span>إصدار تقرير رسمي</span>
                 </button>
             </div>
         </header>
@@ -98,13 +128,13 @@
                 <div class="grid grid-cols-4 gap-4">
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
                         <div class="text-[11px] text-gray-500 font-bold">إجمالي المبيعات المحققة</div>
-                        <div class="text-2xl font-black brand-primary-text mt-1" id="kpi-total-sales">622,000 ر.س</div>
+                        <div class="text-2xl font-black brand-primary-text mt-1" id="kpi-total-sales">62,200.0 ر.ع</div>
                         <div class="text-[10px] text-emerald-700 font-bold mt-1">↑ 95.7% من إجمالي المستهدف</div>
                     </div>
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
                         <div class="text-[11px] text-gray-500 font-bold">معدل تحويل العينات (ROI)</div>
                         <div class="text-2xl font-black text-emerald-700 mt-1">66.7%</div>
-                        <div class="text-[10px] text-gray-500 font-medium mt-1">عائد العينات: 193,000 ر.س</div>
+                        <div class="text-[10px] text-gray-500 font-medium mt-1">عائد العينات: 19,300.0 ر.ع</div>
                     </div>
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
                         <div class="text-[11px] text-gray-500 font-bold">كفاءة استهلاك الوقود الميداني</div>
@@ -120,7 +150,7 @@
 
                 <div class="bg-white rounded-xl border brand-border shadow-xs overflow-hidden">
                     <div class="p-4 border-b brand-border flex justify-between items-center bg-gray-50/60">
-                        <h3 class="font-bold text-xs brand-primary-text">👔 فريق المبيعات التنفيذي وعائد التكلفة الميدانية</h3>
+                        <h3 class="font-bold text-xs brand-primary-text">فريق المبيعات التنفيذي وعائد التكلفة الميدانية</h3>
                         <span class="text-[10px] text-gray-500">تحليل فوري للمبيعات ونفقات الوقود</span>
                     </div>
                     <table class="w-full text-right text-xs">
@@ -132,7 +162,7 @@
                                 <th class="p-3">المبيعات المحققة</th>
                                 <th class="p-3">نسبة الإنجاز</th>
                                 <th class="p-3">الوقود (فعلي / مخصص)</th>
-                                <th class="p-3">المصاريف الكلية</th>
+                                <th class="p-3">المصاريف</th>
                                 <th class="p-3">الكفاءة</th>
                             </tr>
                         </thead>
@@ -155,17 +185,20 @@
                 </div>
             </div>
 
-            <!-- تبويب 3: دليل حسابات العملاء المعتمدة -->
+            <!-- تبويب 3: دليل حسابات العملاء المعتمدة (معزول وجاهز للطباعة الصافية) -->
             <div id="tab-customers" class="hidden space-y-4">
-                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs" id="printable-customers-section">
                     <div class="flex justify-between items-center mb-4">
                         <div>
-                            <h3 class="font-bold text-sm brand-primary-text">🏢 دليل حسابات العملاء ومجموعات المراقبة</h3>
+                            <h3 class="font-bold text-sm brand-primary-text">دليل حسابات العملاء ومجموعات المراقبة المعتمدة</h3>
                             <div class="text-xs text-gray-500">قائمة الشركات، مسؤولي التواصل، والمجموعات المربوطة بالرادار</div>
                         </div>
-                        <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">طباعة دليل العملاء 🖨️</button>
+                        <button onclick="window.print()" class="no-print px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50 flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-[#3A056A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                            <span>طباعة دليل العملاء</span>
+                        </button>
                     </div>
-                    <table class="w-full text-right text-xs">
+                    <table class="w-full text-right text-xs border border-[#E4D9F5]">
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
                             <tr>
                                 <th class="p-3">الشركة / الحساب</th>
@@ -182,13 +215,13 @@
                 </div>
             </div>
 
-            <!-- تبويب 4: سجل العينات والتحويل التجاري -->
+            <!-- تبويب 4: سجل حركة العينات -->
             <div id="tab-samples" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
                         <div>
-                            <h3 class="font-bold text-sm brand-primary-text">🧪 سجل حركة العينات المجانية والتحويل التجاري</h3>
-                            <div class="text-xs text-gray-500">رصد يدوي ورصد آلي عبر محادثات الواتساب</div>
+                            <h3 class="font-bold text-sm brand-primary-text">سجل حركة العينات المجانية والتحويل التجاري</h3>
+                            <div class="text-xs text-gray-500">رصد يدوي وتلقائي عبر محادثات الواتساب</div>
                         </div>
                         <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-xs">+ تسليم عينة جديدة</button>
                     </div>
@@ -211,11 +244,11 @@
                 </div>
             </div>
 
-            <!-- تبويب 5: تقويم المهام الميدانية -->
+            <!-- تبويب 5: تقويم العمليات والمسارات الميدانية -->
             <div id="tab-calendar" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-sm brand-primary-text">📅 جدول المسارات والزيارات الميدانية المعتمدة</h3>
+                        <h3 class="font-bold text-sm brand-primary-text">جدول المسارات والزيارات الميدانية المعتمدة</h3>
                         <button onclick="openNewCalendarModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-xs">+ جدولة مهمة جديدة</button>
                     </div>
                     <div class="space-y-3" id="calendar-events-list"></div>
@@ -227,7 +260,7 @@
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
                         <div>
-                            <h3 class="font-bold text-sm brand-primary-text">💬 المجموعات المراقبة والمحادثات الميدانية</h3>
+                            <h3 class="font-bold text-sm brand-primary-text">المجموعات المراقبة والمحادثات الميدانية</h3>
                             <div class="text-xs text-gray-500">حصر المراقبة لمجموعات عملاء شركة تنمية الغذاء المحددة فقط</div>
                         </div>
                         <button onclick="openWhatsAppModal()" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">إدارة الربط والمجموعات</button>
@@ -240,12 +273,12 @@
     </main>
 
     <!-- مودال: إضافة عينة جديدة -->
-    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينة مجانية جديدة</h3>
             <div>
                 <label class="block font-bold mb-1">اسم العميل:</label>
-                <input type="text" id="sample-client-name" class="w-full p-2 border rounded-lg" value="سلسلة مطاعم الريف الحجازي">
+                <input type="text" id="sample-client-name" class="w-full p-2 border rounded-lg" value="سلسلة مطاعم الريف">
             </div>
             <div>
                 <label class="block font-bold mb-1">مسؤول المبيعات المسلّم:</label>
@@ -273,7 +306,7 @@
     </div>
 
     <!-- مودال: جدولة مهمة ميدانية جديدة -->
-    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة مهمة أو زيارة ميدانية جديدة</h3>
             <div>
@@ -295,7 +328,7 @@
                 </div>
                 <div>
                     <label class="block font-bold mb-1">الموقع ورمز المسار:</label>
-                    <input type="text" id="cal-location" class="w-full p-2 border rounded-lg" value="فرع الكورنيش (R-22)">
+                    <input type="text" id="cal-location" class="w-full p-2 border rounded-lg" value="فرع القرم (R-22)">
                 </div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
@@ -305,22 +338,22 @@
         </div>
     </div>
 
-    <!-- مودال: قيد مبيعات ونفقات (يدعم الجهد المشترك) -->
-    <div id="sale-transaction-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <!-- مودال: قيد مبيعات ونفقات (يدعم الجهد المشترك والريال العماني) -->
+    <div id="sale-transaction-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">قيد مبيعات فعلية ومصاريف ميدانية</h3>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block font-bold mb-1">العميل:</label>
                     <select id="tx-customer-id" class="w-full p-2 border rounded-lg bg-gray-50">
-                        <option value="1">سلسلة مطاعم الريف الحجازي</option>
+                        <option value="1">سلسلة مطاعم الريف</option>
                         <option value="2">مؤسسة التموين الحديث</option>
                         <option value="3">شركة الضيافة الفندقية العالمية</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block font-bold mb-1">قيمة المبيعات المحققة (ر.س):</label>
-                    <input type="number" id="tx-amount" class="w-full p-2 border rounded-lg font-bold" value="50000">
+                    <label class="block font-bold mb-1">قيمة المبيعات المحققة (ر.ع):</label>
+                    <input type="number" id="tx-amount" class="w-full p-2 border rounded-lg font-bold" value="5000">
                 </div>
             </div>
             <div class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-2">
@@ -347,11 +380,11 @@
             </div>
             <div class="grid grid-cols-2 gap-2">
                 <div>
-                    <label class="block font-bold mb-1">مصاريف وقود إضافية (ر.س):</label>
+                    <label class="block font-bold mb-1">مصاريف وقود إضافية (ر.ع):</label>
                     <input type="number" id="tx-fuel" class="w-full p-2 border rounded-lg" value="0">
                 </div>
                 <div>
-                    <label class="block font-bold mb-1">مصاريف ضيافة / أخرى (ر.س):</label>
+                    <label class="block font-bold mb-1">مصاريف ضيافة / أخرى (ر.ع):</label>
                     <input type="number" id="tx-other" class="w-full p-2 border rounded-lg" value="0">
                 </div>
             </div>
@@ -362,9 +395,9 @@
         </div>
     </div>
 
-    <!-- مودال: مركز التقارير الرسمية -->
-    <div id="report-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-4 text-xs">
+    <!-- مودال: مركز التقارير الرسمية (إمكانية تعديل التوصية المباشرة) -->
+    <div id="report-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">مركز إصدار التقارير التنفيذية الرسمية</h3>
             <div>
                 <label class="block font-bold mb-1">اختر التقرير المعتمد:</label>
@@ -376,9 +409,14 @@
                 <label class="block font-bold mb-1">ترويسة التوجيه الرسمية (Recipient):</label>
                 <input type="text" id="report-recipient" value="سعادة رئيس مجلس الإدارة / المدير العام" class="w-full p-2 border rounded-lg">
             </div>
+            <div>
+                <label class="block font-bold mb-1">التوصية الإدارية (يمكنك كتابتها أو تعديلها هنا):</label>
+                <textarea id="report-custom-recommendation" rows="3" class="w-full p-2.5 border rounded-lg focus:ring-1 focus:ring-purple-600 outline-none">أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي.</textarea>
+            </div>
             <div class="flex justify-between items-center pt-3 border-t">
-                <button onclick="previewReportOfficial()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow">
-                    معاينة وطباعة التقرير الرسمي المعتمد 🖨️
+                <button onclick="previewReportOfficial()" class="px-5 py-2.5 brand-primary-bg text-white font-bold rounded-lg shadow hover:opacity-95 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    <span>معاينة وطباعة التقرير المعتمد (A4)</span>
                 </button>
                 <button onclick="closeReportModal()" class="px-4 py-2 border rounded-lg">إغلاق</button>
             </div>
@@ -386,7 +424,7 @@
     </div>
 
     <!-- مودال: مسح رمز الواتساب -->
-    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-5 w-[420px] text-center space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text">ربط بوابة الواتساب الميدانية</h3>
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=FDC-WHATSAPP-AUTH-SECURE" class="w-52 h-52 mx-auto p-2 border rounded-xl">
@@ -404,7 +442,7 @@
             overview: 'لوحة التحكم العامة',
             reps: 'فريق المبيعات وإدارة المستهدفات',
             customers: 'دليل حسابات العملاء المعتمدة',
-            samples: 'سجل العينات والتحويل التجاري',
+            samples: 'سجل حركة العينات والتحويل التجاري',
             calendar: 'تقويم العمليات والمسارات الميدانية',
             whatsapp: 'رادار مجموعات العملاء والمكالمات'
         };
@@ -414,10 +452,10 @@
                 const el = document.getElementById(`tab-${t}`);
                 const nav = document.getElementById(`nav-${t}`);
                 if (el) el.classList.add('hidden');
-                if (nav) nav.className = "w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
+                if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
             });
             document.getElementById(`tab-${id}`).classList.remove('hidden');
-            document.getElementById(`nav-${id}`).className = "w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
+            document.getElementById(`nav-${id}`).className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
             document.getElementById('current-tab-title').innerText = titles[id];
         }
 
@@ -490,7 +528,8 @@
         async function previewReportOfficial() {
             const payload = {
                 template_id: document.getElementById('report-template-select').value,
-                report_recipient: document.getElementById('report-recipient').value
+                report_recipient: document.getElementById('report-recipient').value,
+                recommendation: document.getElementById('report-custom-recommendation').value
             };
             const res = await fetch('/api/reports/preview', {
                 method: 'POST',
@@ -513,11 +552,11 @@
                 <tr>
                     <td class="p-3 font-bold">${r.name}</td>
                     <td class="p-3 text-gray-600">${r.region}</td>
-                    <td class="p-3">${r.monthly_target.toLocaleString()} ر.س</td>
-                    <td class="p-3 font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.س</td>
+                    <td class="p-3">${r.monthly_target.toLocaleString()} ر.ع</td>
+                    <td class="p-3 font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.ع</td>
                     <td class="p-3 font-bold">${r.achievement_rate.toFixed(1)}%</td>
                     <td class="p-3">${r.fuel_liters} / ${r.fuel_allowance_liters} لتر</td>
-                    <td class="p-3">${r.total_expenses.toLocaleString()} ر.س</td>
+                    <td class="p-3">${r.total_expenses.toLocaleString()} ر.ع</td>
                     <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">${r.efficiency}</span></td>
                 </tr>
             `).join('');
@@ -530,9 +569,9 @@
                     </div>
                     <div class="text-xs text-gray-600">${r.region} | الهاتف: ${r.phone_number}</div>
                     <div class="pt-2 border-t brand-border space-y-1 text-xs">
-                        <div class="flex justify-between"><span>المستهدف الشهري:</span><span class="font-bold">${r.monthly_target.toLocaleString()} ر.س</span></div>
-                        <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.س</span></div>
-                        <div class="flex justify-between"><span>المصاريف الكلية:</span><span>${r.total_expenses.toLocaleString()} ر.س</span></div>
+                        <div class="flex justify-between"><span>المستهدف الشهري:</span><span class="font-bold">${r.monthly_target.toLocaleString()} ر.ع</span></div>
+                        <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.ع</span></div>
+                        <div class="flex justify-between"><span>المصاريف:</span><span>${r.total_expenses.toLocaleString()} ر.ع</span></div>
                     </div>
                 </div>
             `).join('');
@@ -565,7 +604,7 @@
                     <td class="p-3 text-[10px] text-gray-500">${s.source || 'يدوي'}</td>
                     <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.status==='APPROVED'?'bg-emerald-100 text-emerald-800':'bg-amber-100 text-amber-800'}">${s.status}</span></td>
                     <td class="p-3 font-mono">${s.converted_po_id || '—'}</td>
-                    <td class="p-3 font-bold ${s.po_value>0?'text-emerald-700':'text-gray-400'}">${s.po_value?s.po_value.toLocaleString()+' ر.س':'—'}</td>
+                    <td class="p-3 font-bold ${s.po_value>0?'text-emerald-700':'text-gray-400'}">${s.po_value?s.po_value.toLocaleString()+' ر.ع':'—'}</td>
                 </tr>
             `).join('');
 
