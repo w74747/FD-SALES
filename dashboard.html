@@ -14,7 +14,7 @@
         .brand-tint { background-color: #F5F0FC; }
 
         @media print {
-            aside, header, .no-print {
+            aside, header, #auth-overlay, .no-print {
                 display: none !important;
             }
             body, main {
@@ -36,10 +36,37 @@
 </head>
 <body class="flex h-screen overflow-hidden">
 
+    <!-- شاشة التحقق الأمني الثنائي (Google Authenticator 2FA) -->
+    <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
+            <div class="w-full flex justify-center mb-2">
+                <img src="/logo.png" alt="شعار الشركة" class="h-12 w-auto object-contain">
+            </div>
+            <h2 class="text-base font-bold text-gray-800">التحقق الأمني الثنائي (2FA)</h2>
+            <p class="text-xs text-gray-500">يرجى إدخال رمز التحقق المكون من 6 أرقام من تطبيق Google Authenticator</p>
+
+            <button onclick="toggleSetupQR()" class="text-[11px] text-purple-700 underline block mx-auto">إظهار رمز QR لربط تطبيق المصادقة</button>
+            <div id="qr-setup-box" class="hidden my-2">
+                <img src="/api/auth/2fa/qr" alt="QR Code" class="w-44 h-44 mx-auto border p-1 rounded-lg">
+                <span class="text-[10px] text-gray-400 block mt-1">امسح الرمز عبر تطبيق Authenticator بهاتفك</span>
+            </div>
+
+            <div>
+                <input type="text" id="auth-otp-code" maxlength="6" placeholder="000000" 
+                       class="text-center tracking-widest text-2xl font-black w-48 p-2 border-2 border-purple-300 rounded-xl focus:border-[#3A056A] outline-none">
+            </div>
+            <div id="auth-error-msg" class="text-xs text-red-600 font-bold hidden"></div>
+
+            <button onclick="submit2FAVerification()" class="w-full py-2.5 bg-[#3A056A] text-white font-bold text-xs rounded-xl shadow hover:bg-purple-900 transition">
+                تأكيد الدخول
+            </button>
+        </div>
+    </div>
+
     <!-- القائمة الجانبية الرسمية -->
     <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
-            <!-- الشعار الرسمي المعتمد متكيف الأبعاد بالكامل ودون مط -->
+            <!-- الشعار الرسمي المعتمد متكيف الأبعاد بالكامل -->
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e] no-print">
                 <div class="w-full h-full bg-white rounded-xl p-2 flex items-center justify-center shadow-sm">
                     <img 
@@ -447,6 +474,44 @@
             whatsapp: 'رادار مجموعات العملاء والمكالمات'
         };
 
+        function toggleSetupQR() {
+            const box = document.getElementById('qr-setup-box');
+            box.classList.toggle('hidden');
+        }
+
+        async function submit2FAVerification() {
+            const code = document.getElementById('auth-otp-code').value.trim();
+            const errorEl = document.getElementById('auth-error-msg');
+            errorEl.classList.add('hidden');
+
+            if (code.length !== 6) {
+                errorEl.innerText = "يرجى إدخال 6 أرقام كاملة";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/2fa/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code })
+                });
+
+                if (res.ok) {
+                    sessionStorage.setItem('fdc_auth_token', 'AUTHENTICATED');
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    loadAllData();
+                } else {
+                    const data = await res.json();
+                    errorEl.innerText = data.detail || "رمز التحقق غير صحيح";
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorEl.innerText = "تعذر الاتصال بالخادم";
+                errorEl.classList.remove('hidden');
+            }
+        }
+
         function switchTab(id) {
             tabs.forEach(t => {
                 const el = document.getElementById(`tab-${t}`);
@@ -630,7 +695,12 @@
             `).join('');
         }
 
-        window.addEventListener('DOMContentLoaded', loadAllData);
+        window.addEventListener('DOMContentLoaded', () => {
+            if (sessionStorage.getItem('fdc_auth_token') === 'AUTHENTICATED') {
+                document.getElementById('auth-overlay').classList.add('hidden');
+                loadAllData();
+            }
+        });
     </script>
 </body>
 </html>
