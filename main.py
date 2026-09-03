@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + High-Precision Printing Engine (OMR Currency & Corporate Identity)
+FastAPI Backend + Flawless Responsive A4 Print Engine
 """
 
 import os
@@ -14,11 +14,13 @@ from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="3.3.0")
+app = FastAPI(title="FDC Sales CRM", version="3.6.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,30 +30,173 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----------------- شعار شركة تنمية الغذاء الرسمي (Pure Vector SVG) -----------------
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+# ----------------- وظائف الاتصال والتهيئة التلقائية لقاعدة البيانات -----------------
+def get_db_connection():
+    if not DATABASE_URL:
+        return None
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        return conn
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
+        return None
+
+def init_database():
+    conn = get_db_connection()
+    if not conn:
+        logger.warning("DATABASE_URL not found. Running in In-Memory fallback mode.")
+        return
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS sales_executives (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(150) NOT NULL,
+                employee_code VARCHAR(50) UNIQUE NOT NULL,
+                phone_number VARCHAR(30) UNIQUE NOT NULL,
+                region VARCHAR(100) NOT NULL,
+                monthly_target NUMERIC(12, 2) DEFAULT 0.00,
+                achieved_sales NUMERIC(12, 2) DEFAULT 0.00,
+                fuel_allowance_liters NUMERIC(8, 2) DEFAULT 0.00,
+                fuel_liters_used NUMERIC(8, 2) DEFAULT 0.00,
+                total_expenses NUMERIC(12, 2) DEFAULT 0.00,
+                status VARCHAR(20) DEFAULT 'نشط'
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS customer_accounts (
+                id SERIAL PRIMARY KEY,
+                company_name VARCHAR(200) NOT NULL,
+                sector VARCHAR(100) NOT NULL,
+                contact_person VARCHAR(150) NOT NULL,
+                phone VARCHAR(30) NOT NULL,
+                assigned_rep_id INT REFERENCES sales_executives(id) ON DELETE SET NULL,
+                assigned_rep_name VARCHAR(150),
+                whatsapp_group_id VARCHAR(100) UNIQUE,
+                tier VARCHAR(10) DEFAULT 'B',
+                status VARCHAR(20) DEFAULT 'نشط'
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS sample_deliveries (
+                id SERIAL PRIMARY KEY,
+                customer_name VARCHAR(200) NOT NULL,
+                rep_name VARCHAR(150) NOT NULL,
+                product_name VARCHAR(200) NOT NULL,
+                qty_free INT NOT NULL,
+                delivery_date DATE DEFAULT CURRENT_DATE,
+                status VARCHAR(20) DEFAULT 'PENDING',
+                converted_po_id VARCHAR(100),
+                po_value NUMERIC(12, 2) DEFAULT 0.00,
+                source VARCHAR(50) DEFAULT 'يدوي'
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS calendar_events (
+                id SERIAL PRIMARY KEY,
+                customer_name VARCHAR(200) NOT NULL,
+                rep_name VARCHAR(150) NOT NULL,
+                task_type VARCHAR(150) NOT NULL,
+                scheduled_at VARCHAR(50) NOT NULL,
+                location VARCHAR(255) NOT NULL,
+                route_code VARCHAR(50) DEFAULT 'R-01',
+                execution_status VARCHAR(20) DEFAULT 'PENDING'
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS whatsapp_logs (
+                id SERIAL PRIMARY KEY,
+                created_at VARCHAR(10) NOT NULL,
+                sender_name VARCHAR(150) NOT NULL,
+                is_external_call BOOLEAN DEFAULT FALSE,
+                message_body TEXT NOT NULL
+            );
+            """)
+
+            cur.execute("SELECT COUNT(*) FROM sales_executives;")
+            if cur.fetchone()["count"] == 0:
+                cur.execute("""
+                INSERT INTO sales_executives (name, employee_code, phone_number, region, monthly_target, achieved_sales, fuel_allowance_liters, fuel_liters_used, total_expenses, status)
+                VALUES 
+                ('أحمد الشمري', 'SE-101', '+96891112233', 'مسقط - الوسطى', 25000.0, 27200.0, 400.0, 380.0, 320.0, 'نشط'),
+                ('سالم الدوسري', 'SE-102', '+96894445566', 'صحار - الباطنة', 18000.0, 13500.0, 350.0, 395.0, 410.0, 'نشط'),
+                ('تركي الغامدي', 'SE-103', '+96897778899', 'صلالة - ظفار', 22000.0, 21500.0, 380.0, 360.0, 360.0, 'نشط');
+                """)
+
+                cur.execute("""
+                INSERT INTO customer_accounts (company_name, sector, contact_person, phone, assigned_rep_id, assigned_rep_name, whatsapp_group_id, tier, status)
+                VALUES 
+                ('سلسلة مطاعم الريف', 'مطاعم وإعاشة', 'م. فهد القرني', '+96899988771', 1, 'أحمد الشمري', '120363029182371@g.us', 'A', 'نشط'),
+                ('مؤسسة التموين الحديث', 'تجارة جملة', 'أ/ طارق المنصور', '+96893322110', 2, 'سالم الدوسري', '120363088716253@g.us', 'B', 'راكد'),
+                ('شركة الضيافة الفندقية العالمية', 'فنادق وخدمات', 'أ/ وائل الخالدي', '+96898822334', 3, 'تركي الغامدي', '120363077615243@g.us', 'A', 'نشط');
+                """)
+
+                cur.execute("""
+                INSERT INTO sample_deliveries (customer_name, rep_name, product_name, qty_free, delivery_date, status, converted_po_id, po_value, source)
+                VALUES 
+                ('سلسلة مطاعم الريف', 'أحمد الشمري', 'صدور دجاج متبلة (خلطة 4B)', 15, '2026-08-25', 'APPROVED', 'PO-2026-889', 7800.0, 'WhatsApp Sentinel'),
+                ('مؤسسة التموين الحديث', 'سالم الدوسري', 'دجاج مجمد فائق الجودة 1000g', 20, '2026-08-12', 'PENDING', NULL, 0.0, 'إدخال يدوي'),
+                ('شركة الضيافة الفندقية العالمية', 'تركي الغامدي', 'شاورما دجاج جاهزة للطهي', 25, '2026-08-28', 'APPROVED', 'PO-2026-904', 11500.0, 'WhatsApp Sentinel');
+                """)
+
+                cur.execute("""
+                INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, route_code, execution_status)
+                VALUES 
+                ('سلسلة مطاعم الريف', 'أحمد الشمري', 'توقيع عقد توريد سنوي', '2026-09-03 10:00', 'الإدارة العامة - مسقط', 'R-10', 'DONE'),
+                ('مؤسسة التموين الحديث', 'سالم الدوسري', 'زيارة تقصي واسترجاع عينات', '2026-09-04 13:00', 'مستودعات صحار', 'R-14', 'PENDING');
+                """)
+
+                cur.execute("""
+                INSERT INTO whatsapp_logs (created_at, sender_name, is_external_call, message_body)
+                VALUES 
+                ('09:15', 'م. فهد القرني', FALSE, 'السلام عليكم، نريد تجربة عينة صدور دجاج جديدة لفرع مسقط.'),
+                ('09:22', 'أحمد الشمري', FALSE, 'أهلاً بك، تم إرسال 15 كرتون عينة للتجربة الميدانية.'),
+                ('11:45', 'أحمد الشمري', TRUE, 'تم إجراء مكالمة مع مدير المشتريات وتأكيد استلام المواصفات القياسية.');
+                """)
+
+            conn.commit()
+            logger.info("PostgreSQL Database initialized and seeded successfully.")
+    except Exception as e:
+        logger.error(f"Error during schema migration: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+@app.on_event("startup")
+def startup_event():
+    init_database()
+
+# ----------------- شعار الشركة الرسمي المقاوم للتداخل -----------------
 OFFICIAL_COMPANY_LOGO = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 70" width="260" height="60" style="display: block;">
-    <rect x="235" y="5" width="58" height="58" rx="14" fill="#3A056A" stroke="#C194FB" stroke-width="2.5"/>
-    <text x="264" y="44" fill="#FFFFFF" font-family="'Cairo', sans-serif" font-size="28" font-weight="900" text-anchor="middle">ت</text>
-    <text x="220" y="32" fill="#3A056A" font-family="'Cairo', sans-serif" font-size="19" font-weight="800" text-anchor="end">شركة تنمية الغذاء</text>
-    <text x="220" y="50" fill="#7E22CE" font-family="'Cairo', sans-serif" font-size="9.5" font-weight="700" letter-spacing="1.5" text-anchor="end">FOOD DEVELOPMENT CO.</text>
-</svg>
+<div style="display: inline-flex; align-items: center; gap: 10px; direction: rtl; text-align: right;">
+    <div style="background: #3A056A; color: #FFFFFF; font-weight: 900; font-size: 20px; width: 42px; height: 42px; min-width: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 2px solid #C194FB;">ت</div>
+    <div>
+        <div style="color: #3A056A; font-weight: 900; font-size: 15px; line-height: 1.15; white-space: nowrap;">شركة تنمية الغذاء</div>
+        <div style="color: #7E22CE; font-size: 8px; font-weight: 800; letter-spacing: 1px; white-space: nowrap;">FOOD DEVELOPMENT CO.</div>
+    </div>
+</div>
 """
 
-# ----------------- CSS الطباعة الصارم والمعتمد (إخفاء ترويسات المتصفح الافتراضية) -----------------
+# ----------------- CSS الطباعة الدقيق المتطابق مع قياس ورقة A4 بنسبة 100% -----------------
 PRINT_ENGINE_CSS = """
 @page {
     size: A4 portrait;
-    margin: 10mm 12mm 10mm 12mm;
+    margin: 8mm 8mm 8mm 8mm;
 }
 @media print {
     html, body {
-        width: 210mm;
-        height: 297mm;
+        width: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #FFFFFF !important;
-        color: #1A202C !important;
+        color: #0F172A !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
@@ -59,102 +204,117 @@ PRINT_ENGINE_CSS = """
         display: none !important;
     }
     .print-container {
+        width: 100% !important;
+        max-width: 100% !important;
         padding: 0 !important;
+        margin: 0 !important;
         box-shadow: none !important;
         border: none !important;
     }
+}
+* {
+    box-sizing: border-box;
 }
 :root {
     --brand: #3A056A;
     --accent: #C194FB;
     --tint: #F5F0FC;
-    --line: #E4D9F5;
-    --text: #1A202C;
-    --ok: #1E7A5A;
-    --warn: #8A5D06;
-    --bad: #9E2222;
+    --line: #E2E8F0;
+    --text: #0F172A;
+    --ok: #166534;
+    --warn: #854D0E;
+    --bad: #991B1B;
 }
 body {
     direction: rtl;
     font-family: 'Cairo', 'Tajawal', sans-serif;
     color: var(--text);
     margin: 0;
-    padding: 24px;
-    font-size: 9.5pt;
+    padding: 16px;
+    font-size: 8.5pt;
     background: #F8FAFC;
+    line-height: 1.35;
 }
 .print-container {
-    max-width: 200mm;
+    width: 100%;
+    max-width: 194mm;
     margin: 0 auto;
     background: #FFFFFF;
-    padding: 24px;
+    padding: 16px;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .kpi-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 18px;
+    gap: 8px;
+    margin-bottom: 12px;
 }
 .kpi-card {
     background: #FAF7FD;
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: 6px;
+    padding: 8px 6px;
     text-align: center;
 }
 .kpi-lbl {
-    font-size: 8.5pt;
+    font-size: 7.5pt;
     color: #64748B;
-    font-weight: 600;
+    font-weight: 700;
 }
 .kpi-val {
-    font-size: 14pt;
-    font-weight: 800;
+    font-size: 11.5pt;
+    font-weight: 900;
     color: var(--brand);
-    margin-top: 4px;
+    margin-top: 3px;
 }
 table.data-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 18px;
+    margin-bottom: 12px;
     border: 1px solid var(--line);
+    table-layout: fixed;
 }
 table.data-table th {
     background: var(--brand);
     color: #FFFFFF;
     text-align: right;
-    padding: 8px 10px;
-    font-size: 8.5pt;
-    font-weight: 700;
+    padding: 6px 8px;
+    font-size: 8pt;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 table.data-table td {
-    padding: 7px 10px;
+    padding: 5px 8px;
     border-bottom: 1px solid var(--line);
-    font-size: 8.5pt;
+    font-size: 8pt;
+    word-break: break-word;
 }
 table.data-table tr:nth-child(even) {
-    background: #FAF7FD;
+    background: #FAFAFC;
 }
 .badge {
     display: inline-block;
-    padding: 2px 8px;
+    padding: 1.5px 6px;
     border-radius: 4px;
-    font-weight: 700;
-    font-size: 7.5pt;
+    font-weight: 800;
+    font-size: 7pt;
+    white-space: nowrap;
 }
-.badge-ok { background: #EDF7F2; color: var(--ok); }
-.badge-warn { background: #FDF6E7; color: var(--warn); }
-.badge-bad { background: #FBEEEE; color: var(--bad); }
+.badge-ok { background: #DCFCE7; color: var(--ok); }
+.badge-warn { background: #FEF9C3; color: var(--warn); }
+.badge-bad { background: #FEE2E2; color: var(--bad); }
 .editable-box {
     background: #FAF7FD;
-    border: 1.5px dashed var(--accent);
-    border-radius: 8px;
-    padding: 12px 16px;
-    margin-top: 14px;
+    border: 1px dashed var(--accent);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-top: 8px;
     outline: none;
-    line-height: 1.6;
+    line-height: 1.5;
+    font-size: 8.5pt;
 }
 .editable-box:focus {
     border-style: solid;
@@ -162,162 +322,7 @@ table.data-table tr:nth-child(even) {
 }
 """
 
-# ----------------- بنك البيانات المعتمد بالريال العماني (OMR) -----------------
-sales_executives_db = [
-    {
-        "id": 1,
-        "name": "أحمد الشمري",
-        "employee_code": "SE-101",
-        "phone_number": "+96891112233",
-        "region": "مسقط - الوسطى",
-        "monthly_target": 25000.0,
-        "achieved_sales": 27200.0,
-        "fuel_allowance_liters": 400.0,
-        "fuel_liters": 380.0,
-        "total_expenses": 320.0,
-        "status": "نشط"
-    },
-    {
-        "id": 2,
-        "name": "سالم الدوسري",
-        "employee_code": "SE-102",
-        "phone_number": "+96894445566",
-        "region": "صحار - الباطنة",
-        "monthly_target": 18000.0,
-        "achieved_sales": 13500.0,
-        "fuel_allowance_liters": 350.0,
-        "fuel_liters": 395.0,
-        "total_expenses": 410.0,
-        "status": "نشط"
-    },
-    {
-        "id": 3,
-        "name": "تركي الغامدي",
-        "employee_code": "SE-103",
-        "phone_number": "+96897778899",
-        "region": "صلالة - ظفار",
-        "monthly_target": 22000.0,
-        "achieved_sales": 21500.0,
-        "fuel_allowance_liters": 380.0,
-        "fuel_liters": 360.0,
-        "total_expenses": 360.0,
-        "status": "نشط"
-    }
-]
-
-customer_accounts_db = [
-    {
-        "id": 1,
-        "company_name": "سلسلة مطاعم الريف",
-        "sector": "مطاعم وإعاشة",
-        "contact_person": "م. فهد القرني",
-        "phone": "+96899988771",
-        "assigned_rep_id": 1,
-        "assigned_rep_name": "أحمد الشمري",
-        "whatsapp_group_id": "120363029182371@g.us",
-        "tier": "A",
-        "status": "نشط",
-        "last_activity": "منذ 15 دقيقة"
-    },
-    {
-        "id": 2,
-        "company_name": "مؤسسة التموين الحديث",
-        "sector": "تجارة جملة",
-        "contact_person": "أ/ طارق المنصور",
-        "phone": "+96893322110",
-        "assigned_rep_id": 2,
-        "assigned_rep_name": "سالم الدوسري",
-        "whatsapp_group_id": "120363088716253@g.us",
-        "tier": "B",
-        "status": "راكد",
-        "last_activity": "منذ 24 يوماً"
-    },
-    {
-        "id": 3,
-        "company_name": "شركة الضيافة الفندقية العالمية",
-        "sector": "فنادق وخدمات",
-        "contact_person": "أ/ وائل الخالدي",
-        "phone": "+96898822334",
-        "assigned_rep_id": 3,
-        "assigned_rep_name": "تركي الغامدي",
-        "whatsapp_group_id": "120363077615243@g.us",
-        "tier": "A",
-        "status": "نشط",
-        "last_activity": "منذ ساعتين"
-    }
-]
-
-samples_db = [
-    {
-        "id": 1,
-        "customer_name": "سلسلة مطاعم الريف",
-        "rep_name": "أحمد الشمري",
-        "product_name": "صدور دجاج متبلة (خلطة 4B)",
-        "qty_free": 15,
-        "delivery_date": "2026-08-25",
-        "status": "APPROVED",
-        "converted_po_id": "PO-2026-889",
-        "po_value": 7800.0,
-        "source": "WhatsApp Sentinel"
-    },
-    {
-        "id": 2,
-        "customer_name": "مؤسسة التموين الحديث",
-        "rep_name": "سالم الدوسري",
-        "product_name": "دجاج مجمد فائق الجودة 1000g",
-        "qty_free": 20,
-        "delivery_date": "2026-08-12",
-        "status": "PENDING",
-        "converted_po_id": None,
-        "po_value": 0.0,
-        "source": "إدخال يدوي"
-    },
-    {
-        "id": 3,
-        "customer_name": "شركة الضيافة الفندقية العالمية",
-        "rep_name": "تركي الغامدي",
-        "product_name": "شاورما دجاج جاهزة للطهي",
-        "qty_free": 25,
-        "delivery_date": "2026-08-28",
-        "status": "APPROVED",
-        "converted_po_id": "PO-2026-904",
-        "po_value": 11500.0,
-        "source": "WhatsApp Sentinel"
-    }
-]
-
-calendar_events_db = [
-    {
-        "id": 1,
-        "customer_name": "سلسلة مطاعم الريف",
-        "rep_name": "أحمد الشمري",
-        "task_type": "توقيع عقد توريد سنوي",
-        "scheduled_at": "2026-09-03 10:00",
-        "location": "الإدارة العامة - مسقط",
-        "route_code": "R-10",
-        "ack_status": True,
-        "execution_status": "DONE"
-    },
-    {
-        "id": 2,
-        "customer_name": "مؤسسة التموين الحديث",
-        "rep_name": "سالم الدوسري",
-        "task_type": "زيارة تقصي واسترجاع عينات",
-        "scheduled_at": "2026-09-04 13:00",
-        "location": "مستودعات صحار",
-        "route_code": "R-14",
-        "ack_status": False,
-        "execution_status": "PENDING"
-    }
-]
-
-whatsapp_logs_db = [
-    {"created_at": "09:15", "sender_name": "م. فهد القرني", "is_external_call": False, "message_body": "السلام عليكم، نريد تجربة عينة صدور دجاج جديدة لفرع مسقط."},
-    {"created_at": "09:22", "sender_name": "أحمد الشمري", "is_external_call": False, "message_body": "أهلاً بك، تم إرسال 15 كرتون عينة للتجربة الميدانية."},
-    {"created_at": "11:45", "sender_name": "أحمد الشمري", "is_external_call": True, "message_body": "تم إجراء مكالمة مع مدير المشتريات وتأكيد استلام المواصفات القياسية."}
-]
-
-# ----------------- نماذج Pydantic للطلبات -----------------
+# ----------------- نماذج Pydantic للبيانات المدخلة -----------------
 class NewSamplePayload(BaseModel):
     customer_name: str
     rep_name: str
@@ -345,83 +350,163 @@ class NewSaleTransactionPayload(BaseModel):
 # ----------------- مسارات واجهة برمجة التطبيقات (APIs) -----------------
 @app.get("/health")
 def health():
-    return {"status": "UP", "timestamp": datetime.now().isoformat()}
+    return {"status": "UP", "timestamp": datetime.now().isoformat(), "db_configured": bool(DATABASE_URL)}
 
 @app.get("/api/reps")
 def get_reps():
-    enriched = []
-    for r in sales_executives_db:
-        rate = (r["achieved_sales"] / r["monthly_target"]) * 100 if r["monthly_target"] > 0 else 0
-        eff = "عالي الكفاءة" if rate >= 100 and r["fuel_liters"] <= r["fuel_allowance_liters"] else ("مقبول" if rate >= 80 else "هدر موارد")
-        enriched.append({**r, "achievement_rate": rate, "efficiency": eff})
-    return enriched
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sales_executives ORDER BY id ASC;")
+            reps = cur.fetchall()
+            enriched = []
+            for r in reps:
+                target = float(r["monthly_target"] or 0)
+                sales = float(r["achieved_sales"] or 0)
+                used_fuel = float(r["fuel_liters_used"] or 0)
+                allow_fuel = float(r["fuel_allowance_liters"] or 0)
+                rate = (sales / target * 100) if target > 0 else 0
+                eff = "عالي الكفاءة" if rate >= 100 and used_fuel <= allow_fuel else ("مقبول" if rate >= 80 else "هدر موارد")
+                enriched.append({
+                    "id": r["id"],
+                    "name": r["name"],
+                    "employee_code": r["employee_code"],
+                    "phone_number": r["phone_number"],
+                    "region": r["region"],
+                    "monthly_target": target,
+                    "achieved_sales": sales,
+                    "fuel_allowance_liters": allow_fuel,
+                    "fuel_liters": used_fuel,
+                    "total_expenses": float(r["total_expenses"] or 0),
+                    "status": r["status"],
+                    "achievement_rate": rate,
+                    "efficiency": eff
+                })
+            return enriched
+    finally:
+        conn.close()
 
 @app.get("/api/customers")
 def get_customers():
-    return customer_accounts_db
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM customer_accounts ORDER BY id ASC;")
+            return cur.fetchall()
+    finally:
+        conn.close()
 
 @app.get("/api/samples")
 def get_samples():
-    return samples_db
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC;")
+            rows = cur.fetchall()
+            for r in rows:
+                r["delivery_date"] = str(r["delivery_date"])
+                r["po_value"] = float(r["po_value"] or 0)
+            return rows
+    finally:
+        conn.close()
 
 @app.post("/api/samples")
 def add_sample(payload: NewSamplePayload):
-    new_s = {
-        "id": len(samples_db) + 1,
-        "customer_name": payload.customer_name,
-        "rep_name": payload.rep_name,
-        "product_name": payload.product_name,
-        "qty_free": payload.qty_free,
-        "delivery_date": payload.delivery_date,
-        "status": "PENDING",
-        "converted_po_id": None,
-        "po_value": 0.0,
-        "source": "إدخال يدوي"
-    }
-    samples_db.insert(0, new_s)
-    return {"status": "SUCCESS", "sample": new_s}
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO sample_deliveries (customer_name, rep_name, product_name, qty_free, delivery_date, status, po_value, source)
+            VALUES (%s, %s, %s, %s, %s, 'PENDING', 0.0, 'إدخال يدوي') RETURNING id;
+            """, (payload.customer_name, payload.rep_name, payload.product_name, payload.qty_free, payload.delivery_date))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
 
 @app.get("/api/calendar")
 def get_calendar():
-    return calendar_events_db
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM calendar_events ORDER BY id DESC;")
+            return cur.fetchall()
+    finally:
+        conn.close()
 
 @app.post("/api/calendar")
 def add_calendar_event(payload: NewCalendarEventPayload):
-    new_ev = {
-        "id": len(calendar_events_db) + 1,
-        "customer_name": payload.customer_name,
-        "rep_name": payload.rep_name,
-        "task_type": payload.task_type,
-        "scheduled_at": payload.scheduled_at,
-        "location": payload.location,
-        "route_code": payload.route_code,
-        "ack_status": False,
-        "execution_status": "PENDING"
-    }
-    calendar_events_db.insert(0, new_ev)
-    return {"status": "SUCCESS", "event": new_ev}
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, route_code, execution_status)
+            VALUES (%s, %s, %s, %s, %s, %s, 'PENDING') RETURNING id;
+            """, (payload.customer_name, payload.rep_name, payload.task_type, payload.scheduled_at, payload.location, payload.route_code))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
 
 @app.post("/api/transactions/sale")
 def record_sale(payload: NewSaleTransactionPayload):
-    p_rep = next((r for r in sales_executives_db if r["id"] == payload.primary_rep_id), None)
-    if not p_rep:
-        raise HTTPException(status_code=404, detail="مسؤول المبيعات غير موجود")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sales_executives WHERE id = %s;", (payload.primary_rep_id,))
+            p_rep = cur.fetchone()
+            if not p_rep:
+                raise HTTPException(status_code=404, detail="مسؤول المبيعات غير موجود")
 
-    if payload.secondary_rep_id:
-        s_rep = next((r for r in sales_executives_db if r["id"] == payload.secondary_rep_id), None)
-        if s_rep:
-            ratio = (payload.split_percentage or 50.0) / 100.0
-            p_rep["achieved_sales"] += payload.sale_amount * (1 - ratio)
-            s_rep["achieved_sales"] += payload.sale_amount * ratio
-    else:
-        p_rep["achieved_sales"] += payload.sale_amount
+            total_exp_added = (payload.expense_fuel or 0.0) + (payload.expense_other or 0.0)
 
-    p_rep["total_expenses"] += (payload.expense_fuel or 0.0) + (payload.expense_other or 0.0)
-    return {"status": "SUCCESS", "message": "تم تقييد المبيعات والمصاريف بنجاح"}
+            if payload.secondary_rep_id:
+                cur.execute("SELECT * FROM sales_executives WHERE id = %s;", (payload.secondary_rep_id,))
+                s_rep = cur.fetchone()
+                if s_rep:
+                    ratio = (payload.split_percentage or 50.0) / 100.0
+                    p_add = payload.sale_amount * (1 - ratio)
+                    s_add = payload.sale_amount * ratio
+                    cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s, total_expenses = total_expenses + %s WHERE id = %s;",
+                                (p_add, total_exp_added, payload.primary_rep_id))
+                    cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s WHERE id = %s;",
+                                (s_add, payload.secondary_rep_id))
+            else:
+                cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s, total_expenses = total_expenses + %s WHERE id = %s;",
+                            (payload.sale_amount, total_exp_added, payload.primary_rep_id))
+
+            conn.commit()
+            return {"status": "SUCCESS", "message": "تم حفظ العملية وتحديث رصيد الإنجاز في قاعدة البيانات"}
+    finally:
+        conn.close()
 
 @app.get("/api/whatsapp/logs")
 def get_whatsapp_logs():
-    return whatsapp_logs_db
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM whatsapp_logs ORDER BY id DESC LIMIT 50;")
+            return cur.fetchall()
+    finally:
+        conn.close()
 
 @app.get("/api/whatsapp/status")
 def get_whatsapp_status():
@@ -436,15 +521,18 @@ def get_whatsapp_qr():
         "status": "QR_READY"
     }
 
-# ----------------- مسار معاينة وطباعة التقرير الرسمي -----------------
+# ----------------- مسار معاينة وطباعة التقرير بدون قص أو تشويه -----------------
 @app.post("/api/reports/preview")
 def preview_report(req: dict):
     recipient = req.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام")
     recommendation = req.get("recommendation", "أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي.")
-    
-    total_sales = sum(r["achieved_sales"] for r in sales_executives_db)
-    total_exp = sum(r["total_expenses"] for r in sales_executives_db)
-    
+
+    reps = get_reps()
+    samples = get_samples()
+
+    total_sales = sum(r["achieved_sales"] for r in reps)
+    total_exp = sum(r["total_expenses"] for r in reps)
+
     html = f"""<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -454,22 +542,20 @@ def preview_report(req: dict):
     <style>{PRINT_ENGINE_CSS}</style>
 </head>
 <body>
-    <div class="no-print" style="max-width: 200mm; margin: 0 auto 16px auto; background: #3A056A; color: #FFFFFF; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-        <div style="font-weight: 700; font-size: 10pt;">معاينة المستند الرسمي | شركة تنمية الغذاء</div>
-        <div style="display: flex; gap: 10px;">
-            <button onclick="window.print()" style="background: #C194FB; color: #3A056A; border: none; font-weight: 800; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: Cairo; font-size: 9pt;">طباعة المستند الرسمي (A4) 🖨️</button>
-        </div>
+    <div class="no-print" style="width: 100%; max-width: 194mm; margin: 0 auto 12px auto; background: #3A056A; color: #FFFFFF; padding: 10px 16px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <div style="font-weight: 700; font-size: 9.5pt;">معاينة المستند الرسمي | شركة تنمية الغذاء</div>
+        <button onclick="window.print()" style="background: #C194FB; color: #3A056A; border: none; font-weight: 800; padding: 6px 16px; border-radius: 5px; cursor: pointer; font-family: Cairo; font-size: 8.5pt;">طباعة المستند الرسمي (A4) 🖨️</button>
     </div>
 
     <div class="print-container">
-        <!-- ترويسة التقرير الرسمية المعتمدة عبر جدول محاذاة صارم -->
-        <table style="width: 100%; border-bottom: 2.5px solid #3A056A; padding-bottom: 12px; margin-bottom: 18px; border-collapse: collapse;">
+        <!-- ترويسة متطابقة ومستقرة بدون أي تداخل -->
+        <table style="width: 100%; border-bottom: 2px solid #3A056A; padding-bottom: 10px; margin-bottom: 12px; border-collapse: collapse;">
             <tr>
                 <td style="text-align: right; vertical-align: middle;">
-                    <h1 style="margin: 0 0 6px 0; color: #3A056A; font-size: 17pt; font-weight: 800;">التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
-                    <div style="color: #64748B; font-size: 9pt;">الفترة: الربع الثالث 2026 &nbsp;|&nbsp; توجيه المستند: {recipient}</div>
+                    <h1 style="margin: 0 0 3px 0; color: #3A056A; font-size: 15pt; font-weight: 900; line-height: 1.2;">التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
+                    <div style="color: #64748B; font-size: 8pt; font-weight: 600;">الفترة: الربع الثالث 2026 &nbsp;|&nbsp; توجيه المستند: {recipient}</div>
                 </td>
-                <td style="text-align: left; vertical-align: middle; width: 270px;">
+                <td style="text-align: left; vertical-align: middle; width: 220px;">
                     {OFFICIAL_COMPANY_LOGO}
                 </td>
             </tr>
@@ -490,22 +576,22 @@ def preview_report(req: dict):
             </div>
             <div class="kpi-card">
                 <div class="kpi-lbl">نسبة كفاءة التكلفة للبيع</div>
-                <div class="kpi-val">{(total_exp/total_sales*100):.2f}%</div>
+                <div class="kpi-val">{(total_exp/total_sales*100 if total_sales > 0 else 0):.2f}%</div>
             </div>
         </div>
 
-        <div style="font-weight: 800; color: var(--brand); margin: 16px 0 8px 0; font-size: 10pt;">جدول إنجازات فريق المبيعات التنفيذي:</div>
+        <div style="font-weight: 800; color: var(--brand); margin: 10px 0 6px 0; font-size: 9pt;">جدول إنجازات فريق المبيعات التنفيذي:</div>
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>المسؤول</th>
-                    <th>المنطقة</th>
-                    <th>المستهدف الشهري</th>
-                    <th>المبيعات المحققة</th>
-                    <th>نسبة الإنجاز</th>
-                    <th>استهلاك الوقود</th>
-                    <th>المصاريف</th>
-                    <th>تقييم الكفاءة</th>
+                    <th style="width: 16%;">المسؤول</th>
+                    <th style="width: 14%;">المنطقة</th>
+                    <th style="width: 13%;">المستهدف</th>
+                    <th style="width: 13%;">المحقق</th>
+                    <th style="width: 10%;">الإنجاز</th>
+                    <th style="width: 14%;">الوقود (فعلي/متاح)</th>
+                    <th style="width: 10%;">المصاريف</th>
+                    <th style="width: 10%;">الكفاءة</th>
                 </tr>
             </thead>
             <tbody>
@@ -515,26 +601,25 @@ def preview_report(req: dict):
                     <td>{r["region"]}</td>
                     <td>{r["monthly_target"]:,.1f} ر.ع</td>
                     <td style="font-weight: 800; color: var(--ok);">{r["achieved_sales"]:,.1f} ر.ع</td>
-                    <td>{(r["achieved_sales"]/r["monthly_target"]*100):.1f}%</td>
+                    <td style="font-weight: 800;">{(r["achievement_rate"]):.1f}%</td>
                     <td>{r["fuel_liters"]} / {r["fuel_allowance_liters"]} لتر</td>
                     <td>{r["total_expenses"]:,.1f} ر.ع</td>
-                    <td><span class="badge badge-ok">عالي الكفاءة</span></td>
+                    <td><span class="badge badge-ok">{r["efficiency"]}</span></td>
                 </tr>
-                ''' for r in sales_executives_db])}
+                ''' for r in reps])}
             </tbody>
         </table>
 
-        <div style="font-weight: 800; color: var(--brand); margin: 16px 0 8px 0; font-size: 10pt;">سجل حركة العينات وتحويلها لأوامر شراء (Sample ROI):</div>
+        <div style="font-weight: 800; color: var(--brand); margin: 10px 0 6px 0; font-size: 9pt;">سجل حركة العينات وتحويلها لأوامر شراء (Sample ROI):</div>
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>العميل</th>
-                    <th>المنتج</th>
-                    <th>الكمية</th>
-                    <th>تاريخ التسليم</th>
-                    <th>قرار الاعتماد</th>
-                    <th>أمر الشراء (PO)</th>
-                    <th>قيمة العقد</th>
+                    <th style="width: 25%;">العميل</th>
+                    <th style="width: 25%;">المنتج</th>
+                    <th style="width: 10%;">الكمية</th>
+                    <th style="width: 13%;">تاريخ التسليم</th>
+                    <th style="width: 12%;">القرار</th>
+                    <th style="width: 15%;">أمر الشراء (PO)</th>
                 </tr>
             </thead>
             <tbody>
@@ -545,19 +630,18 @@ def preview_report(req: dict):
                     <td>{s["qty_free"]} وحدة</td>
                     <td>{s["delivery_date"]}</td>
                     <td><span class="badge {'badge-ok' if s['status']=='APPROVED' else 'badge-warn'}">{s['status']}</span></td>
-                    <td style="font-family: monospace;">{s["converted_po_id"] or '—'}</td>
-                    <td style="font-weight: 800;">{s["po_value"]:,.1f} ر.ع</td>
+                    <td style="font-family: monospace; font-weight: 800;">{s["converted_po_id"] or '—'}</td>
                 </tr>
-                ''' for s in samples_db])}
+                ''' for s in samples])}
             </tbody>
         </table>
 
-        <div style="margin-top: 14px;">
-            <div style="font-weight: 800; color: var(--brand); font-size: 9.5pt; margin-bottom: 4px;">التوصية الإدارية والتنفيذية (قابلة للتحرير قبل الطباعة):</div>
-            <div class="editable-box" contenteditable="true" title="اضغط هنا لتعديل نص التوصية مباشرة قبل الطباعة">{recommendation}</div>
+        <div style="margin-top: 10px;">
+            <div style="font-weight: 800; color: var(--brand); font-size: 8.5pt; margin-bottom: 2px;">التوصية الإدارية والتنفيذية (قابلة للتحرير قبل الطباعة):</div>
+            <div class="editable-box" contenteditable="true" title="اضغط هنا لتعديل نص التوصية مباشرة">{recommendation}</div>
         </div>
 
-        <div style="margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 8pt; color: #64748B;">
+        <div style="margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 7.5pt; color: #64748B;">
             <div>وثيقة رسمية صادرة عن: نظام إدارة المبيعات الميدانية والتنفيذية الذكي</div>
             <div>اعتماد الإدارة العامة: ___________________</div>
         </div>
