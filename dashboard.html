@@ -37,16 +37,17 @@
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- القائمة الجانبية الرسمية (أيقونات أحادية اللون Monochrome SVG) -->
+    <!-- القائمة الجانبية الرسمية (أيقونات أحادية اللون Monochrome SVG والشعار المحدث) -->
     <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
-            <!-- الشعار الرسمي -->
-            <div class="p-4 border-b border-[#52128e] flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-[#C194FB] flex items-center justify-center text-[#3A056A] font-black text-xl shadow-md border-2 border-white">ت</div>
-                <div>
-                    <div class="font-extrabold text-sm tracking-wide leading-tight">شركة تنمية الغذاء</div>
-                    <div class="text-[10px] text-[#C194FB] font-bold tracking-wider uppercase">FOOD DEVELOPMENT CO.</div>
-                </div>
+            <!-- الشعار الرسمي المتجهي داخل القائمة الجانبية -->
+            <div class="p-4 border-b border-[#52128e] flex items-center justify-between">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 60" width="220" height="50">
+                    <rect x="205" y="4" width="50" height="50" rx="12" fill="#C194FB"/>
+                    <text x="230" y="39" fill="#3A056A" font-family="'Cairo', sans-serif" font-size="26" font-weight="900" text-anchor="middle">ت</text>
+                    <text x="192" y="28" fill="#FFFFFF" font-family="'Cairo', sans-serif" font-size="16" font-weight="800" text-anchor="end">شركة تنمية الغذاء</text>
+                    <text x="192" y="45" fill="#C194FB" font-family="'Cairo', sans-serif" font-size="8.5" font-weight="700" letter-spacing="1" text-anchor="end">FOOD DEVELOPMENT CO.</text>
+                </svg>
             </div>
 
             <!-- أقسام التنقل الرئيسية -->
