@@ -13,7 +13,7 @@
         .brand-border { border-color: #E4D9F5; }
         .brand-tint { background-color: #F5F0FC; }
 
-        /* عزل الطباعة لدليل العملاء وكامل النظام */
+        /* عزل تام لطباعة دليل العملاء */
         @media print {
             aside, header, .no-print {
                 display: none !important;
@@ -27,7 +27,7 @@
             #printable-customers-section {
                 display: block !important;
                 width: 100% !important;
-                padding: 10mm !important;
+                padding: 8mm !important;
             }
             #tab-customers {
                 display: block !important;
@@ -37,20 +37,19 @@
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- القائمة الجانبية الرسمية (أيقونات أحادية اللون Monochrome SVG والشعار المحدث) -->
+    <!-- القائمة الجانبية الرسمية -->
     <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
-            <!-- الشعار الرسمي المتجهي داخل القائمة الجانبية -->
-            <div class="p-4 border-b border-[#52128e] flex items-center justify-between">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 60" width="220" height="50">
-                    <rect x="205" y="4" width="50" height="50" rx="12" fill="#C194FB"/>
-                    <text x="230" y="39" fill="#3A056A" font-family="'Cairo', sans-serif" font-size="26" font-weight="900" text-anchor="middle">ت</text>
-                    <text x="192" y="28" fill="#FFFFFF" font-family="'Cairo', sans-serif" font-size="16" font-weight="800" text-anchor="end">شركة تنمية الغذاء</text>
-                    <text x="192" y="45" fill="#C194FB" font-family="'Cairo', sans-serif" font-size="8.5" font-weight="700" letter-spacing="1" text-anchor="end">FOOD DEVELOPMENT CO.</text>
-                </svg>
+            <!-- الشعار المستقر داخل القائمة الجانبية -->
+            <div class="p-4 border-b border-[#52128e] flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-[#C194FB] flex items-center justify-center text-[#3A056A] font-black text-xl shadow-md border-2 border-white flex-shrink-0">ت</div>
+                <div class="overflow-hidden">
+                    <div class="font-extrabold text-sm tracking-wide leading-tight whitespace-nowrap">شركة تنمية الغذاء</div>
+                    <div class="text-[9px] text-[#C194FB] font-bold tracking-wider uppercase whitespace-nowrap">FOOD DEVELOPMENT CO.</div>
+                </div>
             </div>
 
-            <!-- أقسام التنقل الرئيسية -->
+            <!-- عناصر التنقل -->
             <div class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
                 <div class="text-[10px] font-bold text-[#C194FB] mb-2 px-2 uppercase tracking-wider">العمليات والمبيعات الميدانية</div>
                 
@@ -186,7 +185,7 @@
                 </div>
             </div>
 
-            <!-- تبويب 3: دليل حسابات العملاء المعتمدة (معزول وجاهز للطباعة الصافية) -->
+            <!-- تبويب 3: دليل حسابات العملاء المعتمدة -->
             <div id="tab-customers" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs" id="printable-customers-section">
                     <div class="flex justify-between items-center mb-4">
@@ -237,7 +236,6 @@
                                 <th class="p-3">مصدر التسجيل</th>
                                 <th class="p-3">قرار الجودة</th>
                                 <th class="p-3">أمر الشراء (PO)</th>
-                                <th class="p-3">قيمة العقد</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y brand-border" id="samples-table-body"></tbody>
@@ -339,7 +337,7 @@
         </div>
     </div>
 
-    <!-- مودال: قيد مبيعات ونفقات (يدعم الجهد المشترك والريال العماني) -->
+    <!-- مودال: قيد مبيعات ونفقات -->
     <div id="sale-transaction-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">قيد مبيعات فعلية ومصاريف ميدانية</h3>
@@ -396,7 +394,7 @@
         </div>
     </div>
 
-    <!-- مودال: مركز التقارير الرسمية (إمكانية تعديل التوصية المباشرة) -->
+    <!-- مودال: مركز التقارير الرسمية -->
     <div id="report-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[520px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">مركز إصدار التقارير التنفيذية الرسمية</h3>
@@ -411,7 +409,7 @@
                 <input type="text" id="report-recipient" value="سعادة رئيس مجلس الإدارة / المدير العام" class="w-full p-2 border rounded-lg">
             </div>
             <div>
-                <label class="block font-bold mb-1">التوصية الإدارية (يمكنك كتابتها أو تعديلها هنا):</label>
+                <label class="block font-bold mb-1">التوصية الإدارية (قابلة للتعديل):</label>
                 <textarea id="report-custom-recommendation" rows="3" class="w-full p-2.5 border rounded-lg focus:ring-1 focus:ring-purple-600 outline-none">أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي.</textarea>
             </div>
             <div class="flex justify-between items-center pt-3 border-t">
@@ -545,7 +543,6 @@
         }
 
         async function loadAllData() {
-            // تحميل فريق المبيعات
             const repsRes = await fetch('/api/reps');
             const reps = await repsRes.json();
             
@@ -577,7 +574,6 @@
                 </div>
             `).join('');
 
-            // تحميل العملاء
             const custRes = await fetch('/api/customers');
             const custs = await custRes.json();
             document.getElementById('customers-table-body').innerHTML = custs.map(c => `
@@ -592,7 +588,6 @@
                 </tr>
             `).join('');
 
-            // تحميل العينات
             const sRes = await fetch('/api/samples');
             const samples = await sRes.json();
             document.getElementById('samples-table-body').innerHTML = samples.map(s => `
@@ -605,11 +600,9 @@
                     <td class="p-3 text-[10px] text-gray-500">${s.source || 'يدوي'}</td>
                     <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.status==='APPROVED'?'bg-emerald-100 text-emerald-800':'bg-amber-100 text-amber-800'}">${s.status}</span></td>
                     <td class="p-3 font-mono">${s.converted_po_id || '—'}</td>
-                    <td class="p-3 font-bold ${s.po_value>0?'text-emerald-700':'text-gray-400'}">${s.po_value?s.po_value.toLocaleString()+' ر.ع':'—'}</td>
                 </tr>
             `).join('');
 
-            // تحميل التقويم
             const cRes = await fetch('/api/calendar');
             const cal = await cRes.json();
             document.getElementById('calendar-events-list').innerHTML = cal.map(e => `
@@ -623,7 +616,6 @@
                 </div>
             `).join('');
 
-            // تحميل الواتساب
             const wRes = await fetch('/api/whatsapp/logs');
             const wLogs = await wRes.json();
             document.getElementById('whatsapp-feed-list').innerHTML = wLogs.map(l => `
