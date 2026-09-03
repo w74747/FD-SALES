@@ -1,26 +1,24 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + Dual Execution Reporting (Pure HTML/Print + WeasyPrint Fallback)
+FastAPI Backend + High-Precision Printing Engine (OMR Currency & Corporate Identity)
 """
 
 import os
 import json
 import uuid
-import asyncio
 import logging
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Response, Request, BackgroundTasks
+from typing import Optional, List
+from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
-from pydantic import BaseModel, Field
-from jinja2 import Template
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="3.0.0")
+app = FastAPI(title="FDC Sales CRM", version="3.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,21 +28,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----------------- الشعار وهوية الشركة المعتمدة -----------------
-LOGO_SVG = """
-<div style="display: flex; align-items: center; gap: 10px;">
-    <div style="background: #3A056A; color: #FFFFFF; font-weight: 900; font-size: 22px; width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 2px solid #C194FB;">ت</div>
-    <div>
-        <div style="color: #3A056A; font-weight: 800; font-size: 16px; line-height: 1.1;">شركة تنمية الغذاء</div>
-        <div style="color: #6B21A8; font-size: 9px; letter-spacing: 1px; font-weight: bold;">FOOD DEVELOPMENT CO.</div>
+# ----------------- شعار الشركة الرسمي المتجهي (Corporate SVG) -----------------
+OFFICIAL_COMPANY_LOGO = """
+<div style="display: flex; align-items: center; gap: 12px; direction: rtl;">
+    <div style="background: #3A056A; color: #FFFFFF; font-weight: 900; font-size: 24px; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 2px solid #C194FB; box-shadow: 0 2px 6px rgba(58,5,106,0.15);">ت</div>
+    <div style="text-align: right;">
+        <div style="color: #3A056A; font-weight: 800; font-size: 17px; line-height: 1.2;">شركة تنمية الغذاء</div>
+        <div style="color: #7E22CE; font-size: 9px; letter-spacing: 1.5px; font-weight: 700; text-transform: uppercase;">FOOD DEVELOPMENT CO.</div>
     </div>
 </div>
 """
 
-CSS_PRINT = """
+# ----------------- CSS الطباعة الصارم والمعتمد (بدون ترويسات المتصفح) -----------------
+PRINT_ENGINE_CSS = """
 @page {
     size: A4 portrait;
-    margin: 12mm 10mm 15mm 10mm;
+    margin: 10mm 12mm 10mm 12mm;
+}
+@media print {
+    html, body {
+        width: 210mm;
+        height: 297mm;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #FFFFFF !important;
+        color: #1A202C !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .print-container {
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
 }
 :root {
     --brand: #3A056A;
@@ -61,76 +79,145 @@ body {
     font-family: 'Cairo', 'Tajawal', sans-serif;
     color: var(--text);
     margin: 0;
-    padding: 20px;
-    font-size: 9pt;
+    padding: 24px;
+    font-size: 9.5pt;
+    background: #F8FAFC;
+}
+.print-container {
+    max-width: 200mm;
+    margin: 0 auto;
     background: #FFFFFF;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 .header-box {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 2.5px solid var(--brand);
-    padding-bottom: 12px;
-    margin-bottom: 16px;
+    border-bottom: 2px solid var(--brand);
+    padding-bottom: 14px;
+    margin-bottom: 18px;
 }
-.title-box h1 { margin: 0; color: var(--brand); font-size: 16pt; font-weight: 800; }
-.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-.kpi-card { background: #FAF7FD; border: 1px solid var(--line); border-radius: 6px; padding: 10px; text-align: center; }
-.kpi-val { font-size: 13pt; font-weight: bold; color: var(--brand); margin-top: 4px; }
-table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-table.data-table th { background: var(--brand); color: #fff; text-align: right; padding: 8px 10px; font-size: 8.5pt; }
-table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 8.5pt; }
-table.data-table tr:nth-child(even) { background: #FAF7FD; }
-.badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-weight: bold; font-size: 7.5pt; }
+.title-box h1 {
+    margin: 0 0 4px 0;
+    color: var(--brand);
+    font-size: 16pt;
+    font-weight: 800;
+}
+.title-meta {
+    color: #64748B;
+    font-size: 9pt;
+}
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+}
+.kpi-card {
+    background: #FAF7FD;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+}
+.kpi-lbl {
+    font-size: 8.5pt;
+    color: #64748B;
+    font-weight: 600;
+}
+.kpi-val {
+    font-size: 14pt;
+    font-weight: 800;
+    color: var(--brand);
+    margin-top: 4px;
+}
+table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 18px;
+    border: 1px solid var(--line);
+}
+table.data-table th {
+    background: var(--brand);
+    color: #FFFFFF;
+    text-align: right;
+    padding: 8px 10px;
+    font-size: 8.5pt;
+    font-weight: 700;
+}
+table.data-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    font-size: 8.5pt;
+}
+table.data-table tr:nth-child(even) {
+    background: #FAF7FD;
+}
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 7.5pt;
+}
 .badge-ok { background: #EDF7F2; color: var(--ok); }
 .badge-warn { background: #FDF6E7; color: var(--warn); }
 .badge-bad { background: #FBEEEE; color: var(--bad); }
-.ai-box { background: #F6F0FD; border: 1px dashed var(--accent); border-radius: 6px; padding: 12px; margin-top: 15px; }
-@media print {
-    .no-print { display: none !important; }
-    body { padding: 0; }
+.editable-box {
+    background: #FAF7FD;
+    border: 1.5px dashed var(--accent);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 14px;
+    outline: none;
+}
+.editable-box:focus {
+    border-style: solid;
+    background: #FFFFFF;
 }
 """
 
-# ----------------- بنك البيانات المحدث (In-Memory Database) -----------------
+# ----------------- قاعدة البيانات المحلية (OMR Currency) -----------------
 sales_executives_db = [
     {
         "id": 1,
         "name": "أحمد الشمري",
         "employee_code": "SE-101",
-        "phone_number": "+966501112233",
-        "region": "الرياض - الوسطى",
-        "monthly_target": 250000.0,
-        "achieved_sales": 272000.0,
+        "phone_number": "+96891112233",
+        "region": "مسقط - الوسطى",
+        "monthly_target": 25000.0,
+        "achieved_sales": 27200.0,
         "fuel_allowance_liters": 400.0,
         "fuel_liters": 380.0,
-        "total_expenses": 3200.0,
+        "total_expenses": 320.0,
         "status": "نشط"
     },
     {
         "id": 2,
         "name": "سالم الدوسري",
         "employee_code": "SE-102",
-        "phone_number": "+966504445566",
-        "region": "الدمام - الشرقية",
-        "monthly_target": 180000.0,
-        "achieved_sales": 135000.0,
+        "phone_number": "+96894445566",
+        "region": "صحار - الباطنة",
+        "monthly_target": 18000.0,
+        "achieved_sales": 13500.0,
         "fuel_allowance_liters": 350.0,
         "fuel_liters": 395.0,
-        "total_expenses": 4100.0,
+        "total_expenses": 410.0,
         "status": "نشط"
     },
     {
         "id": 3,
         "name": "تركي الغامدي",
         "employee_code": "SE-103",
-        "phone_number": "+966507778899",
-        "region": "جدة - الغربية",
-        "monthly_target": 220000.0,
-        "achieved_sales": 215000.0,
+        "phone_number": "+96897778899",
+        "region": "صلالة - ظفار",
+        "monthly_target": 22000.0,
+        "achieved_sales": 21500.0,
         "fuel_allowance_liters": 380.0,
         "fuel_liters": 360.0,
-        "total_expenses": 3600.0,
+        "total_expenses": 360.0,
         "status": "نشط"
     }
 ]
@@ -138,10 +225,10 @@ sales_executives_db = [
 customer_accounts_db = [
     {
         "id": 1,
-        "company_name": "سلسلة مطاعم الريف الحجازي",
+        "company_name": "سلسلة مطاعم الريف",
         "sector": "مطاعم وإعاشة",
         "contact_person": "م. فهد القرني",
-        "phone": "+966509988771",
+        "phone": "+96899988771",
         "assigned_rep_id": 1,
         "assigned_rep_name": "أحمد الشمري",
         "whatsapp_group_id": "120363029182371@g.us",
@@ -154,7 +241,7 @@ customer_accounts_db = [
         "company_name": "مؤسسة التموين الحديث",
         "sector": "تجارة جملة",
         "contact_person": "أ/ طارق المنصور",
-        "phone": "+966503322110",
+        "phone": "+96893322110",
         "assigned_rep_id": 2,
         "assigned_rep_name": "سالم الدوسري",
         "whatsapp_group_id": "120363088716253@g.us",
@@ -167,7 +254,7 @@ customer_accounts_db = [
         "company_name": "شركة الضيافة الفندقية العالمية",
         "sector": "فنادق وخدمات",
         "contact_person": "أ/ وائل الخالدي",
-        "phone": "+966508822334",
+        "phone": "+96898822334",
         "assigned_rep_id": 3,
         "assigned_rep_name": "تركي الغامدي",
         "whatsapp_group_id": "120363077615243@g.us",
@@ -180,20 +267,18 @@ customer_accounts_db = [
 samples_db = [
     {
         "id": 1,
-        "customer_id": 1,
-        "customer_name": "سلسلة مطاعم الريف الحجازي",
+        "customer_name": "سلسلة مطاعم الريف",
         "rep_name": "أحمد الشمري",
-        "product_name": "صدور دجاج متبلة (خلطة 4B الخاصة)",
+        "product_name": "صدور دجاج متبلة (خلطة 4B)",
         "qty_free": 15,
         "delivery_date": "2026-08-25",
         "status": "APPROVED",
         "converted_po_id": "PO-2026-889",
-        "po_value": 78000.0,
+        "po_value": 7800.0,
         "source": "WhatsApp Sentinel"
     },
     {
         "id": 2,
-        "customer_id": 2,
         "customer_name": "مؤسسة التموين الحديث",
         "rep_name": "سالم الدوسري",
         "product_name": "دجاج مجمد فائق الجودة 1000g",
@@ -206,15 +291,14 @@ samples_db = [
     },
     {
         "id": 3,
-        "customer_id": 3,
         "customer_name": "شركة الضيافة الفندقية العالمية",
         "rep_name": "تركي الغامدي",
-        "product_name": "شاورما دجاج متبلة جاهزة للطهي",
+        "product_name": "شاورما دجاج جاهزة للطهي",
         "qty_free": 25,
         "delivery_date": "2026-08-28",
         "status": "APPROVED",
         "converted_po_id": "PO-2026-904",
-        "po_value": 115000.0,
+        "po_value": 11500.0,
         "source": "WhatsApp Sentinel"
     }
 ]
@@ -222,11 +306,11 @@ samples_db = [
 calendar_events_db = [
     {
         "id": 1,
-        "customer_name": "سلسلة مطاعم الريف الحجازي",
+        "customer_name": "سلسلة مطاعم الريف",
         "rep_name": "أحمد الشمري",
         "task_type": "توقيع عقد توريد سنوي",
         "scheduled_at": "2026-09-03 10:00",
-        "location": "الإدارة العامة - الملز",
+        "location": "الإدارة العامة - مسقط",
         "route_code": "R-10",
         "ack_status": True,
         "execution_status": "DONE"
@@ -237,31 +321,20 @@ calendar_events_db = [
         "rep_name": "سالم الدوسري",
         "task_type": "زيارة تقصي واسترجاع عينات",
         "scheduled_at": "2026-09-04 13:00",
-        "location": "مستودعات الخالدية",
+        "location": "مستودعات صحار",
         "route_code": "R-14",
         "ack_status": False,
-        "execution_status": "PENDING"
-    },
-    {
-        "id": 3,
-        "customer_name": "شركة الضيافة الفندقية العالمية",
-        "rep_name": "تركي الغامدي",
-        "task_type": "تسليم عينات إضافية جديدة",
-        "scheduled_at": "2026-09-04 15:30",
-        "location": "فندق الكورنيش - جدة",
-        "route_code": "R-22",
-        "ack_status": True,
         "execution_status": "PENDING"
     }
 ]
 
 whatsapp_logs_db = [
-    {"created_at": "09:15", "sender_name": "م. فهد القرني", "is_external_call": False, "message_body": "السلام عليكم، نريد تجربة عينة صدور دجاج جديدة لفرع التخصصي."},
-    {"created_at": "09:22", "sender_name": "أحمد الشمري", "is_external_call": False, "message_body": "أهلاً بك، تم جدولة تسليم 15 كرتون عينة غداً صباحاً بإذن الله."},
-    {"created_at": "11:45", "sender_name": "أحمد الشمري", "is_external_call": True, "message_body": "تمت مكالمة مدير التشغيل لتأكيد درجات التبريد والتخزين المعتمدة."}
+    {"created_at": "09:15", "sender_name": "م. فهد القرني", "is_external_call": False, "message_body": "السلام عليكم، نريد تجربة عينة صدور دجاج جديدة لفرع مسقط."},
+    {"created_at": "09:22", "sender_name": "أحمد الشمري", "is_external_call": False, "message_body": "أهلاً بك، تم إرسال 15 كرتون عينة للتجربة الميدانية."},
+    {"created_at": "11:45", "sender_name": "أحمد الشمري", "is_external_call": True, "message_body": "تم إجراء مكالمة مع مدير المشتريات وتأكيد استلام المواصفات القياسية."}
 ]
 
-# ----------------- نماذج Pydantic للإدخال اليدوي -----------------
+# ----------------- نماذج الطلبات -----------------
 class NewSamplePayload(BaseModel):
     customer_name: str
     rep_name: str
@@ -286,7 +359,7 @@ class NewSaleTransactionPayload(BaseModel):
     expense_fuel: Optional[float] = 0.0
     expense_other: Optional[float] = 0.0
 
-# ----------------- واجهات برمجة التطبيقات (APIs) -----------------
+# ----------------- المسارات -----------------
 @app.get("/health")
 def health():
     return {"status": "UP", "timestamp": datetime.now().isoformat()}
@@ -312,7 +385,6 @@ def get_samples():
 def add_sample(payload: NewSamplePayload):
     new_s = {
         "id": len(samples_db) + 1,
-        "customer_id": 1,
         "customer_name": payload.customer_name,
         "rep_name": payload.rep_name,
         "product_name": payload.product_name,
@@ -321,7 +393,7 @@ def add_sample(payload: NewSamplePayload):
         "status": "PENDING",
         "converted_po_id": None,
         "po_value": 0.0,
-        "source": "إدخال يدوي مباشر"
+        "source": "إدخال يدوي"
     }
     samples_db.insert(0, new_s)
     return {"status": "SUCCESS", "sample": new_s}
@@ -381,79 +453,70 @@ def get_whatsapp_qr():
         "status": "QR_READY"
     }
 
-@app.post("/api/whatsapp/confirm-pairing")
-def confirm_pairing():
-    return {"status": "SUCCESS", "message": "تم الربط"}
-
-@app.post("/api/whatsapp/disconnect")
-def disconnect_pairing():
-    return {"status": "SUCCESS", "message": "تم الفصل"}
-
-# ----------------- مسار المعاينة والطباعة عالية الدقة -----------------
+# ----------------- صفحة التقرير التنفيذي للطباعة والمعاينة -----------------
 @app.post("/api/reports/preview")
-async def preview_report(req: dict):
-    template_id = req.get("template_id", "02_executive_sales_report.html")
+def preview_report(req: dict):
     recipient = req.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام")
+    recommendation = req.get("recommendation", "أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي.")
     
     total_sales = sum(r["achieved_sales"] for r in sales_executives_db)
     total_exp = sum(r["total_expenses"] for r in sales_executives_db)
     
-    html_template = f"""
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head>
-        <meta charset="utf-8">
-        <title>تقرير شركة تنمية الغذاء الرسمي</title>
-        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-        <style>
-            {CSS_PRINT}
-        </style>
-    </head>
-    <body>
-        <div class="no-print" style="background: #3A056A; color: #fff; padding: 12px 20px; margin: -20px -20px 20px -20px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-weight: bold; font-size: 11pt;">معاينة التقرير الرسمي المعتمد لشركة تنمية الغذاء</div>
-            <div>
-                <button onclick="window.print()" style="background: #C194FB; color: #3A056A; border: none; font-weight: bold; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-family: Cairo;">طباعة أو حفظ PDF 🖨️</button>
-            </div>
+    html = f"""<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <title>&nbsp;</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>{PRINT_ENGINE_CSS}</style>
+</head>
+<body>
+    <div class="no-print" style="max-width: 200mm; margin: 0 auto 16px auto; background: #3A056A; color: #FFFFFF; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+        <div style="font-weight: 700; font-size: 10pt;">معاينة المستند الرسمي | شركة تنمية الغذاء</div>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="window.print()" style="background: #C194FB; color: #3A056A; border: none; font-weight: 800; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: Cairo; font-size: 9pt;">طباعة المستند الرسمي (A4) 🖨️</button>
         </div>
+    </div>
 
+    <div class="print-container">
         <div class="header-box">
             <div class="title-box">
                 <h1>التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
-                <div style="color: #6B7280; font-size: 9pt; margin-top: 4px;">الفترة: الربع الثالث 2026 | جهة التوجيه: {recipient}</div>
+                <div class="title-meta">الفترة: الربع الثالث 2026 &nbsp;|&nbsp; توجيه المستند: {recipient}</div>
             </div>
-            {LOGO_SVG}
+            {OFFICIAL_COMPANY_LOGO}
         </div>
 
         <div class="kpi-grid">
             <div class="kpi-card">
-                <div style="color: #6B7280; font-size: 8pt;">إجمالي المبيعات المحققة</div>
-                <div class="kpi-val">{total_sales:,.0f} ر.س</div>
+                <div class="kpi-lbl">إجمالي المبيعات المحققة</div>
+                <div class="kpi-val">{total_sales:,.1f} ر.ع</div>
             </div>
             <div class="kpi-card">
-                <div style="color: #6B7280; font-size: 8pt;">العينات المعتمدة تجارياً</div>
+                <div class="kpi-lbl">العينات المعتمدة تجارياً</div>
                 <div class="kpi-val" style="color: var(--ok);">66.7%</div>
             </div>
             <div class="kpi-card">
-                <div style="color: #6B7280; font-size: 8pt;">المصاريف التشغيلية الكلية</div>
-                <div class="kpi-val" style="color: #9333EA;">{total_exp:,.0f} ر.س</div>
+                <div class="kpi-lbl">المصاريف التشغيلية الكلية</div>
+                <div class="kpi-val" style="color: #7E22CE;">{total_exp:,.1f} ر.ع</div>
             </div>
             <div class="kpi-card">
-                <div style="color: #6B7280; font-size: 8pt;">نسبة كفاءة التكلفة للبيع</div>
+                <div class="kpi-lbl">نسبة كفاءة التكلفة للبيع</div>
                 <div class="kpi-val">{(total_exp/total_sales*100):.2f}%</div>
             </div>
         </div>
 
-        <div style="font-weight: bold; color: var(--brand); margin: 16px 0 8px 0; font-size: 10pt;">📊 جدول إنجازات فريق المبيعات التنفيذي:</div>
+        <div style="font-weight: 800; color: var(--brand); margin: 16px 0 8px 0; font-size: 10pt;">جدول إنجازات فريق المبيعات التنفيذي:</div>
         <table class="data-table">
             <thead>
                 <tr>
                     <th>المسؤول</th>
                     <th>المنطقة</th>
-                    <th>المستهدف</th>
-                    <th>المحقق</th>
+                    <th>المستهدف الشهري</th>
+                    <th>المبيعات المحققة</th>
                     <th>نسبة الإنجاز</th>
                     <th>استهلاك الوقود</th>
+                    <th>المصاريف</th>
                     <th>تقييم الكفاءة</th>
                 </tr>
             </thead>
@@ -462,17 +525,18 @@ async def preview_report(req: dict):
                 <tr>
                     <td><strong>{r["name"]}</strong></td>
                     <td>{r["region"]}</td>
-                    <td>{r["monthly_target"]:,.0f} ر.س</td>
-                    <td style="font-weight:bold; color:var(--ok);">{r["achieved_sales"]:,.0f} ر.س</td>
+                    <td>{r["monthly_target"]:,.1f} ر.ع</td>
+                    <td style="font-weight: 800; color: var(--ok);">{r["achieved_sales"]:,.1f} ر.ع</td>
                     <td>{(r["achieved_sales"]/r["monthly_target"]*100):.1f}%</td>
                     <td>{r["fuel_liters"]} / {r["fuel_allowance_liters"]} لتر</td>
+                    <td>{r["total_expenses"]:,.1f} ر.ع</td>
                     <td><span class="badge badge-ok">عالي الكفاءة</span></td>
                 </tr>
                 ''' for r in sales_executives_db])}
             </tbody>
         </table>
 
-        <div style="font-weight: bold; color: var(--brand); margin: 16px 0 8px 0; font-size: 10pt;">🧪 سجل حركة العينات وتحويلها لأوامر شراء (Sample ROI):</div>
+        <div style="font-weight: 800; color: var(--brand); margin: 16px 0 8px 0; font-size: 10pt;">سجل حركة العينات وتحويلها لأوامر شراء (Sample ROI):</div>
         <table class="data-table">
             <thead>
                 <tr>
@@ -480,7 +544,7 @@ async def preview_report(req: dict):
                     <th>المنتج</th>
                     <th>الكمية</th>
                     <th>تاريخ التسليم</th>
-                    <th>قرار الجودة</th>
+                    <th>قرار الاعتماد</th>
                     <th>أمر الشراء (PO)</th>
                     <th>قيمة العقد</th>
                 </tr>
@@ -494,31 +558,34 @@ async def preview_report(req: dict):
                     <td>{s["delivery_date"]}</td>
                     <td><span class="badge {'badge-ok' if s['status']=='APPROVED' else 'badge-warn'}">{s['status']}</span></td>
                     <td style="font-family: monospace;">{s["converted_po_id"] or '—'}</td>
-                    <td style="font-weight:bold;">{s["po_value"]:,.0f} ر.س</td>
+                    <td style="font-weight: 800;">{s["po_value"]:,.1f} ر.ع</td>
                 </tr>
                 ''' for s in samples_db])}
             </tbody>
         </table>
 
-        <div class="ai-box">
-            <div style="font-weight: bold; color: var(--brand); margin-bottom: 4px;">👔 التوصية الاستراتيجية الذكية (Claude 3.7 Intelligence):</div>
-            <div>أظهر الفريق التزاماً استثنائياً في المنطقة الوسطى بتحقيق 108% مع كفاءة في الوقود. يوصى بإسناد حسابات المنطقة الشرقية المتعثرة للمساندة المشتركة وتكثيف توريد عينات الشاورما للقطاع الفندقي.</div>
+        <div style="margin-top: 14px;">
+            <div style="font-weight: 800; color: var(--brand); font-size: 9.5pt; margin-bottom: 4px;">التوصية الإدارية والتنفيذية (قابلة للتحرير قبل الطباعة):</div>
+            <div class="editable-box" contenteditable="true" title="اضغط هنا لتعديل نص التوصية مباشرة قبل الطباعة">{recommendation}</div>
         </div>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_template)
 
-@app.post("/api/reports/download-pdf")
-async def download_pdf_fallback(req: dict):
-    # تحويل مباشر لصفحة المعاينة فائقة الدقة ليقوم المتصفح بطباعتها بدقة A4
-    return await preview_report(req)
+        <div style="margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 8pt; color: #64748B;">
+            <div>وثيقة رسمية صادرة عن: نظام إدارة المبيعات الميدانية والتنفيذية الذكي</div>
+            <div>اعتماد الإدارة العامة: ___________________</div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+    return HTMLResponse(content=html)
 
 @app.get("/", response_class=HTMLResponse)
 def serve_dashboard():
     dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
-    with open(dashboard_path, "r", encoding="utf-8") as f:
-        return f.read()
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>dashboard.html not found</h1>"
 
 if __name__ == "__main__":
     import uvicorn
