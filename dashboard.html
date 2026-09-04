@@ -66,7 +66,7 @@
     <!-- القائمة الجانبية الرسمية -->
     <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
-            <!-- الشعار الرسمي المعتمد متكيف الأبعاد بالكامل -->
+            <!-- الشعار الرسمي -->
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e] no-print">
                 <div class="w-full h-full bg-white rounded-xl p-2 flex items-center justify-center shadow-sm">
                     <img 
@@ -123,6 +123,14 @@
                     <span>مركز التقارير الرسمية المعتمدة</span>
                 </button>
             </div>
+
+            <!-- زر تسجيل الخروج الأمني -->
+            <div class="p-3 border-t border-[#52128e]">
+                <button onclick="logoutSession()" class="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-red-200 bg-red-950/40 hover:bg-red-900/60 rounded-lg transition border border-red-800/40">
+                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    <span>تسجيل الخروج الأمني</span>
+                </button>
+            </div>
         </div>
     </aside>
 
@@ -136,15 +144,19 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100">
-                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
-                    <span>واتساب: بانتظار مسح الرمز</span>
-                    <span class="text-[10px] text-gray-600 bg-white px-2 py-0.5 rounded-full border border-gray-200">مسح QR</span>
+                <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-purple-50 text-[#3A056A] border-purple-200 hover:bg-purple-100">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span>رادار الواتساب الميداني</span>
+                    <span class="text-[10px] text-gray-600 bg-white px-2 py-0.5 rounded-full border border-gray-200">إدارة النطاق</span>
                 </button>
 
                 <button onclick="openReportModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 flex items-center gap-2">
                     <svg class="w-3.5 h-3.5 text-[#C194FB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     <span>إصدار تقرير رسمي</span>
+                </button>
+
+                <button onclick="logoutSession()" title="تسجيل الخروج" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                 </button>
             </div>
         </header>
@@ -205,9 +217,12 @@
                     <div class="flex justify-between items-center mb-4">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">فريق المبيعات التنفيذي ومخصصات التكاليف</h3>
-                            <div class="text-xs text-gray-500">أرقام هواتف الفريق الرسمية والمستهدفات الشهرية المعتمدة</div>
+                            <div class="text-xs text-gray-500">أرقام هواتف الفريق الرسمية والمستهدفات الشهرية المعتمدة للتعرف الآلي</div>
                         </div>
-                        <button onclick="openSaleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ قيد مبيعات / نفقات جديدة</button>
+                        <div class="flex gap-2">
+                            <button onclick="openNewRepModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ إضافة مسؤول مبيعات جديد</button>
+                            <button onclick="openSaleModal()" class="px-3 py-1.5 border border-[#3A056A] text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">+ قيد مبيعات</button>
+                        </div>
                     </div>
                     <div id="reps-grid-cards" class="grid grid-cols-3 gap-4"></div>
                 </div>
@@ -290,7 +305,7 @@
                             <h3 class="font-bold text-sm brand-primary-text">المجموعات المراقبة والمحادثات الميدانية</h3>
                             <div class="text-xs text-gray-500">حصر المراقبة لمجموعات عملاء شركة تنمية الغذاء المحددة فقط</div>
                         </div>
-                        <button onclick="openWhatsAppModal()" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">إدارة الربط والمجموعات</button>
+                        <button onclick="openWhatsAppModal()" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">إدارة نطاق المجموعات</button>
                     </div>
                     <div class="space-y-2.5 text-xs" id="whatsapp-feed-list"></div>
                 </div>
@@ -298,6 +313,46 @@
 
         </div>
     </main>
+
+    <!-- مودال: إضافة مسؤول مبيعات جديد -->
+    <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة مسؤول مبيعات جديد واعتماد رقمه</h3>
+            <div>
+                <label class="block font-bold mb-1">الاسم الكامل:</label>
+                <input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: يوسف المعمري">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">الكود الوظيفي:</label>
+                    <input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="SE-104">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">المنطقة البيعية:</label>
+                    <input type="text" id="rep-region-input" class="w-full p-2 border rounded-lg" placeholder="نزوى - الداخلية">
+                </div>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">رقم الهاتف (الرقم المعتمد للواتساب والنظام):</label>
+                <input type="text" id="rep-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX">
+                <span class="text-[10px] text-gray-400">بهذا الرقم يتعرف النظام عليه ويقبل تقاريره ومبيعاته الميدانية.</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">المستهدف الشهري (ر.ع):</label>
+                    <input type="number" id="rep-target-input" class="w-full p-2 border rounded-lg" value="20000">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">مخصص الوقود (لتر):</label>
+                    <input type="number" id="rep-fuel-input" class="w-full p-2 border rounded-lg" value="350">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeNewRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ المندوب في النظام</button>
+            </div>
+        </div>
+    </div>
 
     <!-- مودال: إضافة عينة جديدة -->
     <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
@@ -372,11 +427,7 @@
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block font-bold mb-1">العميل:</label>
-                    <select id="tx-customer-id" class="w-full p-2 border rounded-lg bg-gray-50">
-                        <option value="1">سلسلة مطاعم الريف</option>
-                        <option value="2">مؤسسة التموين الحديث</option>
-                        <option value="3">شركة الضيافة الفندقية العالمية</option>
-                    </select>
+                    <select id="tx-customer-id" class="w-full p-2 border rounded-lg bg-gray-50"></select>
                 </div>
                 <div>
                     <label class="block font-bold mb-1">قيمة المبيعات المحققة (ر.ع):</label>
@@ -388,20 +439,11 @@
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block mb-1">المسؤول الرئيسي:</label>
-                        <select id="tx-rep1" class="w-full p-1.5 border rounded bg-white">
-                            <option value="1">أحمد الشمري</option>
-                            <option value="2">سالم الدوسري</option>
-                            <option value="3">تركي الغامدي</option>
-                        </select>
+                        <select id="tx-rep1" class="w-full p-1.5 border rounded bg-white"></select>
                     </div>
                     <div>
                         <label class="block mb-1">شريك الإنجاز (إن وجد):</label>
-                        <select id="tx-rep2" class="w-full p-1.5 border rounded bg-white">
-                            <option value="">-- لا يوجد (إنجاز فردي) --</option>
-                            <option value="1">أحمد الشمري</option>
-                            <option value="2">سالم الدوسري</option>
-                            <option value="3">تركي الغامدي</option>
-                        </select>
+                        <select id="tx-rep2" class="w-full p-1.5 border rounded bg-white"></select>
                     </div>
                 </div>
             </div>
@@ -427,12 +469,6 @@
         <div class="bg-white rounded-2xl p-6 w-[520px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">مركز إصدار التقارير التنفيذية الرسمية</h3>
             <div>
-                <label class="block font-bold mb-1">اختر التقرير المعتمد:</label>
-                <select id="report-template-select" class="w-full p-2 border rounded-lg bg-gray-50">
-                    <option value="02_executive_sales_report.html">التقرير التنفيذي الشامل للمبيعات والعمليات</option>
-                </select>
-            </div>
-            <div>
                 <label class="block font-bold mb-1">ترويسة التوجيه الرسمية (Recipient):</label>
                 <input type="text" id="report-recipient" value="سعادة رئيس مجلس الإدارة / المدير العام" class="w-full p-2 border rounded-lg">
             </div>
@@ -450,15 +486,38 @@
         </div>
     </div>
 
-    <!-- مودال: مسح رمز الواتساب -->
+    <!-- مودال: إدارة وحصر نطاق الواتساب الميداني -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-5 w-[420px] text-center space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text">ربط بوابة الواتساب الميدانية</h3>
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=FDC-WHATSAPP-AUTH-SECURE" class="w-52 h-52 mx-auto p-2 border rounded-xl">
-            <p class="text-gray-500">امسح الرمز من: واتساب ⬅️ الأجهزة المرتبطة ⬅️ ربط جهاز</p>
-            <div class="flex gap-2">
-                <button onclick="closeWhatsAppModal()" class="w-full py-2 border rounded-lg">إغلاق</button>
-                <button onclick="closeWhatsAppModal()" class="w-full py-2 brand-primary-bg text-white font-bold rounded-lg">تأكيد الاتصال</button>
+        <div class="bg-white rounded-2xl p-6 w-[560px] space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm brand-primary-text">إدارة وحصر نطاق رادار الواتساب</h3>
+                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">نطاق مقيد وآمن ✓</span>
+            </div>
+
+            <!-- رابط استقبال الرسائل للربط مع أي بوابة -->
+            <div class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-1.5">
+                <div class="font-bold text-[#3A056A]">رابط استقبال الرسائل المباشر (Webhook Endpoint):</div>
+                <div class="p-2 bg-white rounded border font-mono text-[11px] text-gray-700 select-all">
+                    https://fd-sales.up.railway.app/api/whatsapp/webhook
+                </div>
+                <p class="text-[10px] text-gray-500">يتم توجيه بوابة واتساب (مثل Maytapi أو UltraMsg أو WPPConnect) إلى هذا الرابط لفلترة الرسائل تلقائياً.</p>
+            </div>
+
+            <!-- حصر المجموعات المراقبة -->
+            <div class="space-y-2">
+                <div class="font-bold text-[#3A056A]">المجموعات المعتمدة الخاضعة للمراقبة:</div>
+                <div class="space-y-1.5" id="whatsapp-groups-list"></div>
+            </div>
+
+            <!-- أرقام فريق المبيعات المصرح لهم -->
+            <div class="space-y-2">
+                <div class="font-bold text-[#3A056A]">أرقام فريق المبيعات المعتمدة للتفاعل:</div>
+                <div class="p-2.5 bg-gray-50 border rounded-lg space-y-1" id="whatsapp-reps-list"></div>
+                <p class="text-[10px] text-amber-700 font-medium">⚠️ أي محادثات شخصية أو أرقام غير مدرجة في القوائم أعلاه يتم حجبها واستبعادها برمجياً دون قراءتها.</p>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t">
+                <button onclick="closeWhatsAppModal()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs">إغلاق</button>
             </div>
         </div>
     </div>
@@ -491,6 +550,9 @@
         function openWhatsAppModal() { document.getElementById('whatsapp-modal').classList.remove('hidden'); }
         function closeWhatsAppModal() { document.getElementById('whatsapp-modal').classList.add('hidden'); }
         
+        function openNewRepModal() { document.getElementById('new-rep-modal').classList.remove('hidden'); }
+        function closeNewRepModal() { document.getElementById('new-rep-modal').classList.add('hidden'); }
+
         function openNewSampleModal() { document.getElementById('new-sample-modal').classList.remove('hidden'); }
         function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
         
@@ -500,7 +562,25 @@
         function openSaleModal() { document.getElementById('sale-transaction-modal').classList.remove('hidden'); }
         function closeSaleModal() { document.getElementById('sale-transaction-modal').classList.add('hidden'); }
 
-        // وظائف التحقق الثنائي (Google Authenticator)
+        // تسجيل الخروج الأمني وتفريغ الجلسة
+        function logoutSession() {
+            sessionStorage.removeItem('fdc_auth_token');
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            document.getElementById('auth-otp-code').value = '';
+        }
+
+        // قفل تلقائي عند الخمول لمدة 15 دقيقة
+        let inactivityTimer;
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                logoutSession();
+            }, 15 * 60 * 1000);
+        }
+        window.onload = resetInactivityTimer;
+        document.onmousemove = resetInactivityTimer;
+        document.onkeypress = resetInactivityTimer;
+
         function toggleSetupQR() {
             const box = document.getElementById('qr-setup-box');
             const qrImg = document.getElementById('qr-image');
@@ -531,10 +611,11 @@
                 if (res.ok) {
                     sessionStorage.setItem('fdc_auth_token', 'AUTHENTICATED');
                     document.getElementById('auth-overlay').classList.add('hidden');
+                    check2FAStatus();
                     loadAllData();
                 } else {
                     const data = await res.json().catch(() => ({}));
-                    errorEl.innerText = data.detail || ("خطأ من السيرفر: رمز الاستجابة " + res.status);
+                    errorEl.innerText = data.detail || ("فشل التحقق: رمز " + res.status);
                     errorEl.classList.remove('hidden');
                 }
             } catch (err) {
@@ -543,14 +624,13 @@
             }
         }
 
-        // فحص حالة الربط وإخفاء زر الـ QR فورياً إذا كان الحساب مفعلاً
+        // إخفاء زر توليد الـ QR نهائياً إذا كان الحساب مفعلاً مسبقاً
         async function check2FAStatus() {
             try {
                 const res = await fetch('/api/auth/2fa/status');
                 const data = await res.json();
                 const qrBtn = document.getElementById('qr-setup-btn');
                 const qrBox = document.getElementById('qr-setup-box');
-                
                 if (data.is_enabled) {
                     if (qrBtn) qrBtn.remove();
                     if (qrBox) qrBox.remove();
@@ -558,6 +638,28 @@
             } catch (e) {
                 console.error("Error checking 2FA status", e);
             }
+        }
+
+        async function submitNewRep() {
+            const payload = {
+                name: document.getElementById('rep-name-input').value.trim(),
+                employee_code: document.getElementById('rep-code-input').value.trim(),
+                region: document.getElementById('rep-region-input').value.trim(),
+                phone_number: document.getElementById('rep-phone-input').value.trim(),
+                monthly_target: parseFloat(document.getElementById('rep-target-input').value) || 0,
+                fuel_allowance_liters: parseFloat(document.getElementById('rep-fuel-input').value) || 0
+            };
+            if (!payload.name || !payload.phone_number) {
+                alert("يرجى ملء الاسم ورقم الهاتف على الأقل");
+                return;
+            }
+            await fetch('/api/reps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            closeNewRepModal();
+            loadAllData();
         }
 
         async function submitNewSample() {
@@ -614,7 +716,6 @@
 
         async function previewReportOfficial() {
             const payload = {
-                template_id: document.getElementById('report-template-select').value,
                 report_recipient: document.getElementById('report-recipient').value,
                 recommendation: document.getElementById('report-custom-recommendation').value
             };
@@ -653,12 +754,24 @@
                         <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
                     </div>
-                    <div class="text-xs text-gray-600">${r.region} | الهاتف: ${r.phone_number}</div>
+                    <div class="text-xs text-gray-600">${r.region} | كود: <span class="font-mono">${r.employee_code}</span></div>
+                    <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
                     <div class="pt-2 border-t brand-border space-y-1 text-xs">
-                        <div class="flex justify-between"><span>المستهدف الشهري:</span><span class="font-bold">${r.monthly_target.toLocaleString()} ر.ع</span></div>
-                        <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.ع</span></div>
+                        <div class="flex justify-between"><span>المستهدف:</span><span class="font-bold">${r.monthly_target.toLocaleString()} ر.ع</span></div>
+                        <div class="flex justify-between"><span>المبيعات:</span><span class="font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.ع</span></div>
                         <div class="flex justify-between"><span>المصاريف:</span><span>${r.total_expenses.toLocaleString()} ر.ع</span></div>
                     </div>
+                </div>
+            `).join('');
+
+            const repOptions = reps.map(r => `<option value="${r.id}">${r.name} (${r.region})</option>`).join('');
+            document.getElementById('tx-rep1').innerHTML = repOptions;
+            document.getElementById('tx-rep2').innerHTML = '<option value="">-- لا يوجد (إنجاز فردي) --</option>' + repOptions;
+
+            document.getElementById('whatsapp-reps-list').innerHTML = reps.map(r => `
+                <div class="flex justify-between items-center text-[11px]">
+                    <span>${r.name} (${r.region}):</span>
+                    <span class="font-mono font-bold text-[#3A056A]">${r.phone_number}</span>
                 </div>
             `).join('');
 
@@ -674,6 +787,18 @@
                     <td class="p-3 font-mono text-[10px] text-gray-500">${c.whatsapp_group_id}</td>
                     <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${c.status === 'نشط' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">${c.status}</span></td>
                 </tr>
+            `).join('');
+
+            document.getElementById('tx-customer-id').innerHTML = custs.map(c => `<option value="${c.id}">${c.company_name}</option>`).join('');
+
+            document.getElementById('whatsapp-groups-list').innerHTML = custs.map(c => `
+                <div class="p-2 border rounded-lg flex justify-between items-center bg-purple-50/50">
+                    <div>
+                        <div class="font-bold text-gray-800">${c.company_name}</div>
+                        <div class="text-[10px] text-gray-500 font-mono">${c.whatsapp_group_id}</div>
+                    </div>
+                    <span class="text-emerald-700 font-bold text-[10px]">مراقبة نشطة ✓</span>
+                </div>
             `).join('');
 
             const sRes = await fetch('/api/samples');
@@ -717,7 +842,6 @@
             `).join('');
         }
 
-        // فحص الجلسة وحالة الـ 2FA عند فتح الصفحة
         window.addEventListener('DOMContentLoaded', () => {
             check2FAStatus();
             if (sessionStorage.getItem('fdc_auth_token') === 'AUTHENTICATED') {
