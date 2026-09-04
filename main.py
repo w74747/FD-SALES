@@ -31,7 +31,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="4.5.0")
+app = FastAPI(title="FDC Sales CRM", version="4.6.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,10 +41,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+# دعم كافة مسميات روابط الاتصال في Railway
+DATABASE_URL = (
+    os.getenv("DATABASE_URL") 
+    or os.getenv("DATABASE_PUBLIC_URL") 
+    or os.getenv("POSTGRES_URL") 
+    or ""
+)
 FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
 
 # ----------------- وظائف الاتصال والتهيئة لقاعدة البيانات -----------------
+def get_db_connection():
+    if not DATABASE_URL:
+        logger.error("DATABASE_URL is empty.")
+        return None
+    try:
+        conn_url = DATABASE_URL
+        if conn_url.startswith("postgres://"):
+            conn_url = conn_url.replace("postgres://", "postgresql://", 1)
+        conn = psycopg2.connect(conn_url, cursor_factory=RealDictCursor, connect_timeout=5)
+        return conn
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
+        return None
+
 def init_database():
     conn = get_db_connection()
     if not conn:
@@ -211,6 +231,11 @@ def init_database():
         conn.rollback()
     finally:
         conn.close()
+
+@app.on_event("startup")
+def startup_event():
+    init_database()
+
 # ----------------- مسار تقديم الشعار الحقيقي من ملف logo_data.py -----------------
 @app.get("/logo.png")
 def get_logo():
@@ -461,7 +486,26 @@ class NewSaleTransactionPayload(BaseModel):
 # ----------------- مسارات البيانات والعمليات -----------------
 @app.get("/health")
 def health():
-    return {"status": "UP", "timestamp": datetime.now().isoformat(), "db_configured": bool(DATABASE_URL)}
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM sales_executives;")
+                reps_count = cur.fetchone()["count"]
+            conn.close()
+            return {
+                "status": "UP",
+                "database": "CONNECTED_SUCCESSFULLY",
+                "sales_executives_count": reps_count,
+                "db_configured": True
+            }
+        except Exception as e:
+            return {"status": "ERROR", "database": "QUERY_FAILED", "error": str(e), "db_configured": True}
+    return {
+        "status": "OFFLINE",
+        "database": "FAILED_TO_CONNECT",
+        "db_configured": bool(DATABASE_URL)
+    }
 
 @app.get("/api/reps")
 def get_reps():
