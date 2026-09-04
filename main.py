@@ -6,6 +6,7 @@ FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Integrated Ba
 
 import os
 import io
+import sys
 import json
 import uuid
 import base64
@@ -31,7 +32,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="6.5.0")
+app = FastAPI(title="FDC Sales CRM", version="6.7.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,7 +51,7 @@ DATABASE_URL = (
 FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
 whatsapp_process = None
 
-# ----------------- وظائف الاتصال والتهيئة لقاعدة البيانات -----------------
+# ----------------- الاتصال بقاعدة البيانات والتهيئة -----------------
 def get_db_connection():
     if not DATABASE_URL:
         logger.error("DATABASE_URL is empty.")
@@ -70,7 +71,6 @@ def init_database():
         logger.warning("DATABASE_URL not found. Running in local state.")
         return
 
-    # 1. إنشاء وتثبيت جدول الأمان
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -93,7 +93,6 @@ def init_database():
         logger.error(f"Error initializing system_auth: {e}")
         conn.rollback()
 
-    # 2. ترقية وإنشاء جداول النظام
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -173,7 +172,6 @@ def init_database():
         logger.error(f"Error updating system tables: {e}")
         conn.rollback()
 
-    # 3. إدخال البيانات التأسيسية بأمان ودون خرق المفتاح الأجنبي
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM sales_executives;")
@@ -241,22 +239,23 @@ def init_database():
     finally:
         conn.close()
 
-@app.on_event("startup")
-def startup_event():
+def start_whatsapp_service():
     global whatsapp_process
-    init_database()
-    
-    # تشغيل محرك Node.js في الخلفية مباشرة من بايثون
     if os.path.exists("whatsapp_service.js"):
         try:
+            logger.info("Starting WhatsApp Baileys service on port 3001...")
             whatsapp_process = subprocess.Popen(
                 ["node", "whatsapp_service.js"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stdout=sys.stdout,
+                stderr=sys.stderr
             )
-            logger.info("WhatsApp Baileys background engine started successfully.")
         except Exception as e:
-            logger.error(f"Failed to start WhatsApp background engine: {e}")
+            logger.error(f"Error launching whatsapp_service.js: {e}")
+
+@app.on_event("startup")
+def startup_event():
+    init_database()
+    start_whatsapp_service()
 
 @app.on_event("shutdown")
 def shutdown_event():
@@ -264,7 +263,7 @@ def shutdown_event():
     if whatsapp_process:
         whatsapp_process.terminate()
 
-# ----------------- تقديم الشعار المعتمد -----------------
+# ----------------- تقديم الشعار -----------------
 @app.get("/logo.png")
 def get_logo():
     try:
@@ -281,7 +280,7 @@ def get_logo():
         logger.error(f"Error loading logo: {e}")
     raise HTTPException(status_code=404, detail="Logo not found")
 
-# ----------------- المصادقة الثنائية 2FA -----------------
+# ----------------- المصادقة الثنائية -----------------
 class Verify2FAPayload(BaseModel):
     code: str
 
@@ -367,7 +366,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- نماذج Pydantic -----------------
+# ----------------- نماذج البيانات -----------------
 class NewRepPayload(BaseModel):
     name: str
     employee_code: str
@@ -406,7 +405,7 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_name: str
     message_text: str
 
-# ----------------- مسارات العمليات -----------------
+# ----------------- مسارات البيانات والعمليات -----------------
 @app.get("/health")
 def health():
     conn = get_db_connection()
@@ -603,17 +602,17 @@ def get_whatsapp_logs():
     finally:
         conn.close()
 
-# ----------------- جلب الـ QR الحقيقي من Baileys -----------------
+# ----------------- جلب الـ QR الحقيقي الصادر من Baileys حصراً -----------------
 @app.get("/api/whatsapp/qr")
 async def get_whatsapp_qr():
-    """جلب رمز QR الحقيقي المولد بواسطة محرك Baileys الداخلي المشفر"""
+    """جلب رمز QR الحقيقي من Baileys، ورفض توليد أي رموز وهمية"""
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=2.5)
+            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=3.0)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("connected"):
-                    return Response(status_code=204)
+                    return {"status": "CONNECTED", "message": "متصل بالفعل بالواتساب"}
                 
                 qr_base64 = data.get("qr")
                 if qr_base64:
@@ -625,18 +624,14 @@ async def get_whatsapp_qr():
                         headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
                     )
     except Exception as e:
-        logger.warning(f"Baileys engine still starting: {e}")
+        logger.warning(f"Waiting for Baileys on port 3001: {e}")
 
-    qr = qrcode.QRCode(box_size=6, border=2)
-    qr.add_data("WHATSAPP-ENGINE-STARTING-PLEASE-WAIT")
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="#3A056A", back_color="white")
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="image/png")
+    raise HTTPException(
+        status_code=503, 
+        detail="جاري تشغيل محرك اتصال الواتساب... يرجى الانتظار بضع ثوانٍ لتوليد رمز الجلسة المشفرة."
+    )
 
-# ----------------- خطاف الويب مع فلترة القائمة البيضاء -----------------
+# ----------------- خطاف الويب مع فلترة القائمة البيضاء الصارمة -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     conn = get_db_connection()
@@ -725,7 +720,6 @@ def serve_dashboard():
             return f.read()
     return "<h1>dashboard.html not found</h1>"
 
-# تشغيل الخادم مع معالجة المنفذ الصارمة
 if __name__ == "__main__":
     import uvicorn
     
