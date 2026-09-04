@@ -10,6 +10,7 @@ import json
 import uuid
 import base64
 import logging
+import subprocess
 from datetime import datetime
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Response, Request
@@ -22,7 +23,6 @@ import pyotp
 import qrcode
 import httpx
 
-# استيراد الشعار الأصلي المحفوظ كسلسلة Base64
 try:
     from logo_data import LOGO_BASE64
 except ImportError:
@@ -31,7 +31,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="6.1.0")
+app = FastAPI(title="FDC Sales CRM", version="6.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,6 +48,7 @@ DATABASE_URL = (
     or ""
 )
 FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
+whatsapp_process = None
 
 # ----------------- وظائف الاتصال والتهيئة لقاعدة البيانات -----------------
 def get_db_connection():
@@ -242,9 +243,28 @@ def init_database():
 
 @app.on_event("startup")
 def startup_event():
+    global whatsapp_process
     init_database()
+    
+    # تشغيل محرك Node.js في الخلفية مباشرة من بايثون
+    if os.path.exists("whatsapp_service.js"):
+        try:
+            whatsapp_process = subprocess.Popen(
+                ["node", "whatsapp_service.js"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            logger.info("WhatsApp Baileys background engine started successfully.")
+        except Exception as e:
+            logger.error(f"Failed to start WhatsApp background engine: {e}")
 
-# ----------------- مسار تقديم الشعار المعتمد للشركة -----------------
+@app.on_event("shutdown")
+def shutdown_event():
+    global whatsapp_process
+    if whatsapp_process:
+        whatsapp_process.terminate()
+
+# ----------------- تقديم الشعار المعتمد -----------------
 @app.get("/logo.png")
 def get_logo():
     try:
@@ -261,7 +281,7 @@ def get_logo():
         logger.error(f"Error loading logo: {e}")
     raise HTTPException(status_code=404, detail="Logo not found")
 
-# ----------------- مسارات المصادقة الثنائية 2FA -----------------
+# ----------------- المصادقة الثنائية 2FA -----------------
 class Verify2FAPayload(BaseModel):
     code: str
 
@@ -347,7 +367,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- نماذج Pydantic للبيانات -----------------
+# ----------------- نماذج Pydantic -----------------
 class NewRepPayload(BaseModel):
     name: str
     employee_code: str
@@ -386,7 +406,7 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_name: str
     message_text: str
 
-# ----------------- مسارات البيانات والعمليات -----------------
+# ----------------- مسارات العمليات -----------------
 @app.get("/health")
 def health():
     conn = get_db_connection()
@@ -583,7 +603,7 @@ def get_whatsapp_logs():
     finally:
         conn.close()
 
-# ----------------- مسار توليد وجلب QR الواتساب الحقيقي المشفر -----------------
+# ----------------- جلب الـ QR الحقيقي من Baileys -----------------
 @app.get("/api/whatsapp/qr")
 async def get_whatsapp_qr():
     """جلب رمز QR الحقيقي المولد بواسطة محرك Baileys الداخلي المشفر"""
@@ -605,9 +625,8 @@ async def get_whatsapp_qr():
                         headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
                     )
     except Exception as e:
-        logger.warning(f"Connecting to internal Baileys service: {e}")
+        logger.warning(f"Baileys engine still starting: {e}")
 
-    # صورة انتظار مؤقتة واضحة في حال كان محرك Baileys قيد الإقلاع
     qr = qrcode.QRCode(box_size=6, border=2)
     qr.add_data("WHATSAPP-ENGINE-STARTING-PLEASE-WAIT")
     qr.make(fit=True)
@@ -617,7 +636,7 @@ async def get_whatsapp_qr():
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/png")
 
-# ----------------- خطاف الويب الفعلي مع فلترة القائمة البيضاء الصارمة -----------------
+# ----------------- خطاف الويب مع فلترة القائمة البيضاء -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     conn = get_db_connection()
@@ -625,21 +644,18 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
-            # 1. التحقق: هل المحادثة تخص مجموعة عميل معتمدة في النظام؟
             cur.execute(
                 "SELECT id, company_name FROM customer_accounts WHERE whatsapp_group_id = %s;",
                 (msg.chat_id,)
             )
             customer = cur.fetchone()
 
-            # 2. التحقق: هل المرسل مسؤول مبيعات معتمد لدينا؟
             cur.execute(
                 "SELECT id, name FROM sales_executives WHERE phone_number = %s;",
                 (msg.sender_phone,)
             )
             rep = cur.fetchone()
 
-            # جدار الحماية: استبعاد وتجاهل أي رسالة خارج نطاق المجموعات أو أرقام المبيعات
             if not customer and not rep:
                 return {"status": "IGNORED", "reason": "خارج نطاق المجموعات أو الأرقام المعتمدة"}
 
@@ -709,6 +725,15 @@ def serve_dashboard():
             return f.read()
     return "<h1>dashboard.html not found</h1>"
 
+# تشغيل الخادم مع معالجة المنفذ الصارمة
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    
+    raw_port = os.getenv("PORT", "8000")
+    try:
+        clean_port = int(raw_port)
+    except (ValueError, TypeError):
+        clean_port = 8000
+
+    logger.info(f"Starting server on port {clean_port}...")
+    uvicorn.run("main:app", host="0.0.0.0", port=clean_port)
