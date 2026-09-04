@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Official Branding
+FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + WhatsApp Whitelist Engine
 """
 
 import os
@@ -22,7 +22,6 @@ import pyotp
 import qrcode
 import httpx
 
-# استيراد الشعار الأصلي المحفوظ كسلسلة Base64
 try:
     from logo_data import LOGO_BASE64
 except ImportError:
@@ -31,7 +30,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="5.0.0")
+app = FastAPI(title="FDC Sales CRM", version="5.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,6 +46,7 @@ DATABASE_URL = (
     or os.getenv("POSTGRES_URL") 
     or ""
 )
+FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
 
 # ----------------- وظائف الاتصال والتهيئة لقاعدة البيانات -----------------
 def get_db_connection():
@@ -57,8 +57,7 @@ def get_db_connection():
         conn_url = DATABASE_URL
         if conn_url.startswith("postgres://"):
             conn_url = conn_url.replace("postgres://", "postgresql://", 1)
-        conn = psycopg2.connect(conn_url, cursor_factory=RealDictCursor, connect_timeout=5)
-        return conn
+        return psycopg2.connect(conn_url, cursor_factory=RealDictCursor, connect_timeout=5)
     except Exception as e:
         logger.error(f"Database connection error: {e}")
         return None
@@ -92,7 +91,7 @@ def init_database():
         logger.error(f"Error initializing system_auth: {e}")
         conn.rollback()
 
-    # 2. إنشاء وترقية جداول النظام وضمان عدم نقص أي عمود
+    # 2. ترقية وإنشاء جداول النظام وحل مشكلة العمود الناقص
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -172,7 +171,7 @@ def init_database():
         logger.error(f"Error updating system tables: {e}")
         conn.rollback()
 
-    # 3. إدخال البيانات التأسيسية إذا كانت الجداول فارغة
+    # 3. إدخال البيانات التأسيسية
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM sales_executives;")
@@ -235,10 +234,9 @@ def init_database():
 def startup_event():
     init_database()
 
-# ----------------- تقديم الشعار المعتمد من logo_data.py -----------------
+# ----------------- مسار تقديم الشعار المعتمد للشركة -----------------
 @app.get("/logo.png")
 def get_logo():
-    """فك تشفير الشعار الفعلي المعتمد للشركة من logo_data.py وتقديمه بصيغة PNG"""
     try:
         from logo_data import LOGO_BASE64
         if LOGO_BASE64:
@@ -250,17 +248,15 @@ def get_logo():
                 headers={"Cache-Control": "public, max-age=86400"}
             )
     except Exception as e:
-        logger.error(f"Error loading logo from logo_data: {e}")
+        logger.error(f"Error loading logo: {e}")
+    raise HTTPException(status_code=404, detail="Logo not found")
 
-    raise HTTPException(status_code=404, detail="ملف الشعار logo_data.py غير موجود أو البيانات غير صالحة")
-
-# ----------------- مسارات المصادقة الثنائية (Google Authenticator) -----------------
+# ----------------- مسارات المصادقة الثنائية 2FA -----------------
 class Verify2FAPayload(BaseModel):
     code: str
 
 @app.get("/api/auth/2fa/status")
 def get_2fa_status():
-    """التحقق هل النظام مرتبط ومفعل مسبقاً أم يحتاج ربطاً لأول مرة"""
     conn = get_db_connection()
     if not conn:
         return {"is_enabled": False}
@@ -276,17 +272,16 @@ def get_2fa_status():
 def get_2fa_qr():
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متاحة")
+        raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT totp_secret, is_2fa_enabled FROM system_auth WHERE username = 'admin';")
             row = cur.fetchone()
 
-            # إغلاق الثغرة: منع توليد أو عرض QR جديد في حال تم التفعيل مسبقاً
             if row and row["is_2fa_enabled"]:
                 raise HTTPException(
                     status_code=403, 
-                    detail="تم تفعيل التحقق الثنائي مسبقاً. لا يمكن إعادة ربط جهاز جديد من شاشة الدخول لأسباب أمنية."
+                    detail="تم تفعيل التحقق الثنائي مسبقاً. تم قفل إعادة توليد الرمز لأسباب أمنية."
                 )
 
             if not row:
@@ -312,7 +307,6 @@ def get_2fa_qr():
     except HTTPException:
         raise
     except Exception as e:
-        logger.warning(f"Local QR generation failed ({e}), using fallback API...")
         fallback_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={totp_uri}"
         r = httpx.get(fallback_url)
         return Response(content=r.content, media_type="image/png")
@@ -323,7 +317,7 @@ def get_2fa_qr():
 def verify_2fa(payload: Verify2FAPayload):
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متاحة")
+        raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
@@ -343,127 +337,15 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- CSS الطباعة الصارم لتقارير A4 -----------------
-PRINT_ENGINE_CSS = """
-@page {
-    size: A4 portrait;
-    margin: 8mm 8mm 8mm 8mm;
-}
-@media print {
-    html, body {
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #FFFFFF !important;
-        color: #0F172A !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-    }
-    .no-print { display: none !important; }
-    .print-container {
-        width: 100% !important;
-        max-width: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        box-shadow: none !important;
-        border: none !important;
-    }
-}
-* { box-sizing: border-box; }
-:root {
-    --brand: #3A056A;
-    --accent: #C194FB;
-    --tint: #F5F0FC;
-    --line: #E2E8F0;
-    --text: #0F172A;
-    --ok: #166534;
-    --warn: #854D0E;
-    --bad: #991B1B;
-}
-body {
-    direction: rtl;
-    font-family: 'Cairo', 'Tajawal', sans-serif;
-    color: var(--text);
-    margin: 0;
-    padding: 16px;
-    font-size: 8.5pt;
-    background: #F8FAFC;
-    line-height: 1.35;
-}
-.print-container {
-    width: 100%;
-    max-width: 194mm;
-    margin: 0 auto;
-    background: #FFFFFF;
-    padding: 16px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-}
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-bottom: 12px;
-}
-.kpi-card {
-    background: #FAF7FD;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 8px 6px;
-    text-align: center;
-}
-.kpi-lbl { font-size: 7.5pt; color: #64748B; font-weight: 700; }
-.kpi-val { font-size: 11.5pt; font-weight: 900; color: var(--brand); margin-top: 3px; }
-table.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 12px;
-    border: 1px solid var(--line);
-    table-layout: fixed;
-}
-table.data-table th {
-    background: var(--brand);
-    color: #FFFFFF;
-    text-align: right;
-    padding: 6px 8px;
-    font-size: 8pt;
-    font-weight: 800;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-table.data-table td {
-    padding: 5px 8px;
-    border-bottom: 1px solid var(--line);
-    font-size: 8pt;
-    word-break: break-word;
-}
-table.data-table tr:nth-child(even) { background: #FAFAFC; }
-.badge {
-    display: inline-block;
-    padding: 1.5px 6px;
-    border-radius: 4px;
-    font-weight: 800;
-    font-size: 7pt;
-    white-space: nowrap;
-}
-.badge-ok { background: #DCFCE7; color: var(--ok); }
-.badge-warn { background: #FEF9C3; color: var(--warn); }
-.badge-bad { background: #FEE2E2; color: var(--bad); }
-.editable-box {
-    background: #FAF7FD;
-    border: 1px dashed var(--accent);
-    border-radius: 6px;
-    padding: 8px 12px;
-    margin-top: 8px;
-    outline: none;
-    line-height: 1.5;
-    font-size: 8.5pt;
-}
-.editable-box:focus { border-style: solid; background: #FFFFFF; }
-"""
+# ----------------- نماذج Pydantic للبيانات -----------------
+class NewRepPayload(BaseModel):
+    name: str
+    employee_code: str
+    phone_number: str
+    region: str
+    monthly_target: float = 0.0
+    fuel_allowance_liters: float = 0.0
 
-# ----------------- نماذج Pydantic للطلبات -----------------
 class NewSamplePayload(BaseModel):
     customer_name: str
     rep_name: str
@@ -487,6 +369,13 @@ class NewSaleTransactionPayload(BaseModel):
     split_percentage: Optional[float] = 50.0
     expense_fuel: Optional[float] = 0.0
     expense_other: Optional[float] = 0.0
+
+# نموذج استقبال وفلترة رسائل الواتساب الصارمة
+class IncomingWhatsAppMessage(BaseModel):
+    chat_id: str
+    sender_phone: str
+    sender_name: str
+    message_text: str
 
 # ----------------- مسارات البيانات والعمليات -----------------
 @app.get("/health")
@@ -545,6 +434,23 @@ def get_reps():
                     "efficiency": eff
                 })
             return enriched
+    finally:
+        conn.close()
+
+@app.post("/api/reps")
+def add_rep(payload: NewRepPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO sales_executives (name, employee_code, phone_number, region, monthly_target, fuel_allowance_liters, achieved_sales, total_expenses, status)
+            VALUES (%s, %s, %s, %s, %s, %s, 0.0, 0.0, 'نشط') RETURNING id;
+            """, (payload.name, payload.employee_code, payload.phone_number, payload.region, payload.monthly_target, payload.fuel_allowance_liters))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id, "message": "تمت إضافة المندوب واعتماد رقم هاتفه"}
     finally:
         conn.close()
 
@@ -668,28 +574,51 @@ def get_whatsapp_logs():
     finally:
         conn.close()
 
-@app.get("/api/whatsapp/status")
-def get_whatsapp_status():
-    return {"status": "QR_READY", "phone_connected": None, "last_sync": datetime.now().strftime("%Y-%m-%d %H:%M")}
+# ----------------- خطاف الويب الفعلي مع فلترة القائمة البيضاء -----------------
+@app.post("/api/whatsapp/webhook")
+def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            # 1. التحقق هل المجموعة معتمدة؟
+            cur.execute(
+                "SELECT id, company_name FROM customer_accounts WHERE whatsapp_group_id = %s;",
+                (msg.chat_id,)
+            )
+            customer = cur.fetchone()
 
-@app.get("/api/whatsapp/qr")
-def get_whatsapp_qr():
-    session_id = str(uuid.uuid4())[:8]
-    return {
-        "qr_image_url": f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=FDC-WHATSAPP-SESSION-{session_id}",
-        "session_id": session_id,
-        "status": "QR_READY"
-    }
+            # 2. التحقق هل المرسل مسؤول مبيعات معتمد؟
+            cur.execute(
+                "SELECT id, name FROM sales_executives WHERE phone_number = %s;",
+                (msg.sender_phone,)
+            )
+            rep = cur.fetchone()
 
-# ----------------- مسار معاينة وطباعة التقرير بالريال العماني -----------------
+            # جدار الحماية: استبعاد وتجاهل أي رسالة خارج النطاق
+            if not customer and not rep:
+                return {"status": "IGNORED", "reason": "خارج نطاق المجموعات أو الأرقام المعتمدة"}
+
+            cur.execute("""
+            INSERT INTO whatsapp_logs (created_at, sender_name, is_external_call, message_body)
+            VALUES (%s, %s, FALSE, %s);
+            """, (
+                datetime.now().strftime("%H:%M"),
+                msg.sender_name,
+                msg.message_text
+            ))
+            conn.commit()
+            return {"status": "PROCESSED", "target": customer["company_name"] if customer else rep["name"]}
+    finally:
+        conn.close()
+
 @app.post("/api/reports/preview")
 def preview_report(req: dict):
     recipient = req.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام")
     recommendation = req.get("recommendation", "أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي.")
 
     reps = get_reps()
-    samples = get_samples()
-
     total_sales = sum(r["achieved_sales"] for r in reps)
     total_exp = sum(r["total_expenses"] for r in reps)
 
@@ -699,111 +628,30 @@ def preview_report(req: dict):
     <meta charset="utf-8">
     <title>&nbsp;</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-    <style>{PRINT_ENGINE_CSS}</style>
+    <style>
+        body {{ font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; font-size: 9pt; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+        th, td {{ border: 1px solid #E2E8F0; padding: 6px; text-align: right; }}
+        th {{ background: #3A056A; color: white; }}
+    </style>
 </head>
 <body>
-    <div class="no-print" style="width: 100%; max-width: 194mm; margin: 0 auto 12px auto; background: #3A056A; color: #FFFFFF; padding: 10px 16px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-        <div style="font-weight: 700; font-size: 9.5pt;">معاينة المستند الرسمي | شركة تنمية الغذاء</div>
-        <button onclick="window.print()" style="background: #C194FB; color: #3A056A; border: none; font-weight: 800; padding: 6px 16px; border-radius: 5px; cursor: pointer; font-family: Cairo; font-size: 8.5pt;">طباعة المستند الرسمي (A4) 🖨️</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3A056A; padding-bottom: 10px;">
+        <div>
+            <h1 style="color: #3A056A; margin: 0; font-size: 16pt;">التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
+            <div style="color: #64748B; font-size: 8.5pt;">شركة تنمية الغذاء | توجيه: {recipient}</div>
+        </div>
+        <img src="/logo.png" style="max-height: 55px; width: auto;" />
     </div>
-
-    <div class="print-container">
-        <table style="width: 100%; border-bottom: 2px solid #3A056A; padding-bottom: 8px; margin-bottom: 12px; border-collapse: collapse;">
-            <tr>
-                <td style="text-align: right; vertical-align: middle;">
-                    <h1 style="margin: 0 0 3px 0; color: #3A056A; font-size: 15pt; font-weight: 900; line-height: 1.2;">التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
-                    <div style="color: #64748B; font-size: 8pt; font-weight: 600;">الفترة: الربع الثالث 2026 &nbsp;|&nbsp; توجيه المستند: {recipient}</div>
-                </td>
-                <td style="text-align: left; vertical-align: middle; width: 220px; height: 60px;">
-                    <img src="/logo.png" alt="شركة تنمية الغذاء" style="max-width: 100%; max-height: 55px; width: auto; height: auto; object-fit: contain; display: block; border: none;" />
-                </td>
-            </tr>
-        </table>
-
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-lbl">إجمالي المبيعات المحققة</div>
-                <div class="kpi-val">{total_sales:,.1f} ر.ع</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-lbl">العينات المعتمدة تجارياً</div>
-                <div class="kpi-val" style="color: var(--ok);">66.7%</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-lbl">المصاريف التشغيلية الكلية</div>
-                <div class="kpi-val" style="color: #7E22CE;">{total_exp:,.1f} ر.ع</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-lbl">نسبة كفاءة التكلفة للبيع</div>
-                <div class="kpi-val">{(total_exp/total_sales*100 if total_sales > 0 else 0):.2f}%</div>
-            </div>
-        </div>
-
-        <div style="font-weight: 800; color: var(--brand); margin: 10px 0 6px 0; font-size: 9pt;">جدول إنجازات فريق المبيعات التنفيذي:</div>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width: 16%;">المسؤول</th>
-                    <th style="width: 14%;">المنطقة</th>
-                    <th style="width: 13%;">المستهدف</th>
-                    <th style="width: 13%;">المحقق</th>
-                    <th style="width: 10%;">الإنجاز</th>
-                    <th style="width: 14%;">الوقود (فعلي/متاح)</th>
-                    <th style="width: 10%;">المصاريف</th>
-                    <th style="width: 10%;">الكفاءة</th>
-                </tr>
-            </thead>
-            <tbody>
-                {''.join([f'''
-                <tr>
-                    <td><strong>{r["name"]}</strong></td>
-                    <td>{r["region"]}</td>
-                    <td>{r["monthly_target"]:,.1f} ر.ع</td>
-                    <td style="font-weight: 800; color: var(--ok);">{r["achieved_sales"]:,.1f} ر.ع</td>
-                    <td style="font-weight: 800;">{(r["achievement_rate"]):.1f}%</td>
-                    <td>{r["fuel_liters"]} / {r["fuel_allowance_liters"]} لتر</td>
-                    <td>{r["total_expenses"]:,.1f} ر.ع</td>
-                    <td><span class="badge badge-ok">{r["efficiency"]}</span></td>
-                </tr>
-                ''' for r in reps])}
-            </tbody>
-        </table>
-
-        <div style="font-weight: 800; color: var(--brand); margin: 10px 0 6px 0; font-size: 9pt;">سجل حركة العينات وتحويلها لأوامر شراء (Sample ROI):</div>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width: 25%;">العميل</th>
-                    <th style="width: 25%;">المنتج</th>
-                    <th style="width: 10%;">الكمية</th>
-                    <th style="width: 13%;">تاريخ التسليم</th>
-                    <th style="width: 12%;">القرار</th>
-                    <th style="width: 15%;">أمر الشراء (PO)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {''.join([f'''
-                <tr>
-                    <td><strong>{s["customer_name"]}</strong></td>
-                    <td>{s["product_name"]}</td>
-                    <td>{s["qty_free"]} وحدة</td>
-                    <td>{s["delivery_date"]}</td>
-                    <td><span class="badge {'badge-ok' if s['status']=='APPROVED' else 'badge-warn'}">{s['status']}</span></td>
-                    <td style="font-family: monospace; font-weight: 800;">{s["converted_po_id"] or '—'}</td>
-                </tr>
-                ''' for s in samples])}
-            </tbody>
-        </table>
-
-        <div style="margin-top: 10px;">
-            <div style="font-weight: 800; color: var(--brand); font-size: 8.5pt; margin-bottom: 2px;">التوصية الإدارية والتنفيذية (قابلة للتحرير قبل الطباعة):</div>
-            <div class="editable-box" contenteditable="true" title="اضغط هنا لتعديل نص التوصية مباشرة">{recommendation}</div>
-        </div>
-
-        <div style="margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 7.5pt; color: #64748B;">
-            <div>وثيقة رسمية صادرة عن: نظام إدارة المبيعات الميدانية والتنفيذية الذكي</div>
-            <div>اعتماد الإدارة العامة: ___________________</div>
-        </div>
+    <h3>إنجازات مسؤولي المبيعات:</h3>
+    <table>
+        <thead><tr><th>المسؤول</th><th>المنطقة</th><th>المستهدف</th><th>المحقق</th><th>المصاريف</th></tr></thead>
+        <tbody>
+            {''.join([f"<tr><td>{r['name']}</td><td>{r['region']}</td><td>{r['monthly_target']:,.1f} ر.ع</td><td>{r['achieved_sales']:,.1f} ر.ع</td><td>{r['total_expenses']:,.1f} ر.ع</td></tr>" for r in reps])}
+        </tbody>
+    </table>
+    <div style="margin-top: 15px; padding: 10px; background: #F5F0FC; border: 1px dashed #C194FB; border-radius: 6px;">
+        <strong>التوصية التنفيذية:</strong> {recommendation}
     </div>
 </body>
 </html>
