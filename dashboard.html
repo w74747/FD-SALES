@@ -45,7 +45,7 @@
             <h2 class="text-base font-bold text-gray-800">التحقق الأمني الثنائي (2FA)</h2>
             <p class="text-xs text-gray-500">يرجى إدخال رمز التحقق المكون من 6 أرقام من تطبيق Google Authenticator</p>
 
-            <button onclick="toggleSetupQR()" class="text-[11px] text-purple-700 underline block mx-auto">إظهار رمز QR لربط جهاز جديد</button>
+            <button id="qr-setup-btn" onclick="toggleSetupQR()" class="text-[11px] text-purple-700 underline block mx-auto">إظهار رمز QR لربط جهاز جديد</button>
             <div id="qr-setup-box" class="hidden my-2">
                 <img id="qr-image" src="/api/auth/2fa/qr" alt="QR Code" class="w-40 h-40 mx-auto border p-1 rounded-lg">
                 <span class="text-[10px] text-gray-400">امسح الرمز عبر تطبيق Authenticator</span>
@@ -543,6 +543,23 @@
             }
         }
 
+        // فحص حالة الربط وإخفاء زر الـ QR فورياً إذا كان الحساب مفعلاً
+        async function check2FAStatus() {
+            try {
+                const res = await fetch('/api/auth/2fa/status');
+                const data = await res.json();
+                const qrBtn = document.getElementById('qr-setup-btn');
+                const qrBox = document.getElementById('qr-setup-box');
+                
+                if (data.is_enabled) {
+                    if (qrBtn) qrBtn.remove();
+                    if (qrBox) qrBox.remove();
+                }
+            } catch (e) {
+                console.error("Error checking 2FA status", e);
+            }
+        }
+
         async function submitNewSample() {
             const payload = {
                 customer_name: document.getElementById('sample-client-name').value,
@@ -700,8 +717,9 @@
             `).join('');
         }
 
-        // فحص الجلسة عند فتح الصفحة
+        // فحص الجلسة وحالة الـ 2FA عند فتح الصفحة
         window.addEventListener('DOMContentLoaded', () => {
+            check2FAStatus();
             if (sessionStorage.getItem('fdc_auth_token') === 'AUTHENTICATED') {
                 document.getElementById('auth-overlay').classList.add('hidden');
                 loadAllData();
