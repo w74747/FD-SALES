@@ -506,7 +506,6 @@
             const qrImg = document.getElementById('qr-image');
             box.classList.toggle('hidden');
             if (!box.classList.contains('hidden')) {
-                // تجاوز الكاش بـ timestamp لضمان سحب الصورة فوراً
                 qrImg.src = '/api/auth/2fa/qr?t=' + new Date().getTime();
             }
         }
@@ -534,12 +533,12 @@
                     document.getElementById('auth-overlay').classList.add('hidden');
                     loadAllData();
                 } else {
-                    const data = await res.json();
-                    errorEl.innerText = data.detail || "فشل التحقق من الرمز";
+                    const data = await res.json().catch(() => ({}));
+                    errorEl.innerText = data.detail || ("خطأ من السيرفر: رمز الاستجابة " + res.status);
                     errorEl.classList.remove('hidden');
                 }
             } catch (err) {
-                errorEl.innerText = "تعذر الاتصال بالخادم";
+                errorEl.innerText = "تعذر الاتصال بالخادم: " + err.message;
                 errorEl.classList.remove('hidden');
             }
         }
