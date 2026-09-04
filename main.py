@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + 2FA Google Authenticator + Official Branding
+FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Official Branding
 """
 
 import os
@@ -31,7 +31,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="4.6.0")
+app = FastAPI(title="FDC Sales CRM", version="5.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,14 +41,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# دعم كافة مسميات روابط الاتصال في Railway
 DATABASE_URL = (
     os.getenv("DATABASE_URL") 
     or os.getenv("DATABASE_PUBLIC_URL") 
     or os.getenv("POSTGRES_URL") 
     or ""
 )
-FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
 
 # ----------------- وظائف الاتصال والتهيئة لقاعدة البيانات -----------------
 def get_db_connection():
@@ -71,8 +69,8 @@ def init_database():
         logger.warning("DATABASE_URL not found. Running in local state.")
         return
 
+    # 1. إنشاء وتثبيت جدول الأمان
     try:
-        # 1. إنشاء جدول الأمان والمصادقة الثنائية بشكل مستقل وتثبيته
         with conn.cursor() as cur:
             cur.execute("""
             CREATE TABLE IF NOT EXISTS system_auth (
@@ -90,10 +88,13 @@ def init_database():
                     ('admin', default_secret, False)
                 )
         conn.commit()
+    except Exception as e:
+        logger.error(f"Error initializing system_auth: {e}")
+        conn.rollback()
 
-        # 2. إنشاء وتحديث جداول النظام وإضافة الأعمدة الناقصة إن وجدت
+    # 2. إنشاء وترقية جداول النظام وضمان عدم نقص أي عمود
+    try:
         with conn.cursor() as cur:
-            # جدول مسؤولي المبيعات
             cur.execute("""
             CREATE TABLE IF NOT EXISTS sales_executives (
                 id SERIAL PRIMARY KEY,
@@ -110,7 +111,6 @@ def init_database():
             );
             """)
 
-            # جدول حسابات العملاء
             cur.execute("""
             CREATE TABLE IF NOT EXISTS customer_accounts (
                 id SERIAL PRIMARY KEY,
@@ -125,13 +125,11 @@ def init_database():
                 status VARCHAR(20) DEFAULT 'نشط'
             );
             """)
-            # ترقية جدول customer_accounts في حال كان العمود مفقوداً
             cur.execute("""
             ALTER TABLE customer_accounts 
             ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150);
             """)
 
-            # جدول العينات
             cur.execute("""
             CREATE TABLE IF NOT EXISTS sample_deliveries (
                 id SERIAL PRIMARY KEY,
@@ -147,7 +145,6 @@ def init_database():
             );
             """)
 
-            # جدول التقويم الميداني
             cur.execute("""
             CREATE TABLE IF NOT EXISTS calendar_events (
                 id SERIAL PRIMARY KEY,
@@ -161,7 +158,6 @@ def init_database():
             );
             """)
 
-            # جدول سجلات الواتساب
             cur.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_logs (
                 id SERIAL PRIMARY KEY,
@@ -172,8 +168,12 @@ def init_database():
             );
             """)
         conn.commit()
+    except Exception as e:
+        logger.error(f"Error updating system tables: {e}")
+        conn.rollback()
 
-        # 3. إدخال البيانات الافتراضية إذا كانت الجداول فارغة
+    # 3. إدخال البيانات التأسيسية إذا كانت الجداول فارغة
+    try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM sales_executives;")
             if cur.fetchone()["count"] == 0:
@@ -223,11 +223,10 @@ def init_database():
                 ('09:22', 'أحمد الشمري', FALSE, 'أهلاً بك، تم إرسال 15 كرتون عينة للتجربة الميدانية.'),
                 ('11:45', 'أحمد الشمري', TRUE, 'تم إجراء مكالمة مع مدير المشتريات وتأكيد استلام المواصفات القياسية.');
                 """)
-
         conn.commit()
-        logger.info("PostgreSQL Database synchronized successfully.")
+        logger.info("Database schema synchronized and default data verified.")
     except Exception as e:
-        logger.error(f"Error during schema migration: {e}")
+        logger.error(f"Error seeding data: {e}")
         conn.rollback()
     finally:
         conn.close()
@@ -236,7 +235,7 @@ def init_database():
 def startup_event():
     init_database()
 
-# ----------------- مسار تقديم الشعار الحقيقي من ملف logo_data.py -----------------
+# ----------------- تقديم الشعار المعتمد من logo_data.py -----------------
 @app.get("/logo.png")
 def get_logo():
     """فك تشفير الشعار الفعلي المعتمد للشركة من logo_data.py وتقديمه بصيغة PNG"""
@@ -259,35 +258,49 @@ def get_logo():
 class Verify2FAPayload(BaseModel):
     code: str
 
+@app.get("/api/auth/2fa/status")
+def get_2fa_status():
+    """التحقق هل النظام مرتبط ومفعل مسبقاً أم يحتاج ربطاً لأول مرة"""
+    conn = get_db_connection()
+    if not conn:
+        return {"is_enabled": False}
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT is_2fa_enabled FROM system_auth WHERE username = 'admin';")
+            row = cur.fetchone()
+            return {"is_enabled": bool(row["is_2fa_enabled"]) if row else False}
+    finally:
+        conn.close()
+
 @app.get("/api/auth/2fa/qr")
 def get_2fa_qr():
-    secret = None
     conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
-                row = cur.fetchone()
-                if not row:
-                    secret = pyotp.random_base32()
-                    cur.execute("INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES ('admin', %s, FALSE);", (secret,))
-                    conn.commit()
-                else:
-                    secret = row["totp_secret"]
-        except Exception as e:
-            logger.error(f"Error fetching 2FA secret: {e}")
-        finally:
-            conn.close()
-
-    if not secret:
-        secret = FALLBACK_2FA_SECRET
-
-    totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
-        name="admin@fdc.om",
-        issuer_name="Food Development Co - CRM"
-    )
-
+    if not conn:
+        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متاحة")
     try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT totp_secret, is_2fa_enabled FROM system_auth WHERE username = 'admin';")
+            row = cur.fetchone()
+
+            # إغلاق الثغرة: منع توليد أو عرض QR جديد في حال تم التفعيل مسبقاً
+            if row and row["is_2fa_enabled"]:
+                raise HTTPException(
+                    status_code=403, 
+                    detail="تم تفعيل التحقق الثنائي مسبقاً. لا يمكن إعادة ربط جهاز جديد من شاشة الدخول لأسباب أمنية."
+                )
+
+            if not row:
+                secret = pyotp.random_base32()
+                cur.execute("INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES ('admin', %s, FALSE);", (secret,))
+                conn.commit()
+            else:
+                secret = row["totp_secret"]
+
+        totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+            name="admin@fdc.om",
+            issuer_name="Food Development Co - CRM"
+        )
+
         qr = qrcode.QRCode(box_size=6, border=2)
         qr.add_data(totp_uri)
         qr.make(fit=True)
@@ -296,47 +309,39 @@ def get_2fa_qr():
         img.save(buf, format="PNG")
         buf.seek(0)
         return StreamingResponse(buf, media_type="image/png")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(f"Local QR generation failed ({e}), using fallback API...")
         fallback_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={totp_uri}"
         r = httpx.get(fallback_url)
         return Response(content=r.content, media_type="image/png")
+    finally:
+        conn.close()
 
 @app.post("/api/auth/2fa/verify")
 def verify_2fa(payload: Verify2FAPayload):
-    secret = None
     conn = get_db_connection()
-    if conn:
-        try:
+    if not conn:
+        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متاحة")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=400, detail="المفتاح السري غير مهيأ")
+            secret = row["totp_secret"]
+
+        totp = pyotp.TOTP(secret)
+        if totp.verify(payload.code, valid_window=1):
             with conn.cursor() as cur:
-                cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
-                row = cur.fetchone()
-                if row:
-                    secret = row["totp_secret"]
-        except Exception as e:
-            logger.error(f"Error reading 2FA secret: {e}")
-        finally:
-            conn.close()
-
-    if not secret:
-        secret = FALLBACK_2FA_SECRET
-
-    totp = pyotp.TOTP(secret)
-    if totp.verify(payload.code, valid_window=1):
-        if conn:
-            try:
-                conn_up = get_db_connection()
-                if conn_up:
-                    with conn_up.cursor() as cur:
-                        cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
-                        conn_up.commit()
-                    conn_up.close()
-            except Exception as e:
-                logger.error(f"Error updating 2FA flag: {e}")
-
-        return {"status": "SUCCESS", "message": "تم التحقق الأمني بنجاح"}
-    else:
-        raise HTTPException(status_code=401, detail="الرمز غير صحيح أو انتهت صلاحيته")
+                cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
+            conn.commit()
+            return {"status": "SUCCESS", "message": "تم التحقق الأمني بنجاح"}
+        else:
+            raise HTTPException(status_code=401, detail="الرمز غير صحيح أو انتهت صلاحيته")
+    finally:
+        conn.close()
 
 # ----------------- CSS الطباعة الصارم لتقارير A4 -----------------
 PRINT_ENGINE_CSS = """
