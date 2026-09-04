@@ -45,16 +45,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
 
 # ----------------- وظائف الاتصال والتهيئة لقاعدة البيانات -----------------
-def get_db_connection():
-    if not DATABASE_URL:
-        return None
-    try:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-        return conn
-    except Exception as e:
-        logger.error(f"Database connection error: {e}")
-        return None
-
 def init_database():
     conn = get_db_connection()
     if not conn:
@@ -62,8 +52,8 @@ def init_database():
         return
 
     try:
+        # 1. إنشاء جدول الأمان والمصادقة الثنائية بشكل مستقل وتثبيته
         with conn.cursor() as cur:
-            # 1. جدول المصادقة الثنائية 2FA
             cur.execute("""
             CREATE TABLE IF NOT EXISTS system_auth (
                 id SERIAL PRIMARY KEY,
@@ -72,7 +62,6 @@ def init_database():
                 is_2fa_enabled BOOLEAN DEFAULT FALSE
             );
             """)
-
             cur.execute("SELECT COUNT(*) FROM system_auth WHERE username = 'admin';")
             if cur.fetchone()["count"] == 0:
                 default_secret = pyotp.random_base32()
@@ -80,8 +69,11 @@ def init_database():
                     "INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES (%s, %s, %s);",
                     ('admin', default_secret, False)
                 )
+        conn.commit()
 
-            # 2. جدول مسؤولي المبيعات
+        # 2. إنشاء وتحديث جداول النظام وإضافة الأعمدة الناقصة إن وجدت
+        with conn.cursor() as cur:
+            # جدول مسؤولي المبيعات
             cur.execute("""
             CREATE TABLE IF NOT EXISTS sales_executives (
                 id SERIAL PRIMARY KEY,
@@ -98,7 +90,7 @@ def init_database():
             );
             """)
 
-            # 3. جدول حسابات العملاء
+            # جدول حسابات العملاء
             cur.execute("""
             CREATE TABLE IF NOT EXISTS customer_accounts (
                 id SERIAL PRIMARY KEY,
@@ -113,8 +105,13 @@ def init_database():
                 status VARCHAR(20) DEFAULT 'نشط'
             );
             """)
+            # ترقية جدول customer_accounts في حال كان العمود مفقوداً
+            cur.execute("""
+            ALTER TABLE customer_accounts 
+            ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150);
+            """)
 
-            # 4. جدول العينات المجانية
+            # جدول العينات
             cur.execute("""
             CREATE TABLE IF NOT EXISTS sample_deliveries (
                 id SERIAL PRIMARY KEY,
@@ -130,7 +127,7 @@ def init_database():
             );
             """)
 
-            # 5. جدول التقويم الميداني
+            # جدول التقويم الميداني
             cur.execute("""
             CREATE TABLE IF NOT EXISTS calendar_events (
                 id SERIAL PRIMARY KEY,
@@ -144,7 +141,7 @@ def init_database():
             );
             """)
 
-            # 6. جدول سجلات الواتساب
+            # جدول سجلات الواتساب
             cur.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_logs (
                 id SERIAL PRIMARY KEY,
@@ -154,7 +151,10 @@ def init_database():
                 message_body TEXT NOT NULL
             );
             """)
+        conn.commit()
 
+        # 3. إدخال البيانات الافتراضية إذا كانت الجداول فارغة
+        with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM sales_executives;")
             if cur.fetchone()["count"] == 0:
                 cur.execute("""
@@ -165,6 +165,8 @@ def init_database():
                 ('تركي الغامدي', 'SE-103', '+96897778899', 'صلالة - ظفار', 22000.0, 21500.0, 380.0, 360.0, 360.0, 'نشط');
                 """)
 
+            cur.execute("SELECT COUNT(*) FROM customer_accounts;")
+            if cur.fetchone()["count"] == 0:
                 cur.execute("""
                 INSERT INTO customer_accounts (company_name, sector, contact_person, phone, assigned_rep_id, assigned_rep_name, whatsapp_group_id, tier, status)
                 VALUES 
@@ -173,6 +175,8 @@ def init_database():
                 ('شركة الضيافة الفندقية العالمية', 'فنادق وخدمات', 'أ/ وائل الخالدي', '+96898822334', 3, 'تركي الغامدي', '120363077615243@g.us', 'A', 'نشط');
                 """)
 
+            cur.execute("SELECT COUNT(*) FROM sample_deliveries;")
+            if cur.fetchone()["count"] == 0:
                 cur.execute("""
                 INSERT INTO sample_deliveries (customer_name, rep_name, product_name, qty_free, delivery_date, status, converted_po_id, po_value, source)
                 VALUES 
@@ -181,6 +185,8 @@ def init_database():
                 ('شركة الضيافة الفندقية العالمية', 'تركي الغامدي', 'شاورما دجاج جاهزة للطهي', 25, '2026-08-28', 'APPROVED', 'PO-2026-904', 11500.0, 'WhatsApp Sentinel');
                 """)
 
+            cur.execute("SELECT COUNT(*) FROM calendar_events;")
+            if cur.fetchone()["count"] == 0:
                 cur.execute("""
                 INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, route_code, execution_status)
                 VALUES 
@@ -188,6 +194,8 @@ def init_database():
                 ('مؤسسة التموين الحديث', 'سالم الدوسري', 'زيارة تقصي واسترجاع عينات', '2026-09-04 13:00', 'مستودعات صحار', 'R-14', 'PENDING');
                 """)
 
+            cur.execute("SELECT COUNT(*) FROM whatsapp_logs;")
+            if cur.fetchone()["count"] == 0:
                 cur.execute("""
                 INSERT INTO whatsapp_logs (created_at, sender_name, is_external_call, message_body)
                 VALUES 
@@ -196,18 +204,13 @@ def init_database():
                 ('11:45', 'أحمد الشمري', TRUE, 'تم إجراء مكالمة مع مدير المشتريات وتأكيد استلام المواصفات القياسية.');
                 """)
 
-            conn.commit()
-            logger.info("PostgreSQL Database initialized and seeded successfully.")
+        conn.commit()
+        logger.info("PostgreSQL Database synchronized successfully.")
     except Exception as e:
         logger.error(f"Error during schema migration: {e}")
         conn.rollback()
     finally:
         conn.close()
-
-@app.on_event("startup")
-def startup_event():
-    init_database()
-
 # ----------------- مسار تقديم الشعار الحقيقي من ملف logo_data.py -----------------
 @app.get("/logo.png")
 def get_logo():
