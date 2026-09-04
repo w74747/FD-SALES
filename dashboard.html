@@ -14,7 +14,7 @@
         .brand-tint { background-color: #F5F0FC; }
 
         @media print {
-            aside, header, #auth-overlay, .no-print {
+            aside, header, .no-print {
                 display: none !important;
             }
             body, main {
@@ -36,7 +36,7 @@
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- شاشة التحقق الأمني الثنائي (Google Authenticator 2FA) -->
+    <!-- شاشة القفل والتحقق الثنائي عبر Google Authenticator -->
     <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-2">
@@ -45,10 +45,10 @@
             <h2 class="text-base font-bold text-gray-800">التحقق الأمني الثنائي (2FA)</h2>
             <p class="text-xs text-gray-500">يرجى إدخال رمز التحقق المكون من 6 أرقام من تطبيق Google Authenticator</p>
 
-            <button onclick="toggleSetupQR()" class="text-[11px] text-purple-700 underline block mx-auto">إظهار رمز QR لربط تطبيق المصادقة</button>
+            <button onclick="toggleSetupQR()" class="text-[11px] text-purple-700 underline block mx-auto">إظهار رمز QR لربط جهاز جديد</button>
             <div id="qr-setup-box" class="hidden my-2">
-                <img src="/api/auth/2fa/qr" alt="QR Code" class="w-44 h-44 mx-auto border p-1 rounded-lg">
-                <span class="text-[10px] text-gray-400 block mt-1">امسح الرمز عبر تطبيق Authenticator بهاتفك</span>
+                <img src="/api/auth/2fa/qr" alt="QR Code" class="w-40 h-40 mx-auto border p-1 rounded-lg">
+                <span class="text-[10px] text-gray-400">امسح الرمز عبر تطبيق Authenticator</span>
             </div>
 
             <div>
@@ -66,7 +66,7 @@
     <!-- القائمة الجانبية الرسمية -->
     <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
-            <!-- الشعار الرسمي المعتمد متكيف الأبعاد بالكامل -->
+            <!-- الشعار الرسمي المعتمد متكيف الأبعاد بالكامل ودون مط -->
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e] no-print">
                 <div class="w-full h-full bg-white rounded-xl p-2 flex items-center justify-center shadow-sm">
                     <img 
@@ -474,6 +474,33 @@
             whatsapp: 'رادار مجموعات العملاء والمكالمات'
         };
 
+        function switchTab(id) {
+            tabs.forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                const nav = document.getElementById(`nav-${t}`);
+                if (el) el.classList.add('hidden');
+                if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
+            });
+            document.getElementById(`tab-${id}`).classList.remove('hidden');
+            document.getElementById(`nav-${id}`).className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
+            document.getElementById('current-tab-title').innerText = titles[id];
+        }
+
+        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
+        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
+        function openWhatsAppModal() { document.getElementById('whatsapp-modal').classList.remove('hidden'); }
+        function closeWhatsAppModal() { document.getElementById('whatsapp-modal').classList.add('hidden'); }
+        
+        function openNewSampleModal() { document.getElementById('new-sample-modal').classList.remove('hidden'); }
+        function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
+        
+        function openNewCalendarModal() { document.getElementById('new-calendar-modal').classList.remove('hidden'); }
+        function closeNewCalendarModal() { document.getElementById('new-calendar-modal').classList.add('hidden'); }
+
+        function openSaleModal() { document.getElementById('sale-transaction-modal').classList.remove('hidden'); }
+        function closeSaleModal() { document.getElementById('sale-transaction-modal').classList.add('hidden'); }
+
+        // وظائف التحقق الثنائي (Google Authenticator)
         function toggleSetupQR() {
             const box = document.getElementById('qr-setup-box');
             box.classList.toggle('hidden');
@@ -503,7 +530,7 @@
                     loadAllData();
                 } else {
                     const data = await res.json();
-                    errorEl.innerText = data.detail || "رمز التحقق غير صحيح";
+                    errorEl.innerText = data.detail || "فشل التحقق من الرمز";
                     errorEl.classList.remove('hidden');
                 }
             } catch (err) {
@@ -511,32 +538,6 @@
                 errorEl.classList.remove('hidden');
             }
         }
-
-        function switchTab(id) {
-            tabs.forEach(t => {
-                const el = document.getElementById(`tab-${t}`);
-                const nav = document.getElementById(`nav-${t}`);
-                if (el) el.classList.add('hidden');
-                if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
-            });
-            document.getElementById(`tab-${id}`).classList.remove('hidden');
-            document.getElementById(`nav-${id}`).className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
-            document.getElementById('current-tab-title').innerText = titles[id];
-        }
-
-        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
-        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
-        function openWhatsAppModal() { document.getElementById('whatsapp-modal').classList.remove('hidden'); }
-        function closeWhatsAppModal() { document.getElementById('whatsapp-modal').classList.add('hidden'); }
-        
-        function openNewSampleModal() { document.getElementById('new-sample-modal').classList.remove('hidden'); }
-        function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
-        
-        function openNewCalendarModal() { document.getElementById('new-calendar-modal').classList.remove('hidden'); }
-        function closeNewCalendarModal() { document.getElementById('new-calendar-modal').classList.add('hidden'); }
-
-        function openSaleModal() { document.getElementById('sale-transaction-modal').classList.remove('hidden'); }
-        function closeSaleModal() { document.getElementById('sale-transaction-modal').classList.add('hidden'); }
 
         async function submitNewSample() {
             const payload = {
@@ -695,6 +696,7 @@
             `).join('');
         }
 
+        // فحص حالة تسجيل الدخول الثنائي
         window.addEventListener('DOMContentLoaded', () => {
             if (sessionStorage.getItem('fdc_auth_token') === 'AUTHENTICATED') {
                 document.getElementById('auth-overlay').classList.add('hidden');
