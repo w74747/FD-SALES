@@ -32,7 +32,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="6.7.0")
+app = FastAPI(title="FDC Sales CRM", version="6.8.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,7 +51,6 @@ DATABASE_URL = (
 FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
 whatsapp_process = None
 
-# ----------------- الاتصال بقاعدة البيانات والتهيئة -----------------
 def get_db_connection():
     if not DATABASE_URL:
         logger.error("DATABASE_URL is empty.")
@@ -405,7 +404,7 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_name: str
     message_text: str
 
-# ----------------- مسارات البيانات والعمليات -----------------
+# ----------------- مسارات العمليات -----------------
 @app.get("/health")
 def health():
     conn = get_db_connection()
@@ -602,17 +601,33 @@ def get_whatsapp_logs():
     finally:
         conn.close()
 
-# ----------------- جلب الـ QR الحقيقي الصادر من Baileys حصراً -----------------
+# ----------------- مسارات فحص حالة الواتساب وجلب الـ QR -----------------
+@app.get("/api/whatsapp/status")
+async def get_whatsapp_status():
+    """التحقق من حالة الاتصال برقم هاتف الواتساب"""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=2.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                return {
+                    "connected": bool(data.get("connected")),
+                    "phone": data.get("user")
+                }
+    except Exception:
+        pass
+    return {"connected": False, "phone": None}
+
 @app.get("/api/whatsapp/qr")
 async def get_whatsapp_qr():
-    """جلب رمز QR الحقيقي من Baileys، ورفض توليد أي رموز وهمية"""
+    """جلب رمز QR الحقيقي من Baileys"""
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=3.0)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("connected"):
-                    return {"status": "CONNECTED", "message": "متصل بالفعل بالواتساب"}
+                    return {"connected": True, "user": data.get("user")}
                 
                 qr_base64 = data.get("qr")
                 if qr_base64:
