@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + WhatsApp Whitelist Engine
+FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + WhatsApp Sentinel Whitelist Engine
 """
 
 import os
@@ -30,7 +30,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="5.3.0")
+app = FastAPI(title="FDC Sales CRM", version="5.4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -370,7 +370,6 @@ class NewSaleTransactionPayload(BaseModel):
     expense_fuel: Optional[float] = 0.0
     expense_other: Optional[float] = 0.0
 
-# نموذج استقبال وفلترة رسائل الواتساب الصارمة
 class IncomingWhatsAppMessage(BaseModel):
     chat_id: str
     sender_phone: str
@@ -573,6 +572,19 @@ def get_whatsapp_logs():
             return cur.fetchall()
     finally:
         conn.close()
+
+# ----------------- مسار توليد QR الواتساب المباشر -----------------
+@app.get("/api/whatsapp/qr")
+def get_whatsapp_qr():
+    qr_data = "https://wa.me/?text=FDC-SALES-CRM-SENTINEL-LINK"
+    qr = qrcode.QRCode(box_size=6, border=2)
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#3A056A", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/png")
 
 # ----------------- خطاف الويب الفعلي مع فلترة القائمة البيضاء -----------------
 @app.post("/api/whatsapp/webhook")
