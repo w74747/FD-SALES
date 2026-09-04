@@ -31,7 +31,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="6.0.0")
+app = FastAPI(title="FDC Sales CRM", version="6.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -92,7 +92,7 @@ def init_database():
         logger.error(f"Error initializing system_auth: {e}")
         conn.rollback()
 
-    # 2. ترقية وإنشاء جداول النظام وضمان عدم نقص أي عمود
+    # 2. ترقية وإنشاء جداول النظام
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -172,7 +172,7 @@ def init_database():
         logger.error(f"Error updating system tables: {e}")
         conn.rollback()
 
-    # 3. إدخال البيانات التأسيسية إذا كانت الجداول فارغة
+    # 3. إدخال البيانات التأسيسية بأمان ودون خرق المفتاح الأجنبي
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM sales_executives;")
@@ -182,18 +182,27 @@ def init_database():
                 VALUES 
                 ('أحمد الشمري', 'SE-101', '+96891112233', 'مسقط - الوسطى', 25000.0, 27200.0, 400.0, 380.0, 320.0, 'نشط'),
                 ('سالم الدوسري', 'SE-102', '+96894445566', 'صحار - الباطنة', 18000.0, 13500.0, 350.0, 395.0, 410.0, 'نشط'),
-                ('تركي الغامدي', 'SE-103', '+96897778899', 'صلالة - ظفار', 22000.0, 21500.0, 380.0, 360.0, 360.0, 'نشط');
+                ('تركي الغامدي', 'SE-103', '+96897778899', 'صلالة - ظفار', 22000.0, 21500.0, 380.0, 360.0, 360.0, 'نشط')
+                RETURNING id;
                 """)
+                rep_ids = [r["id"] for r in cur.fetchall()]
+            else:
+                cur.execute("SELECT id FROM sales_executives ORDER BY id ASC LIMIT 3;")
+                rep_ids = [r["id"] for r in cur.fetchall()]
 
             cur.execute("SELECT COUNT(*) FROM customer_accounts;")
-            if cur.fetchone()["count"] == 0:
+            if cur.fetchone()["count"] == 0 and rep_ids:
+                r1 = rep_ids[0]
+                r2 = rep_ids[1] if len(rep_ids) > 1 else r1
+                r3 = rep_ids[2] if len(rep_ids) > 2 else r1
+
                 cur.execute("""
                 INSERT INTO customer_accounts (company_name, sector, contact_person, phone, assigned_rep_id, assigned_rep_name, whatsapp_group_id, tier, status)
                 VALUES 
-                ('سلسلة مطاعم الريف', 'مطاعم وإعاشة', 'م. فهد القرني', '+96899988771', 1, 'أحمد الشمري', '120363029182371@g.us', 'A', 'نشط'),
-                ('مؤسسة التموين الحديث', 'تجارة جملة', 'أ/ طارق المنصور', '+96893322110', 2, 'سالم الدوسري', '120363088716253@g.us', 'B', 'راكد'),
-                ('شركة الضيافة الفندقية العالمية', 'فنادق وخدمات', 'أ/ وائل الخالدي', '+96898822334', 3, 'تركي الغامدي', '120363077615243@g.us', 'A', 'نشط');
-                """)
+                ('سلسلة مطاعم الريف', 'مطاعم وإعاشة', 'م. فهد القرني', '+96899988771', %s, 'أحمد الشمري', '120363029182371@g.us', 'A', 'نشط'),
+                ('مؤسسة التموين الحديث', 'تجارة جملة', 'أ/ طارق المنصور', '+96893322110', %s, 'سالم الدوسري', '120363088716253@g.us', 'B', 'راكد'),
+                ('شركة الضيافة الفندقية العالمية', 'فنادق وخدمات', 'أ/ وائل الخالدي', '+96898822334', %s, 'تركي الغامدي', '120363077615243@g.us', 'A', 'نشط');
+                """, (r1, r2, r3))
 
             cur.execute("SELECT COUNT(*) FROM sample_deliveries;")
             if cur.fetchone()["count"] == 0:
@@ -584,7 +593,6 @@ async def get_whatsapp_qr():
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("connected"):
-                    # في حال كان الجهاز متصلاً بالفعل
                     return Response(status_code=204)
                 
                 qr_base64 = data.get("qr")
