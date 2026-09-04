@@ -1,14 +1,13 @@
 """
 sales_reports_engine.py
 محرك التقارير التنفيذية والرسمية لشركة تنمية الغذاء (Food Development Company)
-يعتمد Jinja2 و WeasyPrint لتوليد مستندات PDF فائقة الجودة.
+يعتمد Jinja2 و WeasyPrint لتوليد مستندات PDF فائقة الجودة بالريال العماني.
 """
 
 import os
 from jinja2 import Environment, DictLoader
 from weasyprint import HTML
 
-# استيراد الشعار الفعلي الموحد لشركة تنمية الغذاء
 try:
     from logo_data import LOGO_BASE64
     if LOGO_BASE64.startswith("data:image"):
@@ -184,7 +183,6 @@ table.data-table tr:nth-child(even) {
 """
 
 REPORT_TEMPLATES = {
-    # 01. بطاقة أداء المندوب الشامل وعائد التكلفة
     "01_rep_performance_scorecard.html": """
     <!DOCTYPE html>
     <html lang="ar" dir="rtl">
@@ -262,7 +260,6 @@ REPORT_TEMPLATES = {
     </html>
     """,
 
-    # 02. التقرير التنفيذي العام لإدارة المبيعات
     "02_executive_sales_report.html": """
     <!DOCTYPE html>
     <html lang="ar" dir="rtl">
@@ -326,7 +323,6 @@ REPORT_TEMPLATES = {
 jinja_env = Environment(loader=DictLoader(REPORT_TEMPLATES), autoescape=True)
 
 def render_report_html(template_name: str, context_data: dict) -> str:
-    """يدمج بيانات السياق داخل قالب Jinja2 مع حقن الهوية والـ CSS الموحد."""
     template = jinja_env.get_template(template_name)
     payload = {
         **context_data,
@@ -338,6 +334,5 @@ def render_report_html(template_name: str, context_data: dict) -> str:
     return template.render(**payload)
 
 def generate_report_pdf(template_name: str, context_data: dict) -> bytes:
-    """يقوم بتوليد ملف PDF متوافق مع WeasyPrint بناءً على القالب المختار."""
     html_content = render_report_html(template_name, context_data)
     return HTML(string=html_content).write_pdf()
