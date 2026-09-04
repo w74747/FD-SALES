@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Integrated Baileys Engine
+FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Dynamic Expense Categories
 """
 
 import os
@@ -32,7 +32,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="8.0.0")
+app = FastAPI(title="FDC Sales CRM", version="8.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -140,6 +140,15 @@ def init_database():
             );
             """)
 
+            # جدول بنود المصاريف القابلة للتخصيص والإدارة
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS expense_categories (
+                id SERIAL PRIMARY KEY,
+                category_name VARCHAR(150) UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
             cur.execute("""
             CREATE TABLE IF NOT EXISTS expenses_log (
                 id SERIAL PRIMARY KEY,
@@ -189,6 +198,21 @@ def init_database():
                 message_body TEXT NOT NULL
             );
             """)
+
+            # تعبئة بنود المصاريف الافتراضية إذا كانت فارغة
+            cur.execute("SELECT COUNT(*) FROM expense_categories;")
+            if cur.fetchone()["count"] == 0:
+                cur.execute("""
+                INSERT INTO expense_categories (category_name) VALUES 
+                ('وقود سيارة'),
+                ('إيجار سيارة / نقل'),
+                ('علاوة يومية (انتداب مدينة أخرى)'),
+                ('ضيافة واجتماعات عملاء'),
+                ('شحن ونثريات عينات'),
+                ('صيانة وإصلاحات طارئة')
+                ON CONFLICT DO NOTHING;
+                """)
+
         conn.commit()
     except Exception as e:
         logger.error(f"Error updating system tables: {e}")
@@ -387,6 +411,9 @@ class CloseTargetPayload(BaseModel):
     po_value: float
     po_attachment_url: Optional[str] = ""
 
+class NewExpenseCategoryPayload(BaseModel):
+    category_name: str
+
 class NewExpensePayload(BaseModel):
     rep_id: int
     expense_type: str
@@ -398,6 +425,55 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_phone: str
     sender_name: str
     message_text: str
+
+# ----------------- مسارات بنود المصاريف الديناميكية -----------------
+@app.get("/api/expense-categories")
+def get_expense_categories():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, category_name FROM expense_categories ORDER BY id ASC;")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/expense-categories")
+def add_expense_category(payload: NewExpenseCategoryPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            name = payload.category_name.strip()
+            if not name:
+                raise HTTPException(status_code=400, detail="يرجى كتابة اسم البند")
+            cur.execute("INSERT INTO expense_categories (category_name) VALUES (%s) RETURNING id;", (name,))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id, "category_name": name}
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail="هذا البند مضاف مسبقاً")
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/expense-categories/{cat_id}")
+def delete_expense_category(cat_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM expense_categories WHERE id = %s;", (cat_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
 
 # ----------------- مسارات البيانات والعمليات -----------------
 @app.get("/api/reps")
