@@ -66,7 +66,6 @@
     <!-- القائمة الجانبية الرسمية -->
     <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
-            <!-- الشعار الرسمي -->
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e] no-print">
                 <div class="w-full h-full bg-white rounded-xl p-2 flex items-center justify-center shadow-sm">
                     <img 
@@ -77,7 +76,6 @@
                 </div>
             </div>
 
-            <!-- عناصر التنقل -->
             <div class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
                 <div class="text-[10px] font-bold text-[#C194FB] mb-2 px-2 uppercase tracking-wider">العمليات والمبيعات الميدانية</div>
                 
@@ -124,7 +122,6 @@
                 </button>
             </div>
 
-            <!-- زر تسجيل الخروج الأمني -->
             <div class="p-3 border-t border-[#52128e]">
                 <button onclick="logoutSession()" class="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-red-200 bg-red-950/40 hover:bg-red-900/60 rounded-lg transition border border-red-800/40">
                     <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
@@ -486,7 +483,7 @@
         </div>
     </div>
 
-    <!-- مودال: إدارة وحصر نطاق الواتساب الميداني مع الـ QR -->
+    <!-- مودال: إدارة وحصر نطاق الواتساب الميداني مع الـ QR الحقيقي -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[560px] space-y-4 text-xs max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
@@ -494,12 +491,17 @@
                 <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">نطاق مقيد وآمن ✓</span>
             </div>
 
-            <!-- بطاقة الـ QR للربط -->
+            <!-- بطاقة الـ QR الحقيقي للربط -->
             <div class="text-center p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
                 <div class="font-bold text-gray-700">ربط الجهاز عبر رمز الاستجابة السريعة (QR)</div>
-                <img id="whatsapp-qr-image" src="/api/whatsapp/qr" alt="WhatsApp QR" class="w-44 h-44 mx-auto p-1 bg-white border rounded-lg shadow-sm">
-                <p class="text-[11px] text-gray-500">امسح الرمز من: واتساب ⬅️ الأجهزة المرتبطة ⬅️ ربط جهاز</p>
-                <div class="text-[10px] text-amber-700">ملاحظة: إذا ظهر رمز غير صالح في هاتفك، استخدم رابط الـ Webhook أدناه للربط عبر بوابات الـ API السحابية.</div>
+                <div class="relative w-48 h-48 mx-auto flex items-center justify-center bg-white border rounded-lg shadow-sm">
+                    <img id="whatsapp-qr-image" src="" alt="WhatsApp QR" class="w-44 h-44 object-contain">
+                    <div id="whatsapp-qr-loader" class="absolute inset-0 bg-white/90 flex flex-col items-center justify-center p-2 text-center text-gray-500 text-[11px]">
+                        <span class="animate-spin text-2xl mb-1">⚙️</span>
+                        <span id="whatsapp-loader-text">جاري الاتصال بمحرك الواتساب...</span>
+                    </div>
+                </div>
+                <p id="whatsapp-qr-hint" class="text-[11px] text-gray-500">امسح الرمز من: واتساب ⬅️ الأجهزة المرتبطة ⬅️ ربط جهاز</p>
             </div>
 
             <!-- رابط استقبال الرسائل للربط مع أي بوابة سحابية -->
@@ -555,11 +557,33 @@
         function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
         function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
         
-        function openWhatsAppModal() { 
+        async function openWhatsAppModal() { 
             document.getElementById('whatsapp-modal').classList.remove('hidden'); 
             const img = document.getElementById('whatsapp-qr-image');
-            if (img) img.src = '/api/whatsapp/qr?t=' + new Date().getTime();
+            const loader = document.getElementById('whatsapp-qr-loader');
+            const loaderText = document.getElementById('whatsapp-loader-text');
+            const hint = document.getElementById('whatsapp-qr-hint');
+
+            loader.classList.remove('hidden');
+            loaderText.innerText = "جاري جلب رمز الجلسة المشفرة من خادم واتساب...";
+
+            try {
+                const res = await fetch('/api/whatsapp/qr?t=' + new Date().getTime());
+                if (res.status === 200) {
+                    const blob = await res.blob();
+                    img.src = URL.createObjectURL(blob);
+                    loader.classList.add('hidden');
+                    hint.innerText = "امسح الرمز من: واتساب ⬅️ الأجهزة المرتبطة ⬅️ ربط جهاز";
+                } else if (res.status === 204) {
+                    loaderText.innerText = "✅ الحساب متصل بالفعل بالواتساب والمراقبة نشطة";
+                } else {
+                    loaderText.innerText = "⏳ جاري إقلاع المحرك... يرجى إعادة المحاولة بعد ثوانٍ";
+                }
+            } catch (e) {
+                loaderText.innerText = "تعذر الاتصال بمحرك الواتساب، أعد المحاولة بعد قليل.";
+            }
         }
+
         function closeWhatsAppModal() { document.getElementById('whatsapp-modal').classList.add('hidden'); }
         
         function openNewRepModal() { document.getElementById('new-rep-modal').classList.remove('hidden'); }
