@@ -1,13 +1,14 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + 2FA Google Authenticator + Flawless Printing
+FastAPI Backend + PostgreSQL Persistence + 2FA Google Authenticator + Official Branding
 """
 
 import os
 import io
 import json
 import uuid
+import base64
 import logging
 from datetime import datetime
 from typing import Optional, List
@@ -21,10 +22,16 @@ import pyotp
 import qrcode
 import httpx
 
+# استيراد الشعار الأصلي المحفوظ كسلسلة Base64
+try:
+    from logo_data import LOGO_BASE64
+except ImportError:
+    LOGO_BASE64 = ""
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="4.3.0")
+app = FastAPI(title="FDC Sales CRM", version="4.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,6 +42,7 @@ app.add_middleware(
 )
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
 
 # ----------------- وظائف الاتصال والتهيئة لقاعدة البيانات -----------------
 def get_db_connection():
@@ -55,7 +63,7 @@ def init_database():
 
     try:
         with conn.cursor() as cur:
-            # 1. جدول الحماية الثنائية
+            # 1. جدول المصادقة الثنائية 2FA
             cur.execute("""
             CREATE TABLE IF NOT EXISTS system_auth (
                 id SERIAL PRIMARY KEY,
@@ -106,7 +114,7 @@ def init_database():
             );
             """)
 
-            # 4. جدول العينات
+            # 4. جدول العينات المجانية
             cur.execute("""
             CREATE TABLE IF NOT EXISTS sample_deliveries (
                 id SERIAL PRIMARY KEY,
@@ -200,28 +208,28 @@ def init_database():
 def startup_event():
     init_database()
 
-# ----------------- مسار الشعار المباشر المتجهي (نقي بنسبة 100%) -----------------
+# ----------------- مسار تقديم الشعار الحقيقي من ملف logo_data.py -----------------
 @app.get("/logo.png")
 def get_logo():
-    svg_data = """<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 80' width='320' height='80'>
-        <defs>
-            <linearGradient id='fdc_ring' x1='0%' y1='0%' x2='100%' y2='100%'>
-                <stop offset='0%' stop-color='#C194FB'/>
-                <stop offset='100%' stop-color='#3A056A'/>
-            </linearGradient>
-        </defs>
-        <path d='M 40,12 A 28,28 0 1,1 12,40' fill='none' stroke='url(#fdc_ring)' stroke-width='10' stroke-linecap='round'/>
-        <text x='82' y='36' fill='#3A056A' font-family='Cairo, sans-serif' font-size='18' font-weight='900'>شركة تنمية الغذاء</text>
-        <text x='82' y='56' fill='#7E22CE' font-family='Cairo, sans-serif' font-size='11' font-weight='700' letter-spacing='0.5'>Food Development Company</text>
-    </svg>"""
-    return Response(content=svg_data, media_type="image/svg+xml")
+    """فك تشفير الشعار الفعلي المعتمد للشركة من logo_data.py وتقديمه بصيغة PNG"""
+    try:
+        from logo_data import LOGO_BASE64
+        if LOGO_BASE64:
+            clean_b64 = LOGO_BASE64.split(",")[-1].strip()
+            image_bytes = base64.b64decode(clean_b64)
+            return Response(
+                content=image_bytes,
+                media_type="image/png",
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
+    except Exception as e:
+        logger.error(f"Error loading logo from logo_data: {e}")
+
+    raise HTTPException(status_code=404, detail="ملف الشعار logo_data.py غير موجود أو البيانات غير صالحة")
 
 # ----------------- مسارات المصادقة الثنائية (Google Authenticator) -----------------
 class Verify2FAPayload(BaseModel):
     code: str
-
-# مفتاح سري ثابت لضمان عمل التحقق حتى في حال تعثر الاتصال اللحظي بقاعدة البيانات
-FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
 
 @app.get("/api/auth/2fa/qr")
 def get_2fa_qr():
@@ -248,7 +256,7 @@ def get_2fa_qr():
 
     totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
         name="admin@fdc.om",
-        issuer_name="Food Development Co"
+        issuer_name="Food Development Co - CRM"
     )
 
     try:
@@ -278,15 +286,14 @@ def verify_2fa(payload: Verify2FAPayload):
                 if row:
                     secret = row["totp_secret"]
         except Exception as e:
-            logger.error(f"Error reading 2FA secret in verify: {e}")
+            logger.error(f"Error reading 2FA secret: {e}")
         finally:
             conn.close()
-            
+
     if not secret:
         secret = FALLBACK_2FA_SECRET
 
     totp = pyotp.TOTP(secret)
-    # التحقق مع قبول فارق زمني نافذة +/- 30 ثانية
     if totp.verify(payload.code, valid_window=1):
         if conn:
             try:
@@ -297,13 +304,13 @@ def verify_2fa(payload: Verify2FAPayload):
                         conn_up.commit()
                     conn_up.close()
             except Exception as e:
-                logger.error(f"Error updating 2FA state: {e}")
-                
+                logger.error(f"Error updating 2FA flag: {e}")
+
         return {"status": "SUCCESS", "message": "تم التحقق الأمني بنجاح"}
     else:
         raise HTTPException(status_code=401, detail="الرمز غير صحيح أو انتهت صلاحيته")
 
-# ----------------- CSS الطباعة الصارم A4 -----------------
+# ----------------- CSS الطباعة الصارم لتقارير A4 -----------------
 PRINT_ENGINE_CSS = """
 @page {
     size: A4 portrait;
@@ -423,7 +430,7 @@ table.data-table tr:nth-child(even) { background: #FAFAFC; }
 .editable-box:focus { border-style: solid; background: #FFFFFF; }
 """
 
-# ----------------- نماذج Pydantic للبيانات -----------------
+# ----------------- نماذج Pydantic للطلبات -----------------
 class NewSamplePayload(BaseModel):
     customer_name: str
     rep_name: str
@@ -448,7 +455,7 @@ class NewSaleTransactionPayload(BaseModel):
     expense_fuel: Optional[float] = 0.0
     expense_other: Optional[float] = 0.0
 
-# ----------------- مسارات واجهة برمجة التطبيقات الأساسية -----------------
+# ----------------- مسارات البيانات والعمليات -----------------
 @app.get("/health")
 def health():
     return {"status": "UP", "timestamp": datetime.now().isoformat(), "db_configured": bool(DATABASE_URL)}
@@ -655,7 +662,7 @@ def preview_report(req: dict):
                     <h1 style="margin: 0 0 3px 0; color: #3A056A; font-size: 15pt; font-weight: 900; line-height: 1.2;">التقرير التنفيذي الشامل للمبيعات والعمليات</h1>
                     <div style="color: #64748B; font-size: 8pt; font-weight: 600;">الفترة: الربع الثالث 2026 &nbsp;|&nbsp; توجيه المستند: {recipient}</div>
                 </td>
-                <td style="text-align: left; vertical-align: middle; width: 220px; height: 55px;">
+                <td style="text-align: left; vertical-align: middle; width: 220px; height: 60px;">
                     <img src="/logo.png" alt="شركة تنمية الغذاء" style="max-width: 100%; max-height: 55px; width: auto; height: auto; object-fit: contain; display: block; border: none;" />
                 </td>
             </tr>
