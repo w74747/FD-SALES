@@ -178,9 +178,9 @@
                     <div class="flex justify-between items-center mb-4">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
-                            <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج</div>
+                            <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج والمصاريف</div>
                         </div>
-                        <button onclick="openNewRepModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ إضافة مسؤول مبيعات جديد</button>
+                        <button onclick="openNewRepModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة مسؤول مبيعات جديد</button>
                     </div>
                     <div id="reps-grid-cards" class="grid grid-cols-3 gap-4"></div>
                 </div>
@@ -207,6 +207,7 @@
                                 <th class="p-3">المنطقة / القطاع</th>
                                 <th class="p-3">المسؤول ورقم التواصل</th>
                                 <th class="p-3">المسؤول المتابع</th>
+                                <th class="p-3">مجموعة الواتساب المراقبة</th>
                                 <th class="p-3">تعليمات وملاحظات العميل</th>
                                 <th class="p-3">الحالة</th>
                             </tr>
@@ -265,7 +266,7 @@
                             <h3 class="font-bold text-sm brand-primary-text">المجموعات المراقبة والمحادثات الميدانية</h3>
                             <div class="text-xs text-gray-500">مراقبة محادثات مجموعات العملاء المحددة حصراً</div>
                         </div>
-                        <button onclick="openWhatsAppModal()" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">إدارة اتصال الواتساب</button>
+                        <button onclick="openWhatsAppModal()" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">إدارة اتصال ونطاق الواتساب</button>
                     </div>
                     <div class="space-y-2.5 text-xs" id="whatsapp-feed-list"></div>
                 </div>
@@ -291,25 +292,25 @@
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="block font-bold mb-1">المنطقة:</label>
-                    <input type="text" id="cust-region" class="w-full p-2 border rounded-lg" placeholder="مسقط / صحار / صلالة">
+                    <input type="text" id="cust-region" class="w-full p-2 border rounded-lg" value="مسقط">
                 </div>
                 <div>
                     <label class="block font-bold mb-1">القطاع:</label>
-                    <input type="text" id="cust-sector" class="w-full p-2 border rounded-lg" placeholder="مطاعم / فنادق / جملة">
+                    <input type="text" id="cust-sector" class="w-full p-2 border rounded-lg" placeholder="مطاعم / جملة / فنادق">
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="block font-bold mb-1">اسم المسؤول:</label>
-                    <input type="text" id="cust-contact-person" class="w-full p-2 border rounded-lg" placeholder="م. فهد القرني">
+                    <input type="text" id="cust-contact-person" class="w-full p-2 border rounded-lg" placeholder="علي">
                 </div>
                 <div>
                     <label class="block font-bold mb-1">رقم التواصل:</label>
-                    <input type="text" id="cust-phone" class="w-full p-2 border rounded-lg font-mono" placeholder="+96899988771">
+                    <input type="text" id="cust-phone" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX">
                 </div>
             </div>
             <div>
-                <label class="block font-bold mb-1">تعيين مسؤول المبيعات المتابع (من الفريق المعتمد):</label>
+                <label class="block font-bold mb-1">تعيين مسؤول المبيعات المتابع:</label>
                 <select id="cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
             </div>
             <div>
@@ -323,16 +324,16 @@
         </div>
     </div>
 
-    <!-- مودال: تسليم عينة جديدة (مربوط بالقوائم المنسدلة) -->
+    <!-- مودال: تسليم عينة جديدة -->
     <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينة جديدة</h3>
             <div>
-                <label class="block font-bold mb-1">العميل المستلم (من قائمة العملاء المعتمدين):</label>
+                <label class="block font-bold mb-1">العميل المستلم:</label>
                 <select id="sample-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
             </div>
             <div>
-                <label class="block font-bold mb-1">المندوب المسلّم (من فريق المبيعات):</label>
+                <label class="block font-bold mb-1">المندوب المسلّم:</label>
                 <select id="sample-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
             </div>
             <div>
@@ -356,7 +357,7 @@
         </div>
     </div>
 
-    <!-- مودال: جدولة مهمة جديدة (مربوط بالقوائم المنسدلة) -->
+    <!-- مودال: جدولة مهمة جديدة -->
     <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية جديدة</h3>
@@ -428,12 +429,12 @@
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
             <div>
                 <label class="block font-bold mb-1">الاسم الكامل:</label>
-                <input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: يوسف المعمري">
+                <input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: عبدالله">
             </div>
             <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="block font-bold mb-1">الكود الوظيفي:</label>
-                    <input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="SE-105">
+                    <input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="0144">
                 </div>
                 <div>
                     <label class="block font-bold mb-1">المنطقة البيعية:</label>
@@ -461,9 +462,9 @@
         </div>
     </div>
 
-    <!-- مودال: قيد مصاريف عامة -->
+    <!-- مودال: قيد مصاريف عامة مع زر إدارة البنود -->
     <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
+        <div class="bg-white rounded-2xl p-6 w-[470px] space-y-3 text-xs">
             <h3 class="font-bold text-sm text-amber-800 border-b pb-2">قيد مصاريف ميدانية وتشغيلية</h3>
             <div>
                 <label class="block font-bold mb-1">مسؤول المبيعات:</label>
@@ -471,15 +472,11 @@
             </div>
             <div class="grid grid-cols-2 gap-2">
                 <div>
-                    <label class="block font-bold mb-1">نوع وبند المصروف:</label>
-                    <select id="exp-type-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
-                        <option value="وقود سيارة">وقود سيارة</option>
-                        <option value="إيجار سيارة / نقل">إيجار سيارة / نقل</option>
-                        <option value="علاوة يومية (انتداب مدينة أخرى)">علاوة يومية (انتداب مدينة أخرى)</option>
-                        <option value="ضيافة واجتماعات عملاء">ضيافة واجتماعات عملاء</option>
-                        <option value="شحن ونثريات عينات">شحن ونثريات عينات</option>
-                        <option value="مصاريف أخرى">مصاريف أخرى</option>
-                    </select>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="font-bold">نوع وبند المصروف:</label>
+                        <button onclick="openManageCategoriesModal()" class="text-[10px] text-purple-700 underline font-bold hover:text-purple-900">إدارة البنود ⚙️</button>
+                    </div>
+                    <select id="exp-type-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]"></select>
                 </div>
                 <div>
                     <label class="block font-bold mb-1">قيمة المصروف (ر.ع):</label>
@@ -488,11 +485,37 @@
             </div>
             <div>
                 <label class="block font-bold mb-1">ملاحظات وبيان المصروف:</label>
-                <input type="text" id="exp-notes" class="w-full p-2 border rounded-lg" placeholder="رحلة عمل إلى صلالة لمتابعة الفنادق">
+                <input type="text" id="exp-notes" class="w-full p-2 border rounded-lg" placeholder="رحلة عمل لمتابعة العملاء">
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeExpenseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitExpense()" class="px-4 py-2 bg-amber-600 text-white font-bold rounded-lg">قيد المصروف</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال: إدارة بنود وأنواع المصاريف المخصصة -->
+    <div id="manage-categories-modal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-[440px] space-y-3 text-xs">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm brand-primary-text">إدارة بنود وأنواع المصاريف المعتمدة</h3>
+                <span class="text-[10px] text-gray-500">تخصيص القائمة المنسدلة</span>
+            </div>
+
+            <!-- إضافة بند جديد -->
+            <div class="flex gap-2">
+                <input type="text" id="new-category-name-input" class="flex-1 p-2 border rounded-lg" placeholder="اسم بند جديد (مثال: صيانة سيارة، شحن عينات...)">
+                <button onclick="submitNewCategory()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow-xs">+ إضافة</button>
+            </div>
+
+            <!-- قائمة البنود الحالية -->
+            <div class="space-y-1.5">
+                <div class="font-bold text-gray-700">البنود الحالية المسجلة في النظام:</div>
+                <div id="categories-list-container" class="space-y-1 max-h-48 overflow-y-auto border p-2 rounded-lg bg-gray-50"></div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t">
+                <button onclick="closeManageCategoriesModal()" class="px-4 py-1.5 border rounded-lg">إغلاق</button>
             </div>
         </div>
     </div>
@@ -537,32 +560,60 @@
         </div>
     </div>
 
-    <!-- مودال: الواتساب والتأكيد الفوري -->
+    <!-- مودال: إدارة اتصال ونطاق الواتساب -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl p-6 w-[560px] space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-2xl p-6 w-[580px] space-y-4 text-xs max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">ربط وإدارة نطاق رادار الواتساب</h3>
+                <h3 class="font-bold text-sm brand-primary-text">إدارة اتصال ونطاق رادار الواتساب</h3>
                 <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">نطاق مقيد وآمن ✓</span>
             </div>
 
-            <div class="text-center p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
-                <div id="whatsapp-connected-card" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2">
-                    <div class="w-12 h-12 bg-emerald-500 text-white text-2xl flex items-center justify-center rounded-full mx-auto shadow-sm">✓</div>
-                    <div class="font-bold text-emerald-900 text-sm">تم ربط جلسة WhatsApp بنجاح!</div>
-                    <div class="text-[11px] text-emerald-700">رقم الهاتف المقترن: <span id="connected-phone-display" class="font-mono font-bold"></span></div>
+            <!-- بطاقة الاتصال -->
+            <div class="text-center p-3 bg-gray-50 rounded-xl border border-gray-200">
+                <div id="whatsapp-connected-card" class="hidden p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-1">
+                    <div class="w-9 h-9 bg-emerald-500 text-white text-lg flex items-center justify-center rounded-full mx-auto">✓</div>
+                    <div class="font-bold text-emerald-900 text-xs">تم ربط جلسة WhatsApp بنجاح!</div>
+                    <div class="text-[11px] text-emerald-700">الرقم المقترن: <span id="connected-phone-display" class="font-mono font-bold"></span></div>
                 </div>
 
                 <div id="whatsapp-qr-wrapper">
                     <div class="font-bold text-gray-700 mb-2">ربط الجهاز عبر رمز الاستجابة السريعة (QR)</div>
-                    <div class="relative w-48 h-48 mx-auto flex items-center justify-center bg-white border rounded-lg shadow-sm">
-                        <img id="whatsapp-qr-image" src="" alt="WhatsApp QR" class="w-44 h-44 object-contain">
+                    <div class="relative w-44 h-44 mx-auto flex items-center justify-center bg-white border rounded-lg shadow-sm">
+                        <img id="whatsapp-qr-image" src="" alt="WhatsApp QR" class="w-40 h-40 object-contain">
                         <div id="whatsapp-qr-loader" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-2 text-center text-gray-500 text-[11px]">
                             <span class="animate-spin text-2xl mb-1">⚙️</span>
                             <span id="whatsapp-loader-text">جاري الاتصال بمحرك الواتساب...</span>
                         </div>
                     </div>
-                    <p id="whatsapp-qr-hint" class="text-[11px] text-gray-500 mt-2">امسح الرمز من: واتساب ⬅️ الأجهزة المرتبطة ⬅️ ربط جهاز</p>
                 </div>
+            </div>
+
+            <!-- حصر المجموعات المراقبة -->
+            <div class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-2">
+                <div class="font-bold text-[#3A056A]">تعيين مجموعة واتساب لعميل معتمد (حصر المراقبة):</div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="col-span-1">
+                        <select id="wa-assign-customer-select" class="w-full p-1.5 border rounded bg-white"></select>
+                    </div>
+                    <div class="col-span-2 flex gap-1">
+                        <input type="text" id="wa-assign-group-id" class="w-full p-1.5 border rounded font-mono" placeholder="معرف المجموعة مثلا: 1203630... @g.us">
+                        <button onclick="submitAssignGroup()" class="px-3 py-1 brand-primary-bg text-white font-bold rounded">ربط</button>
+                    </div>
+                </div>
+                <p class="text-[10px] text-gray-500">للحصول على معرف المجموعة، أضف رقم النظام للمجموعة وستلتقط الرسائل الواردة منها فورياً.</p>
+            </div>
+
+            <!-- قائمة المجموعات النشطة المراقبة -->
+            <div class="space-y-1.5">
+                <div class="font-bold text-gray-700">المجموعات المعتمدة الخاضعة للمراقبة حالياً:</div>
+                <div class="space-y-1 max-h-28 overflow-y-auto" id="whatsapp-groups-list"></div>
+            </div>
+
+            <!-- أرقام فريق المبيعات المصرح لهم بالتفاعل -->
+            <div class="space-y-1.5">
+                <div class="font-bold text-gray-700">أرقام فريق المبيعات المعتمدة للتفاعل:</div>
+                <div class="p-2 bg-gray-50 border rounded-lg space-y-1 max-h-24 overflow-y-auto" id="whatsapp-reps-list"></div>
+                <p class="text-[10px] text-amber-700">⚠️ أي رسائل خارج هذه المجموعات أو من غير مسؤولي المبيعات والعملاء أعلاه يتم تجاهلها فوراً دون معالجة.</p>
             </div>
 
             <div class="flex justify-end pt-2 border-t">
@@ -697,6 +748,15 @@
         function openExpenseModal() { document.getElementById('expense-modal').classList.remove('hidden'); }
         function closeExpenseModal() { document.getElementById('expense-modal').classList.add('hidden'); }
 
+        function openManageCategoriesModal() { 
+            loadExpenseCategories();
+            document.getElementById('manage-categories-modal').classList.remove('hidden'); 
+        }
+        function closeManageCategoriesModal() { 
+            document.getElementById('manage-categories-modal').classList.add('hidden'); 
+            loadExpenseCategories();
+        }
+
         function openTargetNoteModal(id, currentNote) {
             document.getElementById('target-note-id').value = id;
             document.getElementById('target-new-note-text').value = currentNote || '';
@@ -772,51 +832,202 @@
             } catch (e) {}
         }
 
-        // عمليات الحفظ مع التأكيد التلقائي
-        async function submitNewCustomer() {
-            const repSelect = document.getElementById('cust-rep-select');
+        // جلب بنود المصاريف وتعبئة القائمة المنسدلة ونافذة الإدارة
+        async function loadExpenseCategories() {
+            try {
+                const res = await fetch('/api/expense-categories');
+                const categories = await res.json();
+                
+                const selectEl = document.getElementById('exp-type-select');
+                const listContainer = document.getElementById('categories-list-container');
+                
+                if (selectEl) {
+                    selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
+                }
+                
+                if (listContainer) {
+                    listContainer.innerHTML = categories.map(c => `
+                        <div class="flex justify-between items-center bg-white p-2 rounded border text-[11px]">
+                            <span class="font-bold text-gray-800">${c.category_name}</span>
+                            <button onclick="deleteCategory(${c.id})" class="text-red-500 hover:text-red-700 font-bold px-1.5 py-0.5 rounded hover:bg-red-50">حذف ✕</button>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error("Error loading categories", e);
+            }
+        }
+
+        async function submitNewCategory() {
+            const input = document.getElementById('new-category-name-input');
+            const name = input.value.trim();
+            if (!name) {
+                alert("يرجى كتابة اسم البند أولاً");
+                return;
+            }
+            try {
+                const res = await fetch('/api/expense-categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category_name: name })
+                });
+                if (res.ok) {
+                    input.value = '';
+                    await loadExpenseCategories();
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "تعذر إضافة البند");
+                }
+            } catch (e) {
+                alert("خطأ في الاتصال بالخادم");
+            }
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا البند من قائمة المصاريف؟")) return;
+            try {
+                const res = await fetch(`/api/expense-categories/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    await loadExpenseCategories();
+                }
+            } catch (e) {
+                alert("تعذر حذف البند");
+            }
+        }
+
+        // حفظ عضو مبيعات جديد
+        async function submitNewRep() {
+            const name = document.getElementById('rep-name-input').value.trim();
+            const code = document.getElementById('rep-code-input').value.trim();
+            const region = document.getElementById('rep-region-input').value.trim();
+            const phone = document.getElementById('rep-phone-input').value.trim();
+            const hasT = document.getElementById('rep-has-target-toggle').checked;
+            const targetVal = hasT ? (parseFloat(document.getElementById('rep-target-input').value) || 0) : 0;
+
+            if (!name || !phone) {
+                alert("يرجى ملء الاسم الكامل ورقم الهاتف على الأقل");
+                return;
+            }
+
             const payload = {
-                company_name: document.getElementById('cust-company-name').value.trim(),
-                brand_name: document.getElementById('cust-brand-name').value.trim(),
-                sector: document.getElementById('cust-sector').value.trim(),
-                region: document.getElementById('cust-region').value.trim(),
-                contact_person: document.getElementById('cust-contact-person').value.trim(),
-                phone: document.getElementById('cust-phone').value.trim(),
-                assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null,
-                notes: document.getElementById('cust-notes').value.trim()
+                name: name,
+                employee_code: code || "SE-" + Math.floor(100 + Math.random() * 900),
+                region: region || "مسقط",
+                phone_number: phone,
+                has_target: hasT,
+                monthly_target: targetVal
             };
-            if (!payload.company_name || !payload.phone) {
+
+            try {
+                const res = await fetch('/api/reps', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeNewRepModal();
+                    await loadAllData();
+                    alert("تم حفظ المندوب بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "حدث خطأ أثناء حفظ المندوب");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لحفظ المندوب");
+            }
+        }
+
+        // حفظ عميل جديد
+        async function submitNewCustomer() {
+            const company = document.getElementById('cust-company-name').value.trim();
+            const brand = document.getElementById('cust-brand-name').value.trim();
+            const region = document.getElementById('cust-region').value.trim();
+            const sector = document.getElementById('cust-sector').value.trim();
+            const person = document.getElementById('cust-contact-person').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const repSelect = document.getElementById('cust-rep-select');
+            const notes = document.getElementById('cust-notes').value.trim();
+
+            if (!company || !phone) {
                 alert("يرجى ملء اسم الشركة ورقم الهاتف");
                 return;
             }
-            const res = await fetch('/api/customers', {
+
+            const payload = {
+                company_name: company,
+                brand_name: brand || "",
+                sector: sector || "عام",
+                region: region || "مسقط",
+                contact_person: person || "المسؤول",
+                phone: phone,
+                assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null,
+                notes: notes || ""
+            };
+
+            try {
+                const res = await fetch('/api/customers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeNewCustomerModal();
+                    await loadAllData();
+                    alert("تمت إضافة العميل بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "حدث خطأ أثناء حفظ العميل");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لحفظ العميل");
+            }
+        }
+
+        // ربط معرف مجموعة الواتساب بعميل
+        async function submitAssignGroup() {
+            const customerId = parseInt(document.getElementById('wa-assign-customer-select').value);
+            const groupId = document.getElementById('wa-assign-group-id').value.trim();
+
+            if (!groupId) {
+                alert("يرجى إدخال معرف المجموعة (GroupID)");
+                return;
+            }
+
+            const res = await fetch('/api/customers/group', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ customer_id: customerId, whatsapp_group_id: groupId })
             });
+
             if (res.ok) {
-                closeNewCustomerModal();
-                loadAllData();
-                alert("تمت إضافة العميل بنجاح ✓");
+                document.getElementById('wa-assign-group-id').value = '';
+                await loadAllData();
+                alert("تم ربط المجموعة بنجاح وتفعيل المراقبة الحصرية لها ✓");
             } else {
-                alert("حدث خطأ أثناء حفظ العميل");
+                alert("حدث خطأ أثناء تعيين المجموعة");
             }
         }
 
         async function submitNewSample() {
             const custSelect = document.getElementById('sample-customer-select');
             const repSelect = document.getElementById('sample-rep-select');
-            const payload = {
-                customer_name: custSelect.value,
-                rep_name: repSelect.value,
-                product_name: document.getElementById('sample-product-name').value.trim(),
-                qty_free: parseInt(document.getElementById('sample-qty').value) || 1,
-                delivery_date: document.getElementById('sample-date').value
-            };
-            if (!payload.product_name) {
+            const product = document.getElementById('sample-product-name').value.trim();
+            const qty = parseInt(document.getElementById('sample-qty').value) || 1;
+            const date = document.getElementById('sample-date').value;
+
+            if (!product) {
                 alert("يرجى كتابة اسم المنتج المسلّم");
                 return;
             }
+
+            const payload = {
+                customer_name: custSelect.value,
+                rep_name: repSelect.value,
+                product_name: product,
+                qty_free: qty,
+                delivery_date: date
+            };
+
             const res = await fetch('/api/samples', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -824,27 +1035,32 @@
             });
             if (res.ok) {
                 closeNewSampleModal();
-                loadAllData();
+                await loadAllData();
                 alert("تم حفظ تسليم العينة بنجاح ✓");
-            } else {
-                alert("حدث خطأ أثناء حفظ العينة");
             }
         }
 
         async function submitNewCalendarEvent() {
             const custSelect = document.getElementById('cal-customer-select');
             const repSelect = document.getElementById('cal-rep-select');
-            const payload = {
-                customer_name: custSelect.value,
-                rep_name: repSelect.value,
-                task_type: document.getElementById('cal-task-type').value.trim(),
-                scheduled_at: document.getElementById('cal-scheduled-at').value.trim(),
-                location: document.getElementById('cal-location').value.trim()
-            };
-            if (!payload.task_type) {
+            const task = document.getElementById('cal-task-type').value.trim();
+            const sched = document.getElementById('cal-scheduled-at').value.trim();
+            const loc = document.getElementById('cal-location').value.trim();
+
+            if (!task) {
                 alert("يرجى تحديد نوع المهمة");
                 return;
             }
+
+            const payload = {
+                customer_name: custSelect.value,
+                rep_name: repSelect.value,
+                task_type: task,
+                scheduled_at: sched,
+                location: loc || "مقر العميل",
+                route_code: "R-01"
+            };
+
             const res = await fetch('/api/calendar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -852,36 +1068,8 @@
             });
             if (res.ok) {
                 closeNewCalendarModal();
-                loadAllData();
+                await loadAllData();
                 alert("تمت جدولة المهمة بنجاح ✓");
-            } else {
-                alert("حدث خطأ أثناء جدولة المهمة");
-            }
-        }
-
-        async function submitNewRep() {
-            const hasT = document.getElementById('rep-has-target-toggle').checked;
-            const payload = {
-                name: document.getElementById('rep-name-input').value.trim(),
-                employee_code: document.getElementById('rep-code-input').value.trim(),
-                region: document.getElementById('rep-region-input').value.trim(),
-                phone_number: document.getElementById('rep-phone-input').value.trim(),
-                has_target: hasT,
-                monthly_target: hasT ? parseFloat(document.getElementById('rep-target-input').value) || 0 : 0
-            };
-            if (!payload.name || !payload.phone_number) {
-                alert("يرجى إدخال الاسم ورقم الهاتف على الأقل");
-                return;
-            }
-            const res = await fetch('/api/reps', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) {
-                closeNewRepModal();
-                loadAllData();
-                alert("تمت إضافة المندوب بنجاح ✓");
             }
         }
 
@@ -904,8 +1092,8 @@
             });
             if (res.ok) {
                 closeNewTargetModal();
-                loadAllData();
-                alert("تم إنشاء الهدف وبدء العداد بنجاح ✓");
+                await loadAllData();
+                alert("تم إنشاء الهدف بنجاح ✓");
             }
         }
 
@@ -919,7 +1107,7 @@
             });
             if (res.ok) {
                 closeTargetNoteModal();
-                loadAllData();
+                await loadAllData();
             }
         }
 
@@ -941,7 +1129,7 @@
             });
             if (res.ok) {
                 closeTargetCloseModal();
-                loadAllData();
+                await loadAllData();
                 alert("تهانينا! تم إغلاق الهدف بنجاح وترحيل المبيعات ✓");
             }
         }
@@ -964,14 +1152,15 @@
             });
             if (res.ok) {
                 closeExpenseModal();
-                loadAllData();
+                await loadAllData();
                 alert("تم قيد المصروف بنجاح ✓");
             }
         }
 
-        // تحميل وتوزيع البيانات على الجداول والقوائم المنسدلة
+        // تحميل ورسم كافة البيانات
         async function loadAllData() {
             checkWhatsAppLiveStatus();
+            loadExpenseCategories();
 
             // 1. جلب فريق المبيعات
             const repsRes = await fetch('/api/reps');
@@ -981,15 +1170,15 @@
             let totalExp = 0;
 
             document.getElementById('overview-reps-tbody').innerHTML = reps.map(r => {
-                totalSales += r.achieved_sales;
-                totalExp += r.total_expenses;
+                totalSales += (r.achieved_sales || 0);
+                totalExp += (r.total_expenses || 0);
                 return `
                 <tr>
                     <td class="p-3 font-bold">${r.name}</td>
                     <td class="p-3 text-gray-600">${r.region}</td>
-                    <td class="p-3 font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.ع</td>
-                    <td class="p-3">${r.has_target ? r.monthly_target.toLocaleString() + ' ر.ع (' + r.achievement_rate.toFixed(1) + '%)' : '<span class="text-gray-400">قياس مفتوح</span>'}</td>
-                    <td class="p-3 font-semibold text-amber-800">${r.total_expenses.toLocaleString()} ر.ع</td>
+                    <td class="p-3 font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</td>
+                    <td class="p-3">${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع (' + (r.achievement_rate || 0).toFixed(1) + '%)' : '<span class="text-gray-400">قياس مفتوح</span>'}</td>
+                    <td class="p-3 font-semibold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</td>
                     <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span></td>
                 </tr>`;
             }).join('');
@@ -1006,15 +1195,14 @@
                     <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
                     <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
                     <div class="pt-2 border-t brand-border space-y-1 text-xs">
-                        <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${r.achieved_sales.toLocaleString()} ر.ع</span></div>
-                        <div class="flex justify-between"><span>المستهدف:</span><span>${r.has_target ? r.monthly_target.toLocaleString() + ' ر.ع' : 'قياس نتائج مفتوح'}</span></div>
-                        <div class="flex justify-between"><span>إجمالي المصاريف:</span><span class="font-bold text-amber-800">${r.total_expenses.toLocaleString()} ر.ع</span></div>
+                        <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</span></div>
+                        <div class="flex justify-between"><span>المستهدف:</span><span>${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع' : 'قياس نتائج مفتوح'}</span></div>
+                        <div class="flex justify-between"><span>إجمالي المصاريف:</span><span class="font-bold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</span></div>
                     </div>
                 </div>
             `).join('');
 
-            // تغذية القوائم المنسدلة بأسماء مسؤولي المبيعات
-            const repOptionsHTML = reps.map(r => `<option value="${r.id}" data-name="${r.name}">${r.name} (${r.region})</option>`).join('');
+            const repOptionsHTML = reps.map(r => `<option value="${r.id}">${r.name} (${r.region})</option>`).join('');
             const repNamesOnlyHTML = reps.map(r => `<option value="${r.name}">${r.name} (${r.region})</option>`).join('');
 
             document.getElementById('cust-rep-select').innerHTML = '<option value="">-- بدون تعيين حالي --</option>' + repOptionsHTML;
@@ -1023,28 +1211,50 @@
             document.getElementById('sample-rep-select').innerHTML = repNamesOnlyHTML;
             document.getElementById('cal-rep-select').innerHTML = repNamesOnlyHTML;
 
+            // قائمة أرقام المبيعات لنافذة الواتساب
+            document.getElementById('whatsapp-reps-list').innerHTML = reps.map(r => `
+                <div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border">
+                    <span>${r.name} (${r.region}):</span>
+                    <span class="font-mono font-bold text-[#3A056A]">${r.phone_number}</span>
+                </div>
+            `).join('');
+
             // 2. جلب حسابات العملاء
             const custRes = await fetch('/api/customers');
             const custs = await custRes.json();
+            
             document.getElementById('customers-table-body').innerHTML = custs.map(c => `
                 <tr>
-                    <td class="p-3 font-bold">${c.company_name}</td>
+                    <td class="p-3 font-bold">${c.company_name || '—'}</td>
                     <td class="p-3 font-semibold text-purple-900">${c.brand_name || '—'}</td>
-                    <td class="p-3 text-gray-600">${c.region} | ${c.sector}</td>
-                    <td class="p-3"><div>${c.contact_person}</div><div class="font-mono text-gray-500 text-[10px]">${c.phone}</div></td>
+                    <td class="p-3 text-gray-600">${c.region || 'مسقط'} | ${c.sector || 'عام'}</td>
+                    <td class="p-3"><div>${c.contact_person || '—'}</div><div class="font-mono text-gray-500 text-[10px]">${c.phone || '—'}</div></td>
                     <td class="p-3 font-bold text-[#3A056A]">${c.assigned_rep_name || '—'}</td>
+                    <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id ? '✓ ' + c.whatsapp_group_id : '<span class="text-gray-400">غير مربوط</span>'}</td>
                     <td class="p-3 text-[11px] text-gray-600 max-w-xs">${c.notes || 'لا توجد ملاحظات خاصة'}</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status}</span></td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status || 'نشط'}</span></td>
                 </tr>
             `).join('');
 
-            // تغذية القوائم المنسدلة بأسماء العملاء
             const custOptionsHTML = custs.map(c => `<option value="${c.id}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
             const custNamesOnlyHTML = custs.map(c => `<option value="${c.brand_name ? c.company_name + ' (' + c.brand_name + ')' : c.company_name}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
 
             document.getElementById('tgt-customer-select').innerHTML = custOptionsHTML;
             document.getElementById('sample-customer-select').innerHTML = custNamesOnlyHTML;
             document.getElementById('cal-customer-select').innerHTML = custNamesOnlyHTML;
+            document.getElementById('wa-assign-customer-select').innerHTML = custOptionsHTML;
+
+            // قائمة المجموعات النشطة لنافذة الواتساب
+            const monitoredGroups = custs.filter(c => c.whatsapp_group_id);
+            document.getElementById('whatsapp-groups-list').innerHTML = monitoredGroups.length > 0 ? monitoredGroups.map(c => `
+                <div class="p-1.5 border rounded-lg flex justify-between items-center bg-white text-[11px]">
+                    <div>
+                        <span class="font-bold text-gray-800">${c.company_name}</span>
+                        <span class="text-[10px] text-gray-500 block font-mono">${c.whatsapp_group_id}</span>
+                    </div>
+                    <span class="text-emerald-700 font-bold text-[10px]">مراقبة نشطة ✓</span>
+                </div>
+            `).join('') : '<div class="text-gray-400 text-[11px] p-2 bg-white rounded border text-center">لا توجد مجموعات مربوطة حالياً. استخدم الخانة أعلاه لربط مجموعة بالعميل.</div>';
 
             // 3. جلب الأهداف
             const tgtRes = await fetch('/api/targets');
@@ -1083,7 +1293,7 @@
                     <div class="p-2 bg-emerald-100/60 rounded-lg text-xs space-y-0.5 border border-emerald-300">
                         <div class="flex justify-between font-bold text-emerald-900">
                             <span>رقم أمر الشراء (PO): ${t.po_number}</span>
-                            <span>القيمة: ${t.po_value.toLocaleString()} ر.ع</span>
+                            <span>القيمة: ${(t.po_value || 0).toLocaleString()} ر.ع</span>
                         </div>
                         ${t.po_attachment_url ? `<a href="${t.po_attachment_url}" target="_blank" class="text-[10px] text-blue-700 underline block mt-1">عرض المستند المرفق 🔗</a>` : ''}
                     </div>
@@ -1106,26 +1316,25 @@
             document.getElementById('samples-table-body').innerHTML = samples.map(s => `
                 <tr>
                     <td class="p-3 font-bold">${s.customer_name}</td>
-                    <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name}</td>
+                    <td class="p-3 text-[#3A056A]">${s.rep_name}</td>
                     <td class="p-3">${s.product_name}</td>
                     <td class="p-3">${s.qty_free} وحدة</td>
                     <td class="p-3 text-gray-500">${s.delivery_date}</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${s.status}</span></td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">${s.status}</span></td>
                     <td class="p-3 font-mono">${s.converted_po_id || '—'}</td>
                 </tr>
             `).join('');
 
-            // 5. جلب جدول المهام والتقويم
+            // 5. جلب التقويم
             const cRes = await fetch('/api/calendar');
             const cal = await cRes.json();
             document.getElementById('calendar-events-list').innerHTML = cal.map(e => `
                 <div class="p-3.5 rounded-xl border brand-border brand-tint flex justify-between items-center text-xs">
                     <div>
-                        <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
+                        <div class="font-bold text-gray-800">${e.task_type}</div>
                         <div class="text-gray-500 mt-0.5">العميل: ${e.customer_name} | المسؤول: ${e.rep_name} | الموعد: ${e.scheduled_at}</div>
-                        <div class="text-[11px] text-purple-700 mt-1">الموقع: ${e.location}</div>
                     </div>
-                    <span class="px-2.5 py-1 rounded text-xs font-bold ${e.execution_status === 'DONE' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${e.execution_status}</span>
+                    <span class="px-2.5 py-1 rounded text-xs font-bold bg-amber-100 text-amber-800">${e.execution_status}</span>
                 </div>
             `).join('');
 
