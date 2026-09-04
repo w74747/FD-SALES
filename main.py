@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + WhatsApp Sentinel Whitelist Engine
+FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Integrated Baileys Engine
 """
 
 import os
@@ -22,6 +22,7 @@ import pyotp
 import qrcode
 import httpx
 
+# استيراد الشعار الأصلي المحفوظ كسلسلة Base64
 try:
     from logo_data import LOGO_BASE64
 except ImportError:
@@ -30,7 +31,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="5.4.0")
+app = FastAPI(title="FDC Sales CRM", version="6.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -91,7 +92,7 @@ def init_database():
         logger.error(f"Error initializing system_auth: {e}")
         conn.rollback()
 
-    # 2. ترقية وإنشاء جداول النظام وحل مشكلة العمود الناقص
+    # 2. ترقية وإنشاء جداول النظام وضمان عدم نقص أي عمود
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -171,7 +172,7 @@ def init_database():
         logger.error(f"Error updating system tables: {e}")
         conn.rollback()
 
-    # 3. إدخال البيانات التأسيسية
+    # 3. إدخال البيانات التأسيسية إذا كانت الجداول فارغة
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM sales_executives;")
@@ -573,12 +574,34 @@ def get_whatsapp_logs():
     finally:
         conn.close()
 
-# ----------------- مسار توليد QR الواتساب المباشر -----------------
+# ----------------- مسار توليد وجلب QR الواتساب الحقيقي المشفر -----------------
 @app.get("/api/whatsapp/qr")
-def get_whatsapp_qr():
-    qr_data = "https://wa.me/?text=FDC-SALES-CRM-SENTINEL-LINK"
+async def get_whatsapp_qr():
+    """جلب رمز QR الحقيقي المولد بواسطة محرك Baileys الداخلي المشفر"""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=2.5)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("connected"):
+                    # في حال كان الجهاز متصلاً بالفعل
+                    return Response(status_code=204)
+                
+                qr_base64 = data.get("qr")
+                if qr_base64:
+                    clean_b64 = qr_base64.split(",")[-1].strip()
+                    image_bytes = base64.b64decode(clean_b64)
+                    return Response(
+                        content=image_bytes, 
+                        media_type="image/png",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+                    )
+    except Exception as e:
+        logger.warning(f"Connecting to internal Baileys service: {e}")
+
+    # صورة انتظار مؤقتة واضحة في حال كان محرك Baileys قيد الإقلاع
     qr = qrcode.QRCode(box_size=6, border=2)
-    qr.add_data(qr_data)
+    qr.add_data("WHATSAPP-ENGINE-STARTING-PLEASE-WAIT")
     qr.make(fit=True)
     img = qr.make_image(fill_color="#3A056A", back_color="white")
     buf = io.BytesIO()
@@ -586,7 +609,7 @@ def get_whatsapp_qr():
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/png")
 
-# ----------------- خطاف الويب الفعلي مع فلترة القائمة البيضاء -----------------
+# ----------------- خطاف الويب الفعلي مع فلترة القائمة البيضاء الصارمة -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     conn = get_db_connection()
@@ -594,21 +617,21 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
-            # 1. التحقق هل المجموعة معتمدة؟
+            # 1. التحقق: هل المحادثة تخص مجموعة عميل معتمدة في النظام؟
             cur.execute(
                 "SELECT id, company_name FROM customer_accounts WHERE whatsapp_group_id = %s;",
                 (msg.chat_id,)
             )
             customer = cur.fetchone()
 
-            # 2. التحقق هل المرسل مسؤول مبيعات معتمد؟
+            # 2. التحقق: هل المرسل مسؤول مبيعات معتمد لدينا؟
             cur.execute(
                 "SELECT id, name FROM sales_executives WHERE phone_number = %s;",
                 (msg.sender_phone,)
             )
             rep = cur.fetchone()
 
-            # جدار الحماية: استبعاد وتجاهل أي رسالة خارج النطاق
+            # جدار الحماية: استبعاد وتجاهل أي رسالة خارج نطاق المجموعات أو أرقام المبيعات
             if not customer and not rep:
                 return {"status": "IGNORED", "reason": "خارج نطاق المجموعات أو الأرقام المعتمدة"}
 
