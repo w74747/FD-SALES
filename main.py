@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + 2FA Security + Live Reporting
+FastAPI Backend + PostgreSQL Persistence + 2FA Google Authenticator + Live A4 Printing
 """
 
 import os
@@ -21,6 +21,7 @@ from psycopg2.extras import RealDictCursor
 import pyotp
 import qrcode
 
+# استيراد الشعار من الملف المساعد المعزول
 try:
     from logo_data import LOGO_BASE64
 except ImportError:
@@ -60,7 +61,7 @@ def init_database():
 
     try:
         with conn.cursor() as cur:
-            # 1. جدول الحماية الثنائية 2FA
+            # 1. جدول الحماية والمصادقة الثنائية 2FA
             cur.execute("""
             CREATE TABLE IF NOT EXISTS system_auth (
                 id SERIAL PRIMARY KEY,
@@ -152,7 +153,6 @@ def init_database():
             );
             """)
 
-            # حقن البيانات الأولية عند أول تشغيل
             cur.execute("SELECT COUNT(*) FROM sales_executives;")
             if cur.fetchone()["count"] == 0:
                 cur.execute("""
@@ -206,7 +206,7 @@ def init_database():
 def startup_event():
     init_database()
 
-# ----------------- تقديم الشعار الرسمي كمسار صورة سريع ومستقر -----------------
+# ----------------- مسار تقديم الشعار بالصيغة النقية -----------------
 @app.get("/logo.png")
 def get_logo():
     if LOGO_BASE64:
@@ -215,12 +215,68 @@ def get_logo():
         return Response(content=image_data, media_type="image/png")
     
     svg_fallback = """<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 80' width='320' height='80'>
-        <path d='M 40,12 A 28,28 0 1,1 12,40' fill='none' stroke='#3A056A' stroke-width='10' stroke-linecap='round'/>
-        <text x='82' y='36' fill='#3A056A' font-family='Cairo, sans-serif' font-size='18' font-weight='900'>شركة تنمية الغذاء</text>
-        <text x='82' y='56' fill='#7E22CE' font-family='Cairo, sans-serif' font-size='11' font-weight='700'>Food Development Company</text>
+        <path d='M 40,12 A 28,28 0 1,1 12,40' fill='none' stroke='%233A056A' stroke-width='10' stroke-linecap='round'/>
+        <text x='82' y='36' fill='%233A056A' font-family='Cairo, sans-serif' font-size='18' font-weight='900'>شركة تنمية الغذاء</text>
+        <text x='82' y='56' fill='%237E22CE' font-family='Cairo, sans-serif' font-size='11' font-weight='700'>Food Development Company</text>
     </svg>"""
     return Response(content=svg_fallback, media_type="image/svg+xml")
 
+# ----------------- مسارات المصادقة الثنائية (Google Authenticator) -----------------
+class Verify2FAPayload(BaseModel):
+    code: str
+
+@app.get("/api/auth/2fa/qr")
+def get_2fa_qr():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
+            row = cur.fetchone()
+            if not row:
+                secret = pyotp.random_base32()
+                cur.execute("INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES ('admin', %s, FALSE);", (secret,))
+                conn.commit()
+            else:
+                secret = row["totp_secret"]
+
+        totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+            name="admin@fdc.om",
+            issuer_name="Food Development Co - CRM"
+        )
+        img = qrcode.make(totp_uri)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return StreamingResponse(buf, media_type="image/png")
+    finally:
+        conn.close()
+
+@app.post("/api/auth/2fa/verify")
+def verify_2fa(payload: Verify2FAPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=400, detail="المفتاح السري غير مهيأ")
+            
+            secret = row["totp_secret"]
+            totp = pyotp.TOTP(secret)
+            if totp.verify(payload.code, valid_window=1):
+                cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
+                conn.commit()
+                return {"status": "SUCCESS", "message": "تم التحقق الأمني بنجاح"}
+            else:
+                raise HTTPException(status_code=401, detail="الرمز غير صحيح أو انتهت صلاحيته")
+    finally:
+        conn.close()
+
+# ----------------- محرك CSS المعتمد للطباعة الصارمة A4 -----------------
 PRINT_ENGINE_CSS = """
 @page {
     size: A4 portrait;
@@ -340,10 +396,7 @@ table.data-table tr:nth-child(even) { background: #FAFAFC; }
 .editable-box:focus { border-style: solid; background: #FFFFFF; }
 """
 
-# ----------------- نماذج Pydantic للطلبات -----------------
-class Verify2FAPayload(BaseModel):
-    code: str
-
+# ----------------- نماذج Pydantic للبيانات -----------------
 class NewSamplePayload(BaseModel):
     customer_name: str
     rep_name: str
@@ -368,59 +421,7 @@ class NewSaleTransactionPayload(BaseModel):
     expense_fuel: Optional[float] = 0.0
     expense_other: Optional[float] = 0.0
 
-# ----------------- مسارات التحقق الثنائي (Google Authenticator) -----------------
-@app.get("/api/auth/2fa/qr")
-def get_2fa_qr():
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
-            row = cur.fetchone()
-            if not row:
-                secret = pyotp.random_base32()
-                cur.execute("INSERT INTO system_auth (username, totp_secret) VALUES ('admin', %s);", (secret,))
-                conn.commit()
-            else:
-                secret = row["totp_secret"]
-
-        totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
-            name="admin@fdc.om",
-            issuer_name="Food Development Co - CRM"
-        )
-        img = qrcode.make(totp_uri)
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-        return StreamingResponse(buf, media_type="image/png")
-    finally:
-        conn.close()
-
-@app.post("/api/auth/2fa/verify")
-def verify_2fa(payload: Verify2FAPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(status_code=400, detail="إعدادات المصادقة غير متوفرة")
-            
-            secret = row["totp_secret"]
-            totp = pyotp.TOTP(secret)
-            if totp.verify(payload.code, valid_window=1):
-                cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
-                conn.commit()
-                return {"status": "SUCCESS", "message": "تم التحقق بنجاح"}
-            else:
-                raise HTTPException(status_code=401, detail="رمز التحقق غير صحيح أو منتهي الصلاحية")
-    finally:
-        conn.close()
-
-# ----------------- مسارات البيانات والعمليات -----------------
+# ----------------- مسارات واجهة برمجة التطبيقات الأساسية -----------------
 @app.get("/health")
 def health():
     return {"status": "UP", "timestamp": datetime.now().isoformat(), "db_configured": bool(DATABASE_URL)}
@@ -565,7 +566,7 @@ def record_sale(payload: NewSaleTransactionPayload):
                             (payload.sale_amount, total_exp_added, payload.primary_rep_id))
 
             conn.commit()
-            return {"status": "SUCCESS", "message": "تم تقييد المبيعات والمصاريف بنجاح في قاعدة البيانات"}
+            return {"status": "SUCCESS", "message": "تم حفظ العملية وتحديث رصيد الإنجاز في قاعدة البيانات"}
     finally:
         conn.close()
 
@@ -594,7 +595,7 @@ def get_whatsapp_qr():
         "status": "QR_READY"
     }
 
-# ----------------- معاينة وطباعة التقرير الرسمي -----------------
+# ----------------- مسار معاينة وطباعة التقرير بالريال العماني -----------------
 @app.post("/api/reports/preview")
 def preview_report(req: dict):
     recipient = req.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام")
