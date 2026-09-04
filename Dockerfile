@@ -1,6 +1,6 @@
 FROM node:20-bullseye-slim
 
-# تثبيت git وأدوات البناء وبايثون
+# تثبيت أدوات البناء و git وبايثون وبيئة PostgreSQL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     python3 \
@@ -21,11 +21,10 @@ RUN npm install --production
 COPY requirements.txt ./
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# 3. نسخ باقي ملفات المشروع
+# 3. نسخ ملفات المشروع بالكامل
 COPY . .
-
-RUN chmod +x start.sh
 
 EXPOSE 8000
 
-CMD ["/bin/sh", "./start.sh"]
+# تشغيل النظام مباشرة عبر بايثون لحل مشكلة المنفذ نهائياً
+CMD ["python3", "main.py"]
