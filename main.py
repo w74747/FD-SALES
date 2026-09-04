@@ -32,7 +32,7 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
-app = FastAPI(title="FDC Sales CRM", version="7.5.0")
+app = FastAPI(title="FDC Sales CRM", version="8.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,7 +48,6 @@ DATABASE_URL = (
     or os.getenv("POSTGRES_URL") 
     or ""
 )
-FALLBACK_2FA_SECRET = "JBSWY3DPEHPK3PXP"
 whatsapp_process = None
 
 def get_db_connection():
@@ -107,23 +106,19 @@ def init_database():
             CREATE TABLE IF NOT EXISTS customer_accounts (
                 id SERIAL PRIMARY KEY,
                 company_name VARCHAR(200) NOT NULL,
-                brand_name VARCHAR(200),
+                brand_name VARCHAR(200) DEFAULT '',
                 sector VARCHAR(100) NOT NULL,
                 region VARCHAR(100) DEFAULT 'مسقط',
                 contact_person VARCHAR(150) NOT NULL,
                 phone VARCHAR(30) NOT NULL,
                 assigned_rep_id INT REFERENCES sales_executives(id) ON DELETE SET NULL,
-                assigned_rep_name VARCHAR(150),
-                notes TEXT,
+                assigned_rep_name VARCHAR(150) DEFAULT '',
+                notes TEXT DEFAULT '',
                 whatsapp_group_id VARCHAR(100) UNIQUE,
                 tier VARCHAR(10) DEFAULT 'B',
                 status VARCHAR(20) DEFAULT 'نشط'
             );
             """)
-            cur.execute("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS brand_name VARCHAR(200);")
-            cur.execute("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS region VARCHAR(100) DEFAULT 'مسقط';")
-            cur.execute("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS notes TEXT;")
-            cur.execute("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150);")
 
             cur.execute("""
             CREATE TABLE IF NOT EXISTS sales_targets (
@@ -135,13 +130,13 @@ def init_database():
                 rep_name VARCHAR(150) NOT NULL,
                 target_value NUMERIC(12, 2) DEFAULT 0.00,
                 started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_note TEXT,
+                last_note TEXT DEFAULT '',
                 last_note_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 status VARCHAR(30) DEFAULT 'IN_PROGRESS',
                 closed_at TIMESTAMP,
                 po_number VARCHAR(100),
                 po_value NUMERIC(12, 2) DEFAULT 0.00,
-                po_attachment_url TEXT
+                po_attachment_url TEXT DEFAULT ''
             );
             """)
 
@@ -152,7 +147,7 @@ def init_database():
                 rep_name VARCHAR(150) NOT NULL,
                 expense_type VARCHAR(100) NOT NULL,
                 amount NUMERIC(12, 2) NOT NULL,
-                notes TEXT,
+                notes TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
@@ -219,35 +214,12 @@ def init_database():
 
             cur.execute("SELECT COUNT(*) FROM customer_accounts;")
             if cur.fetchone()["count"] == 0 and rep_ids:
-                r1 = rep_ids[0]
-                r2 = rep_ids[1] if len(rep_ids) > 1 else r1
-                r3 = rep_ids[2] if len(rep_ids) > 2 else r1
-
                 cur.execute("""
                 INSERT INTO customer_accounts (company_name, brand_name, sector, region, contact_person, phone, assigned_rep_id, assigned_rep_name, notes, whatsapp_group_id, tier, status)
                 VALUES 
                 ('شركة التغذية المتكاملة', 'مطاعم الريف', 'مطاعم وإعاشة', 'مسقط', 'م. فهد القرني', '+96899988771', %s, 'أحمد الشمري', 'الاستلام من 7:00 إلى 10:00 صباحاً من الباب الخلفي.', '120363029182371@g.us', 'A', 'نشط'),
-                ('مؤسسة التموين الحديث', 'أسواق الواحة', 'تجارة جملة', 'صحار', 'أ/ طارق المنصور', '+96893322110', %s, 'سالم الدوسري', 'طلب توريد تجريبي مجدول لكل أسبوعين.', '120363088716253@g.us', 'B', 'راكد'),
-                ('مجموعة الفنادق الدولية', 'فندق شاطئ القرم', 'ضيافة وفنادق', 'مسقط', 'أ/ وائل الخالدي', '+96898822334', %s, 'عبدالله', 'التركيز على الدجاج الطازج خالي من المضادات.', '120363077615243@g.us', 'A', 'نشط');
-                """, (r1, r2, r3))
-
-            cur.execute("SELECT COUNT(*) FROM sample_deliveries;")
-            if cur.fetchone()["count"] == 0:
-                cur.execute("""
-                INSERT INTO sample_deliveries (customer_name, rep_name, product_name, qty_free, delivery_date, status, converted_po_id, po_value, source)
-                VALUES 
-                ('مطاعم الريف', 'أحمد الشمري', 'صدور دجاج متبلة (خلطة 4B)', 15, '2026-08-25', 'APPROVED', 'PO-2026-889', 7800.0, 'يدوي'),
-                ('فندق شاطئ القرم', 'عبدالله', 'شاورما دجاج جاهزة للطهي', 25, '2026-08-28', 'APPROVED', 'PO-2026-904', 11500.0, 'يدوي');
-                """)
-
-            cur.execute("SELECT COUNT(*) FROM calendar_events;")
-            if cur.fetchone()["count"] == 0:
-                cur.execute("""
-                INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, route_code, execution_status)
-                VALUES 
-                ('مطاعم الريف', 'أحمد الشمري', 'توقيع عقد توريد سنوي', '2026-09-03 10:00', 'الإدارة العامة - مسقط', 'R-10', 'DONE'),
-                ('فندق شاطئ القرم', 'عبدالله', 'زيارة فحص جودة وتفاوض', '2026-09-06 11:00', 'فرع القرم', 'R-22', 'PENDING');
-                """)
+                ('مؤسسة التموين الحديث', 'أسواق الواحة', 'تجارة جملة', 'صحار', 'أ/ طارق المنصور', '+96893322110', %s, 'سالم الدوسري', 'طلب توريد تجريبي مجدول لكل أسبوعين.', '120363088716253@g.us', 'B', 'راكد');
+                """, (rep_ids[0], rep_ids[1] if len(rep_ids) > 1 else rep_ids[0]))
 
         conn.commit()
     except Exception as e:
@@ -295,7 +267,6 @@ def get_logo():
         logger.error(f"Error loading logo: {e}")
     raise HTTPException(status_code=404, detail="Logo not found")
 
-# ----------------- المصادقة الثنائية -----------------
 class Verify2FAPayload(BaseModel):
     code: str
 
@@ -369,18 +340,22 @@ class NewRepPayload(BaseModel):
     employee_code: str
     phone_number: str
     region: str
-    has_target: bool = False
-    monthly_target: float = 0.0
+    has_target: Optional[bool] = False
+    monthly_target: Optional[float] = 0.0
 
 class NewCustomerPayload(BaseModel):
     company_name: str
     brand_name: Optional[str] = ""
     sector: str
-    region: str = "مسقط"
+    region: Optional[str] = "مسقط"
     contact_person: str
     phone: str
     assigned_rep_id: Optional[int] = None
     notes: Optional[str] = ""
+
+class UpdateCustomerGroupPayload(BaseModel):
+    customer_id: int
+    whatsapp_group_id: str
 
 class NewSamplePayload(BaseModel):
     customer_name: str
@@ -395,13 +370,13 @@ class NewCalendarEventPayload(BaseModel):
     task_type: str
     scheduled_at: str
     location: str
-    route_code: str = "R-01"
+    route_code: Optional[str] = "R-01"
 
 class NewTargetPayload(BaseModel):
     title: str
     customer_id: int
     rep_id: int
-    target_value: float = 0.0
+    target_value: Optional[float] = 0.0
     initial_note: Optional[str] = ""
 
 class UpdateTargetNotePayload(BaseModel):
@@ -464,13 +439,17 @@ def add_rep(payload: NewRepPayload):
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
+            target = payload.monthly_target if payload.has_target else 0.0
             cur.execute("""
             INSERT INTO sales_executives (name, employee_code, phone_number, region, has_target, monthly_target, achieved_sales, total_expenses, status)
             VALUES (%s, %s, %s, %s, %s, %s, 0.0, 0.0, 'نشط') RETURNING id;
-            """, (payload.name, payload.employee_code, payload.phone_number, payload.region, payload.has_target, payload.monthly_target if payload.has_target else 0.0))
+            """, (payload.name, payload.employee_code, payload.phone_number, payload.region, payload.has_target, target))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل الحفظ: {str(e)}")
     finally:
         conn.close()
 
@@ -482,7 +461,13 @@ def get_customers():
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM customer_accounts ORDER BY id ASC;")
-            return cur.fetchall()
+            rows = cur.fetchall()
+            for r in rows:
+                r["brand_name"] = r.get("brand_name") or ""
+                r["notes"] = r.get("notes") or ""
+                r["assigned_rep_name"] = r.get("assigned_rep_name") or "—"
+                r["whatsapp_group_id"] = r.get("whatsapp_group_id") or ""
+            return rows
     finally:
         conn.close()
 
@@ -493,7 +478,7 @@ def add_customer(payload: NewCustomerPayload):
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
-            rep_name = None
+            rep_name = ""
             if payload.assigned_rep_id:
                 cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (payload.assigned_rep_id,))
                 r = cur.fetchone()
@@ -507,6 +492,23 @@ def add_customer(payload: NewCustomerPayload):
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل حفظ العميل: {str(e)}")
+    finally:
+        conn.close()
+
+@app.post("/api/customers/group")
+def update_customer_group(payload: UpdateCustomerGroupPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE customer_accounts SET whatsapp_group_id = %s WHERE id = %s;",
+                        (payload.whatsapp_group_id.strip(), payload.customer_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
     finally:
         conn.close()
 
@@ -522,6 +524,7 @@ def get_samples():
             for r in rows:
                 r["delivery_date"] = str(r["delivery_date"])
                 r["po_value"] = float(r["po_value"] or 0)
+                r["converted_po_id"] = r.get("converted_po_id") or "—"
             return rows
     finally:
         conn.close()
@@ -565,7 +568,7 @@ def add_calendar_event(payload: NewCalendarEventPayload):
             cur.execute("""
             INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, route_code, execution_status)
             VALUES (%s, %s, %s, %s, %s, %s, 'PENDING') RETURNING id;
-            """, (payload.customer_name, payload.rep_name, payload.task_type, payload.scheduled_at, payload.location, payload.route_code))
+            """, (payload.customer_name, payload.rep_name, payload.task_type, payload.scheduled_at, payload.location, payload.route_code or "R-01"))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
@@ -613,7 +616,7 @@ def add_target(payload: NewTargetPayload):
             cur.execute("""
             INSERT INTO sales_targets (title, customer_id, customer_name, rep_id, rep_name, target_value, last_note, last_note_at, status)
             VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), 'IN_PROGRESS') RETURNING id;
-            """, (payload.title, payload.customer_id, c["company_name"], payload.rep_id, r["name"], payload.target_value, payload.initial_note))
+            """, (payload.title, payload.customer_id, c["company_name"], payload.rep_id, r["name"], payload.target_value, payload.initial_note or ""))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
@@ -649,7 +652,7 @@ def close_target_with_po(target_id: int, payload: CloseTargetPayload):
             UPDATE sales_targets 
             SET status = 'CLOSED', closed_at = NOW(), po_number = %s, po_value = %s, po_attachment_url = %s 
             WHERE id = %s;
-            """, (payload.po_number, payload.po_value, payload.po_attachment_url, target_id))
+            """, (payload.po_number, payload.po_value, payload.po_attachment_url or "", target_id))
 
             cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s WHERE id = %s;", (payload.po_value, tgt["rep_id"]))
             conn.commit()
@@ -672,7 +675,7 @@ def add_expense(payload: NewExpensePayload):
             cur.execute("""
             INSERT INTO expenses_log (rep_id, rep_name, expense_type, amount, notes)
             VALUES (%s, %s, %s, %s, %s);
-            """, (payload.rep_id, rep["name"], payload.expense_type, payload.amount, payload.notes))
+            """, (payload.rep_id, rep["name"], payload.expense_type, payload.amount, payload.notes or ""))
 
             cur.execute("UPDATE sales_executives SET total_expenses = total_expenses + %s WHERE id = %s;", (payload.amount, payload.rep_id))
             conn.commit()
