@@ -486,21 +486,28 @@
         </div>
     </div>
 
-    <!-- مودال: إدارة وحصر نطاق الواتساب الميداني -->
+    <!-- مودال: إدارة وحصر نطاق الواتساب الميداني مع الـ QR -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[560px] space-y-4 text-xs max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">إدارة وحصر نطاق رادار الواتساب</h3>
+                <h3 class="font-bold text-sm brand-primary-text">ربط وإدارة نطاق رادار الواتساب</h3>
                 <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">نطاق مقيد وآمن ✓</span>
             </div>
 
-            <!-- رابط استقبال الرسائل للربط مع أي بوابة -->
+            <!-- بطاقة الـ QR للربط -->
+            <div class="text-center p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                <div class="font-bold text-gray-700">ربط الجهاز عبر رمز الاستجابة السريعة (QR)</div>
+                <img id="whatsapp-qr-image" src="/api/whatsapp/qr" alt="WhatsApp QR" class="w-44 h-44 mx-auto p-1 bg-white border rounded-lg shadow-sm">
+                <p class="text-[11px] text-gray-500">امسح الرمز من: واتساب ⬅️ الأجهزة المرتبطة ⬅️ ربط جهاز</p>
+                <div class="text-[10px] text-amber-700">ملاحظة: إذا ظهر رمز غير صالح في هاتفك، استخدم رابط الـ Webhook أدناه للربط عبر بوابات الـ API السحابية.</div>
+            </div>
+
+            <!-- رابط استقبال الرسائل للربط مع أي بوابة سحابية -->
             <div class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-1.5">
                 <div class="font-bold text-[#3A056A]">رابط استقبال الرسائل المباشر (Webhook Endpoint):</div>
                 <div class="p-2 bg-white rounded border font-mono text-[11px] text-gray-700 select-all">
                     https://fd-sales.up.railway.app/api/whatsapp/webhook
                 </div>
-                <p class="text-[10px] text-gray-500">يتم توجيه بوابة واتساب (مثل Maytapi أو UltraMsg أو WPPConnect) إلى هذا الرابط لفلترة الرسائل تلقائياً.</p>
             </div>
 
             <!-- حصر المجموعات المراقبة -->
@@ -547,7 +554,12 @@
 
         function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
         function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
-        function openWhatsAppModal() { document.getElementById('whatsapp-modal').classList.remove('hidden'); }
+        
+        function openWhatsAppModal() { 
+            document.getElementById('whatsapp-modal').classList.remove('hidden'); 
+            const img = document.getElementById('whatsapp-qr-image');
+            if (img) img.src = '/api/whatsapp/qr?t=' + new Date().getTime();
+        }
         function closeWhatsAppModal() { document.getElementById('whatsapp-modal').classList.add('hidden'); }
         
         function openNewRepModal() { document.getElementById('new-rep-modal').classList.remove('hidden'); }
@@ -562,14 +574,12 @@
         function openSaleModal() { document.getElementById('sale-transaction-modal').classList.remove('hidden'); }
         function closeSaleModal() { document.getElementById('sale-transaction-modal').classList.add('hidden'); }
 
-        // تسجيل الخروج الأمني وتفريغ الجلسة
         function logoutSession() {
             sessionStorage.removeItem('fdc_auth_token');
             document.getElementById('auth-overlay').classList.remove('hidden');
             document.getElementById('auth-otp-code').value = '';
         }
 
-        // قفل تلقائي عند الخمول لمدة 15 دقيقة
         let inactivityTimer;
         function resetInactivityTimer() {
             clearTimeout(inactivityTimer);
@@ -624,7 +634,6 @@
             }
         }
 
-        // إخفاء زر توليد الـ QR نهائياً إذا كان الحساب مفعلاً مسبقاً
         async function check2FAStatus() {
             try {
                 const res = await fetch('/api/auth/2fa/status');
