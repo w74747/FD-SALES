@@ -47,7 +47,7 @@
 
             <button onclick="toggleSetupQR()" class="text-[11px] text-purple-700 underline block mx-auto">إظهار رمز QR لربط جهاز جديد</button>
             <div id="qr-setup-box" class="hidden my-2">
-                <img src="/api/auth/2fa/qr" alt="QR Code" class="w-40 h-40 mx-auto border p-1 rounded-lg">
+                <img id="qr-image" src="/api/auth/2fa/qr" alt="QR Code" class="w-40 h-40 mx-auto border p-1 rounded-lg">
                 <span class="text-[10px] text-gray-400">امسح الرمز عبر تطبيق Authenticator</span>
             </div>
 
@@ -66,7 +66,7 @@
     <!-- القائمة الجانبية الرسمية -->
     <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
-            <!-- الشعار الرسمي المعتمد متكيف الأبعاد بالكامل ودون مط -->
+            <!-- الشعار الرسمي المعتمد متكيف الأبعاد بالكامل -->
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e] no-print">
                 <div class="w-full h-full bg-white rounded-xl p-2 flex items-center justify-center shadow-sm">
                     <img 
@@ -503,7 +503,12 @@
         // وظائف التحقق الثنائي (Google Authenticator)
         function toggleSetupQR() {
             const box = document.getElementById('qr-setup-box');
+            const qrImg = document.getElementById('qr-image');
             box.classList.toggle('hidden');
+            if (!box.classList.contains('hidden')) {
+                // تجاوز الكاش بـ timestamp لضمان سحب الصورة فوراً
+                qrImg.src = '/api/auth/2fa/qr?t=' + new Date().getTime();
+            }
         }
 
         async function submit2FAVerification() {
@@ -696,7 +701,7 @@
             `).join('');
         }
 
-        // فحص حالة تسجيل الدخول الثنائي
+        // فحص الجلسة عند فتح الصفحة
         window.addEventListener('DOMContentLoaded', () => {
             if (sessionStorage.getItem('fdc_auth_token') === 'AUTHENTICATED') {
                 document.getElementById('auth-overlay').classList.add('hidden');
