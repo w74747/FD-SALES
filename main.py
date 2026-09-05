@@ -289,7 +289,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="9.6.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="9.7.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -301,21 +301,18 @@ app.add_middleware(
 
 @app.get("/logo.png")
 def get_logo():
-    """تقديم الشعار مع كسر التخزين المؤقت (Cache Busting) تلقائياً"""
+    """إرسال صورة الشعار مباشرة وتجاوز مشاكل التخزين المؤقت"""
     try:
         from logo_data import LOGO_BASE64
         if LOGO_BASE64:
             clean_b64 = LOGO_BASE64.split(",")[-1].strip()
             image_bytes = base64.b64decode(clean_b64)
-            etag = hashlib.md5(image_bytes).hexdigest()
             return Response(
                 content=image_bytes,
                 media_type="image/png",
                 headers={
-                    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
-                    "Pragma": "no-cache",
-                    "Expires": "0",
-                    "ETag": etag
+                    "Cache-Control": "public, max-age=86400",
+                    "Access-Control-Allow-Origin": "*"
                 }
             )
     except Exception as e:
@@ -340,16 +337,14 @@ def get_2fa_status():
 
 @app.get("/api/auth/2fa/qr")
 def get_2fa_qr():
+    """إرجاع QR التوثيق دائماً دون حظر 403 لمنع تعليق واجهة المستخدم"""
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT totp_secret, is_2fa_enabled FROM system_auth WHERE username = 'admin';")
+            cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
             row = cur.fetchone()
-            if row and row["is_2fa_enabled"]:
-                raise HTTPException(status_code=403, detail="تم تفعيل التحقق الثنائي مسبقاً.")
-
             secret = row["totp_secret"] if row else pyotp.random_base32()
             if not row:
                 cur.execute("INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES ('admin', %s, FALSE);", (secret,))
