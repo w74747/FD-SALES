@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Multi-Language AI Agents
+FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Multi-Agent Automation
 """
 
 import os
@@ -99,7 +99,6 @@ def init_database():
                 employee_code VARCHAR(50) UNIQUE NOT NULL,
                 phone_number VARCHAR(30) UNIQUE NOT NULL,
                 region VARCHAR(100) NOT NULL,
-                preferred_language VARCHAR(20) DEFAULT 'ar',
                 has_target BOOLEAN DEFAULT FALSE,
                 monthly_target NUMERIC(12, 2) DEFAULT 0.00,
                 achieved_sales NUMERIC(12, 2) DEFAULT 0.00,
@@ -223,13 +222,16 @@ def init_database():
     finally:
         conn.close()
 
-    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(20) DEFAULT 'ar';")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS has_target BOOLEAN DEFAULT FALSE;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS monthly_target NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS achieved_sales NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS total_expenses NUMERIC(12, 2) DEFAULT 0.00;")
+    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS brand_name VARCHAR(200) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS region VARCHAR(100) DEFAULT 'مسقط';")
+    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150) DEFAULT '';")
 
-    # إضافة وكلاء افتراضيين متقدمين
+    # تحديث وتصحيح الوكلاء
     run_isolated_ddl("""
     INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
     VALUES 
@@ -238,7 +240,7 @@ def init_database():
         'SAMPLES_CONVERSION',
         'أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق لمتابعة العينات المسلمة التي لم يُصدر لها أمر شراء حتى الآن، واطلب منه بلباقة موافاتك بقرار الشيف أو مدير المشتريات وإرسال رقم أمر الشراء PO عند اعتماده.',
         'DAILY_10AM',
-        '+96898996963',
+        '+96893904404',
         TRUE
     ),
     (
@@ -246,7 +248,15 @@ def init_database():
         'CALENDAR_DISPATCH',
         'أنت منسق جدول العمليات في شركة تنمية الغذاء. قم بصياغة رسالة صباحية مشجعة وموجزة تذكر فيها عضو الفريق بالزيارات الميدانية المجدولة له اليوم، وأسماء العملاء والمواقع المستهدفة.',
         'DAILY_08AM',
-        '+96898996963',
+        '+96893904404',
+        TRUE
+    ),
+    (
+        'وكيل إنعاش الأهداف والفرص الراكدة',
+        'STAGNANT_TARGETS',
+        'أنت مستشار الصفقات في شركة تنمية الغذاء. اكتب رسالة تحفيزية لعضو الفريق بخصوص الفرص البيعية التي مر عليها أكثر من 3 أيام دون أي تحديث، واقترح عليه إجراء مكالمة هاتفية أو طلب عينة دعم للإغلاق.',
+        'WEEKLY_SUNDAY',
+        '+96893904404',
         TRUE
     )
     ON CONFLICT DO NOTHING;
@@ -280,7 +290,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="10.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="9.8.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -290,20 +300,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----------------- تقديم الشعار المباشر والدقيق -----------------
 @app.get("/logo.png")
 def get_logo():
+    """تقديم الشعار مع كسر التخزين المؤقت (Cache Busting) تلقائياً"""
     try:
         from logo_data import LOGO_BASE64
         if LOGO_BASE64:
             clean_b64 = LOGO_BASE64.split(",")[-1].strip()
             image_bytes = base64.b64decode(clean_b64)
+            etag = hashlib.md5(image_bytes).hexdigest()
             return Response(
                 content=image_bytes,
                 media_type="image/png",
                 headers={
-                    "Cache-Control": "public, max-age=86400",
-                    "Access-Control-Allow-Origin": "*"
+                    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                    "ETag": etag
                 }
             )
     except Exception as e:
@@ -383,7 +396,6 @@ class NewRepPayload(BaseModel):
     employee_code: str
     phone_number: str
     region: str
-    preferred_language: Optional[str] = "ar"
     has_target: Optional[bool] = False
     monthly_target: Optional[float] = 0.0
 
@@ -440,12 +452,22 @@ class NewExpensePayload(BaseModel):
     amount: float
     notes: Optional[str] = ""
 
-class AgentPayload(BaseModel):
+class NewAgentPayload(BaseModel):
     name: str
     role_type: str
     system_prompt: str
     trigger_schedule: Optional[str] = "DAILY_MORNING"
     test_phone: Optional[str] = ""
+
+class EditAgentPayload(BaseModel):
+    name: str
+    role_type: str
+    system_prompt: str
+    trigger_schedule: str
+    test_phone: str
+
+class GlobalTestPhonePayload(BaseModel):
+    test_phone: str
 
 class ToggleAgentPayload(BaseModel):
     is_active: bool
@@ -456,7 +478,7 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_name: str
     message_text: str
 
-# ----------------- مسارات وكلاء الذكاء الاصطناعي (AI Agents) -----------------
+# ----------------- مسارات وكلاء الذكاء الاصطناعي -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -470,7 +492,7 @@ def get_ai_agents():
         conn.close()
 
 @app.post("/api/agents")
-def create_ai_agent(payload: AgentPayload):
+def create_ai_agent(payload: NewAgentPayload):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
@@ -487,8 +509,7 @@ def create_ai_agent(payload: AgentPayload):
         conn.close()
 
 @app.put("/api/agents/{agent_id}")
-def update_ai_agent(agent_id: int, payload: AgentPayload):
-    """تعديل الوكيل ورقم هاتف الاختبار والبرومبت"""
+def update_ai_agent(agent_id: int, payload: EditAgentPayload):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
@@ -499,6 +520,20 @@ def update_ai_agent(agent_id: int, payload: AgentPayload):
             SET name = %s, role_type = %s, system_prompt = %s, trigger_schedule = %s, test_phone = %s 
             WHERE id = %s;
             """, (payload.name.strip(), payload.role_type, payload.system_prompt.strip(), payload.trigger_schedule, payload.test_phone.strip(), agent_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/global-test-phone")
+def update_global_test_phone(payload: GlobalTestPhonePayload):
+    """تحديث وتعليم رقم هاتف الاختبار لجميع الوكلاء دفعة واحدة"""
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE ai_agents SET test_phone = %s;", (payload.test_phone.strip(),))
             conn.commit()
             return {"status": "SUCCESS"}
     finally:
@@ -531,28 +566,44 @@ async def test_ai_agent(agent_id: int):
 
             test_target = agent.get("test_phone")
             if not test_target:
-                raise HTTPException(status_code=400, detail="يرجى تحديد رقم هاتف للاختبار في إعدادات الوكيل أولاً")
+                raise HTTPException(status_code=400, detail="يرجى تحديد رقم هاتف للاختبار")
 
             cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC LIMIT 1;")
             sample = cur.fetchone()
             sample_info = f"العميل: {sample['customer_name']}، المنتج: {sample['product_name']} ({sample['qty_free']} كرتون)" if sample else "العميل: مطاعم الريف، المنتج: صدور دجاج متبلة 4B"
 
+            cur.execute("SELECT * FROM calendar_events ORDER BY id DESC LIMIT 1;")
+            cal = cur.fetchone()
+            cal_info = f"المهمة: {cal['task_type']} لدى {cal['customer_name']} في {cal['location']}" if cal else "زيارة فحص جودة العينات لدى فندق شاطئ القرم"
+
             if agent["role_type"] == "SAMPLES_CONVERSION":
                 message_text = (
-                    f"🤖 *Test Message / رسالة تجريبية: {agent['name']}*\n"
+                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
-                    f"Hello Sales Executive / مرحباً بك،\n\n"
-                    f"Kindly follow up on the free sample delivered to:\n"
+                    f"مرحباً بك أخي عضو فريق المبيعات،\n\n"
+                    f"نرجو متابعة نتيجة فحص العينة الميدانية لدى:\n"
                     f"📍 {sample_info}\n\n"
-                    f"Please update the chef/buyer feedback and send the Purchase Order (PO) number once approved.\n\n"
-                    f"Food Development Company | Sales CRM"
+                    f"💡 يُرجى التكرم بموافاتنا بملاحظات الشيف/مدير المشتريات، وفي حال تم الاعتماد نرجو تسجيل رقم أمر الشراء (PO) في النظام لإغلاق التحويل.\n\n"
+                    f"شركة تنمية الغذاء | نظام المتابعة الذكية"
+                )
+            elif agent["role_type"] == "CALENDAR_DISPATCH":
+                message_text = (
+                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"صباح الخير والنشاط،\n\n"
+                    f"تذكير بالزيارات والمهام المجدولة لك اليوم:\n"
+                    f"🗓️ {cal_info}\n\n"
+                    f"نتمنى لك يوماً موفقاً ومبيعات مثمرة!\n\n"
+                    f"شركة تنمية الغذاء | إدارة العمليات"
                 )
             else:
                 message_text = (
-                    f"🤖 *Test Message / رسالة تجريبية: {agent['name']}*\n"
+                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
+                    f"مرحباً بك، هذا تنبيه آلي صادر وفق التوجيه المحدد:\n"
                     f"«{agent['system_prompt'][:120]}...»\n\n"
-                    f"Food Development Company | Sales CRM"
+                    f"حالة النظام: متصل بنجاح وجاهز للمتابعة الميدانية.\n\n"
+                    f"شركة تنمية الغذاء | FDC Sales CRM"
                 )
 
         async with httpx.AsyncClient() as client:
@@ -578,82 +629,6 @@ async def test_ai_agent(agent_id: int):
         raise HTTPException(status_code=500, detail=f"خطأ أثناء تجربة الوكيل: {str(e)}")
     finally:
         conn.close()
-
-# ----------------- مسارات التقارير التنفيذية الرسمية -----------------
-@app.get("/api/reports/preview", response_class=HTMLResponse)
-@app.post("/api/reports/preview", response_class=HTMLResponse)
-async def preview_report(request: Request):
-    """تقديم معاينة وطباعة التقرير التنفيذي الرسمي بصفحة A4 بيضاء ناصعة"""
-    recipient = "سعادة رئيس مجلس الإدارة / المدير العام"
-    recommendation = "أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي."
-
-    if request.method == "POST":
-        try:
-            req_data = await request.json()
-            recipient = req_data.get("report_recipient", recipient)
-            recommendation = req_data.get("recommendation", recommendation)
-        except Exception:
-            pass
-
-    reps = get_reps()
-
-    html_content = f"""<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="utf-8">
-    <title>التقرير التنفيذي الشامل للمبيعات والعمليات</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-    <style>
-        body {{ font-family: 'Cairo', sans-serif; direction: rtl; padding: 25px; font-size: 10pt; color: #1E293B; background: #FFFFFF; }}
-        .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3A056A; padding-bottom: 12px; margin-bottom: 20px; }}
-        .logo {{ max-height: 60px; width: auto; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 9.5pt; }}
-        th, td {{ border: 1px solid #CBD5E1; padding: 8px; text-align: right; }}
-        th {{ background-color: #3A056A; color: white; }}
-        .recommendation-box {{ margin-top: 20px; padding: 12px; background: #F5F0FC; border: 1px dashed #3A056A; border-radius: 8px; font-size: 9.5pt; }}
-        @media print {{
-            .no-print {{ display: none !important; }}
-            body {{ padding: 0; }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div>
-            <h1 style="color: #3A056A; margin: 0; font-size: 18pt;">التقرير التنفيذي الشامل للمبيعات والعمليات الميدانية</h1>
-            <div style="color: #64748B; font-size: 9pt; margin-top: 4px;">شركة تنمية الغذاء | توجيه: {recipient}</div>
-        </div>
-        <img src="/logo.png" class="logo" />
-    </div>
-
-    <button onclick="window.print()" class="no-print" style="margin-bottom: 15px; padding: 8px 16px; background: #3A056A; color: white; font-weight: bold; border: none; border-radius: 6px; cursor: pointer;">
-        🖨️ طباعة التقرير (A4)
-    </button>
-
-    <h3>ملخص إنجازات ومصاريف أعضاء فريق المبيعات:</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>عضو الفريق</th>
-                <th>المنطقة</th>
-                <th>المبيعات المحققة</th>
-                <th>المستهدف الشهري</th>
-                <th>المصاريف الكلية</th>
-                <th>الحالة</th>
-            </tr>
-        </thead>
-        <tbody>
-            {''.join([f"<tr><td>{r['name']}</td><td>{r['region']}</td><td>{r['achieved_sales']:,.1f} ر.ع</td><td>{r['monthly_target']:,.1f} ر.ع</td><td>{r['total_expenses']:,.1f} ر.ع</td><td>{r['status']}</td></tr>" for r in reps])}
-        </tbody>
-    </table>
-
-    <div class="recommendation-box">
-        <strong>التوصية التنفيذية والإدارية:</strong> {recommendation}
-    </div>
-</body>
-</html>
-"""
-    return HTMLResponse(content=html_content)
 
 # ----------------- مسارات بنود المصاريف -----------------
 @app.get("/api/expense-categories")
@@ -723,7 +698,6 @@ def get_reps():
                     "employee_code": r["employee_code"],
                     "phone_number": r["phone_number"],
                     "region": r["region"],
-                    "preferred_language": r.get("preferred_language") or "ar",
                     "has_target": has_t,
                     "monthly_target": target,
                     "achieved_sales": sales,
@@ -744,9 +718,9 @@ def add_rep(payload: NewRepPayload):
         with conn.cursor() as cur:
             target = payload.monthly_target if payload.has_target else 0.0
             cur.execute("""
-            INSERT INTO sales_executives (name, employee_code, phone_number, region, preferred_language, has_target, monthly_target, achieved_sales, total_expenses, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 0.0, 0.0, 'نشط') RETURNING id;
-            """, (payload.name, payload.employee_code, payload.phone_number, payload.region, payload.preferred_language or "ar", payload.has_target, target))
+            INSERT INTO sales_executives (name, employee_code, phone_number, region, has_target, monthly_target, achieved_sales, total_expenses, status)
+            VALUES (%s, %s, %s, %s, %s, %s, 0.0, 0.0, 'نشط') RETURNING id;
+            """, (payload.name, payload.employee_code, payload.phone_number, payload.region, payload.has_target, target))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
@@ -1079,6 +1053,57 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             return {"status": "PROCESSED", "target": customer["company_name"] if customer else rep["name"]}
     finally:
         conn.close()
+
+@app.post("/api/reports/preview")
+def preview_report(req: dict):
+    recipient = req.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام")
+    recommendation = req.get("recommendation", "أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي.")
+
+    reps = get_reps()
+    logo_src = f"data:image/png;base64,{LOGO_BASE64.split(',')[-1]}" if LOGO_BASE64 else "/logo.png"
+
+    html = f"""<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <title>التقرير التنفيذي الشامل للمبيعات</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {{ font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; font-size: 9pt; background: #fff; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
+        th, td {{ border: 1px solid #CBD5E1; padding: 8px; text-align: right; }}
+        th {{ background: #3A056A; color: white; -webkit-print-color-adjust: exact; }}
+        .no-print {{ margin-top: 20px; text-align: center; }}
+        @media print {{ .no-print {{ display: none !important; }} }}
+    </style>
+</head>
+<body>
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3A056A; padding-bottom: 10px;">
+        <div>
+            <h1 style="color: #3A056A; margin: 0; font-size: 16pt;">التقرير التنفيذي الشامل للمبيعات والعمليات الميدانية</h1>
+            <div style="color: #64748B; font-size: 9pt; margin-top: 4px;">شركة تنمية الغذاء | توجيه: {recipient}</div>
+        </div>
+        <div style="background: #ffffff; padding: 5px; border-radius: 8px;">
+            <img src="{logo_src}" style="max-height: 55px; width: auto;" alt="Logo" />
+        </div>
+    </div>
+    <h3 style="color: #3A056A; margin-top: 15px;">ملخص إنجازات ومصاريف أعضاء فريق المبيعات:</h3>
+    <table>
+        <thead><tr><th>عضو الفريق</th><th>المنطقة</th><th>المبيعات المحققة</th><th>المستهدف الشهري</th><th>المصاريف الكلية</th><th>الحالة</th></tr></thead>
+        <tbody>
+            {''.join([f"<tr><td style='font-weight:bold;'>{r['name']}</td><td>{r['region']}</td><td style='color:#047857; font-weight:bold;'>{r['achieved_sales']:,.1f} ر.ع</td><td>{r['monthly_target']:,.1f} ر.ع</td><td>{r['total_expenses']:,.1f} ر.ع</td><td>{r['status']}</td></tr>" for r in reps])}
+        </tbody>
+    </table>
+    <div style="margin-top: 20px; padding: 12px; background: #F5F0FC; border: 1px dashed #C194FB; border-radius: 8px; font-size: 9.5pt; color: #1E293B;">
+        <strong style="color: #3A056A;">التوصية التنفيذية والإدارية:</strong> {recommendation}
+    </div>
+    <div class="no-print">
+        <button onclick="window.print()" style="background: #3A056A; color: white; border: none; padding: 10px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; font-family: 'Cairo';">🖨️ طباعة التقرير (A4)</button>
+    </div>
+</body>
+</html>
+"""
+    return HTMLResponse(content=html)
 
 @app.get("/", response_class=HTMLResponse)
 def serve_dashboard():
