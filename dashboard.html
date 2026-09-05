@@ -63,6 +63,7 @@
                     <span>🎯</span> <span>الأهداف والفرص البيعية</span>
                 </button>
 
+                <!-- قسم فريق المبيعات بالمسمى الجديد -->
                 <button onclick="switchTab('reps')" id="nav-reps" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>👥</span> <span>فريق المبيعات</span>
                 </button>
@@ -145,7 +146,7 @@
                     <table class="w-full text-right text-xs">
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
                             <tr>
-                                <th class="p-3">المسؤول</th>
+                                <th class="p-3">عضو فريق المبيعات</th>
                                 <th class="p-3">المنطقة</th>
                                 <th class="p-3">المبيعات المحققة</th>
                                 <th class="p-3">المستهدف الشهري</th>
@@ -172,7 +173,7 @@
                 </div>
             </div>
 
-            <!-- تبويب 3: فريق المبيعات -->
+            <!-- تبويب 3: فريق المبيعات المحدث -->
             <div id="tab-reps" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
@@ -180,7 +181,8 @@
                             <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
                             <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج والمصاريف</div>
                         </div>
-                        <button onclick="openNewRepModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة مسؤول مبيعات جديد</button>
+                        <!-- زر إضافة عضو فريق مبيعات جديد -->
+                        <button onclick="openNewRepModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة عضو جديد</button>
                     </div>
                     <div id="reps-grid-cards" class="grid grid-cols-3 gap-4"></div>
                 </div>
@@ -206,7 +208,7 @@
                                 <th class="p-3">العلامة التجارية</th>
                                 <th class="p-3">المنطقة / القطاع</th>
                                 <th class="p-3">المسؤول ورقم التواصل</th>
-                                <th class="p-3">المسؤول المتابع</th>
+                                <th class="p-3">عضو الفريق المتابع</th>
                                 <th class="p-3">مجموعة الواتساب المراقبة</th>
                                 <th class="p-3">تعليمات وملاحظات العميل</th>
                                 <th class="p-3">الحالة</th>
@@ -223,7 +225,7 @@
                     <div class="flex justify-between items-center mb-4">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">سجل حركة العينات المجانية والتحويل التجاري</h3>
-                            <div class="text-xs text-gray-500">رصد تسليم العينات وربطها بالعميل ومسؤول المبيعات المعتمد</div>
+                            <div class="text-xs text-gray-500">رصد تسليم العينات وربطها بالعميل وعضو الفريق المعتمد</div>
                         </div>
                         <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ تسليم عينة جديدة</button>
                     </div>
@@ -231,7 +233,7 @@
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
                             <tr>
                                 <th class="p-3">العميل</th>
-                                <th class="p-3">المسؤول</th>
+                                <th class="p-3">عضو الفريق المسلّم</th>
                                 <th class="p-3">المنتج المسلّم</th>
                                 <th class="p-3">الكمية</th>
                                 <th class="p-3">تاريخ التسليم</th>
@@ -250,7 +252,7 @@
                     <div class="flex justify-between items-center mb-4">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">تقويم العمليات والزيارات الميدانية المعتمدة</h3>
-                            <div class="text-xs text-gray-500">جدولة وتكليف المهام لفرق المبيعات مع العملاء</div>
+                            <div class="text-xs text-gray-500">جدولة وتكليف المهام لأعضاء فريق المبيعات</div>
                         </div>
                         <button onclick="openNewCalendarModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ جدولة مهمة جديدة</button>
                     </div>
@@ -274,6 +276,45 @@
 
         </div>
     </main>
+
+    <!-- مودال: إضافة عضو فريق مبيعات جديد -->
+    <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
+            <div>
+                <label class="block font-bold mb-1">الاسم الكامل:</label>
+                <input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: عبدالله">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">الكود الوظيفي:</label>
+                    <input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="0144">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">المنطقة البيعية:</label>
+                    <input type="text" id="rep-region-input" class="w-full p-2 border rounded-lg" placeholder="نزوى - الداخلية">
+                </div>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">رقم الهاتف المعتمد (الرقم المربوط بالنظام):</label>
+                <input type="text" id="rep-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX">
+            </div>
+            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
+                    <input type="checkbox" id="rep-has-target-toggle" onchange="toggleTargetInput(this.checked)" class="w-4 h-4 text-purple-600 rounded">
+                </div>
+                <div id="rep-target-box" class="hidden">
+                    <label class="block mb-1 text-[11px] text-gray-600">المستهدف الشهري (ر.ع):</label>
+                    <input type="number" id="rep-target-input" class="w-full p-1.5 border rounded bg-white" value="0">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeNewRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العضو</button>
+            </div>
+        </div>
+    </div>
 
     <!-- مودال: إضافة عميل جديد -->
     <div id="new-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
@@ -310,7 +351,7 @@
                 </div>
             </div>
             <div>
-                <label class="block font-bold mb-1">تعيين مسؤول المبيعات المتابع:</label>
+                <label class="block font-bold mb-1">تعيين عضو الفريق المتابع (من فريق المبيعات المعتمد):</label>
                 <select id="cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
             </div>
             <div>
@@ -333,7 +374,7 @@
                 <select id="sample-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
             </div>
             <div>
-                <label class="block font-bold mb-1">المندوب المسلّم:</label>
+                <label class="block font-bold mb-1">عضو الفريق المسلّم:</label>
                 <select id="sample-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
             </div>
             <div>
@@ -352,7 +393,7 @@
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العينة في السجل</button>
+                <button onclick="submitNewSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العينة</button>
             </div>
         </div>
     </div>
@@ -366,7 +407,7 @@
                 <select id="cal-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
             </div>
             <div>
-                <label class="block font-bold mb-1">المسؤول المكلّف:</label>
+                <label class="block font-bold mb-1">عضو الفريق المكلّف:</label>
                 <select id="cal-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
             </div>
             <div>
@@ -404,7 +445,7 @@
                     <select id="tgt-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
                 </div>
                 <div>
-                    <label class="block font-bold mb-1">المسؤول المكلّف:</label>
+                    <label class="block font-bold mb-1">عضو الفريق المكلّف:</label>
                     <select id="tgt-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
                 </div>
             </div>
@@ -423,51 +464,12 @@
         </div>
     </div>
 
-    <!-- مودال: إضافة عضو فريق مبيعات جديد -->
-    <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
-            <div>
-                <label class="block font-bold mb-1">الاسم الكامل:</label>
-                <input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: عبدالله">
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">الكود الوظيفي:</label>
-                    <input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="0144">
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">المنطقة البيعية:</label>
-                    <input type="text" id="rep-region-input" class="w-full p-2 border rounded-lg" placeholder="نزوى - الداخلية">
-                </div>
-            </div>
-            <div>
-                <label class="block font-bold mb-1">رقم الهاتف المعتمد (الرقم المربوط بالنظام):</label>
-                <input type="text" id="rep-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX">
-            </div>
-            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
-                    <input type="checkbox" id="rep-has-target-toggle" onchange="toggleTargetInput(this.checked)" class="w-4 h-4 text-purple-600 rounded">
-                </div>
-                <div id="rep-target-box" class="hidden">
-                    <label class="block mb-1 text-[11px] text-gray-600">المستهدف الشهري (ر.ع):</label>
-                    <input type="number" id="rep-target-input" class="w-full p-1.5 border rounded bg-white" value="0">
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeNewRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ المندوب</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- مودال: قيد مصاريف عامة مع زر إدارة البنود -->
+    <!-- مودال: قيد مصاريف عامة -->
     <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[470px] space-y-3 text-xs">
             <h3 class="font-bold text-sm text-amber-800 border-b pb-2">قيد مصاريف ميدانية وتشغيلية</h3>
             <div>
-                <label class="block font-bold mb-1">مسؤول المبيعات:</label>
+                <label class="block font-bold mb-1">عضو فريق المبيعات:</label>
                 <select id="exp-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
             </div>
             <div class="grid grid-cols-2 gap-2">
@@ -494,26 +496,21 @@
         </div>
     </div>
 
-    <!-- مودال: إدارة بنود وأنواع المصاريف المخصصة -->
+    <!-- مودال: إدارة بنود وأنواع المصاريف -->
     <div id="manage-categories-modal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[440px] space-y-3 text-xs">
             <div class="flex justify-between items-center border-b pb-2">
                 <h3 class="font-bold text-sm brand-primary-text">إدارة بنود وأنواع المصاريف المعتمدة</h3>
                 <span class="text-[10px] text-gray-500">تخصيص القائمة المنسدلة</span>
             </div>
-
-            <!-- إضافة بند جديد -->
             <div class="flex gap-2">
-                <input type="text" id="new-category-name-input" class="flex-1 p-2 border rounded-lg" placeholder="اسم بند جديد (مثال: صيانة سيارة، شحن عينات...)">
+                <input type="text" id="new-category-name-input" class="flex-1 p-2 border rounded-lg" placeholder="اسم بند جديد...">
                 <button onclick="submitNewCategory()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow-xs">+ إضافة</button>
             </div>
-
-            <!-- قائمة البنود الحالية -->
             <div class="space-y-1.5">
                 <div class="font-bold text-gray-700">البنود الحالية المسجلة في النظام:</div>
                 <div id="categories-list-container" class="space-y-1 max-h-48 overflow-y-auto border p-2 rounded-lg bg-gray-50"></div>
             </div>
-
             <div class="flex justify-end pt-2 border-t">
                 <button onclick="closeManageCategoriesModal()" class="px-4 py-1.5 border rounded-lg">إغلاق</button>
             </div>
@@ -600,7 +597,6 @@
                         <button onclick="submitAssignGroup()" class="px-3 py-1 brand-primary-bg text-white font-bold rounded">ربط</button>
                     </div>
                 </div>
-                <p class="text-[10px] text-gray-500">للحصول على معرف المجموعة، أضف رقم النظام للمجموعة وستلتقط الرسائل الواردة منها فورياً.</p>
             </div>
 
             <!-- قائمة المجموعات النشطة المراقبة -->
@@ -613,7 +609,7 @@
             <div class="space-y-1.5">
                 <div class="font-bold text-gray-700">أرقام فريق المبيعات المعتمدة للتفاعل:</div>
                 <div class="p-2 bg-gray-50 border rounded-lg space-y-1 max-h-24 overflow-y-auto" id="whatsapp-reps-list"></div>
-                <p class="text-[10px] text-amber-700">⚠️ أي رسائل خارج هذه المجموعات أو من غير مسؤولي المبيعات والعملاء أعلاه يتم تجاهلها فوراً دون معالجة.</p>
+                <p class="text-[10px] text-amber-700">⚠️ أي رسائل خارج هذه المجموعات أو من غير أعضاء فريق المبيعات والعملاء أعلاه يتم تجاهلها فوراً.</p>
             </div>
 
             <div class="flex justify-end pt-2 border-t">
@@ -627,7 +623,7 @@
         const titles = {
             overview: 'لوحة التحكم العامة',
             targets: 'الأهداف والفرص البيعية (Target Pipeline)',
-            reps: 'دليل أعضاء فريق المبيعات',
+            reps: 'فريق المبيعات',
             customers: 'دليل حسابات العملاء المعتمدة',
             samples: 'سجل حركة العينات والتحويل التجاري',
             calendar: 'تقويم العمليات والمسارات الميدانية',
@@ -832,7 +828,6 @@
             } catch (e) {}
         }
 
-        // جلب بنود المصاريف وتعبئة القائمة المنسدلة ونافذة الإدارة
         async function loadExpenseCategories() {
             try {
                 const res = await fetch('/api/expense-categories');
@@ -895,14 +890,15 @@
             }
         }
 
-        // حفظ عضو مبيعات جديد
+        // حفظ عضو فريق مبيعات جديد
         async function submitNewRep() {
             const name = document.getElementById('rep-name-input').value.trim();
             const code = document.getElementById('rep-code-input').value.trim();
             const region = document.getElementById('rep-region-input').value.trim();
             const phone = document.getElementById('rep-phone-input').value.trim();
             const hasT = document.getElementById('rep-has-target-toggle').checked;
-            const targetVal = hasT ? (parseFloat(document.getElementById('rep-target-input').value) || 0) : 0;
+            const targetInput = document.getElementById('rep-target-input');
+            const targetVal = (hasT && targetInput) ? (parseFloat(targetInput.value) || 0) : 0;
 
             if (!name || !phone) {
                 alert("يرجى ملء الاسم الكامل ورقم الهاتف على الأقل");
@@ -927,13 +923,13 @@
                 if (res.ok) {
                     closeNewRepModal();
                     await loadAllData();
-                    alert("تم حفظ المندوب بنجاح ✓");
+                    alert("تم حفظ عضو فريق المبيعات بنجاح ✓");
                 } else {
                     const err = await res.json().catch(() => ({}));
-                    alert(err.detail || "حدث خطأ أثناء حفظ المندوب");
+                    alert(err.detail || "حدث خطأ أثناء حفظ عضو الفريق");
                 }
             } catch (e) {
-                alert("تعذر الاتصال بالسيرفر لحفظ المندوب");
+                alert("تعذر الاتصال بالسيرفر لحفظ عضو الفريق");
             }
         }
 
@@ -960,7 +956,7 @@
                 region: region || "مسقط",
                 contact_person: person || "المسؤول",
                 phone: phone,
-                assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null,
+                assigned_rep_id: (repSelect && repSelect.value) ? parseInt(repSelect.value) : null,
                 notes: notes || ""
             };
 
@@ -983,7 +979,6 @@
             }
         }
 
-        // ربط معرف مجموعة الواتساب بعميل
         async function submitAssignGroup() {
             const customerId = parseInt(document.getElementById('wa-assign-customer-select').value);
             const groupId = document.getElementById('wa-assign-group-id').value.trim();
@@ -1269,7 +1264,7 @@
                         <div>
                             <span class="font-bold text-sm text-gray-900">${t.title}</span>
                             <div class="text-xs text-[#3A056A] font-semibold mt-0.5">🏢 العميل: ${t.customer_name}</div>
-                            <div class="text-xs text-gray-500">👤 مسؤول المتابعة: <strong>${t.rep_name}</strong></div>
+                            <div class="text-xs text-gray-500">👤 عضو الفريق المتابع: <strong>${t.rep_name}</strong></div>
                         </div>
                         <span class="px-2.5 py-1 rounded text-[10px] font-bold ${t.status === 'CLOSED' ? 'bg-emerald-200 text-emerald-900' : 'bg-purple-100 text-[#3A056A]'}">
                             ${t.status === 'CLOSED' ? 'مغلق بأمر شراء ✓' : 'فرصة جارية ⏳'}
