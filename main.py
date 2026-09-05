@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Dynamic Expense Categories
+FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Integrated Baileys Engine
 """
 
 import os
@@ -14,6 +14,7 @@ import logging
 import subprocess
 from datetime import datetime
 from typing import Optional, List
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -31,16 +32,6 @@ except ImportError:
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
-
-app = FastAPI(title="FDC Sales CRM", version="8.5.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 DATABASE_URL = (
     os.getenv("DATABASE_URL") 
@@ -63,12 +54,27 @@ def get_db_connection():
         logger.error(f"Database connection error: {e}")
         return None
 
+def run_isolated_ddl(sql_statement: str):
+    """تنفيذ أوامر تعديل الجداول في معاملة مستقلة ومعزولة تماماً لضمان ترقية الأعمدة"""
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute(sql_statement)
+    except Exception as e:
+        logger.warning(f"DDL statement bypassed ({e}): {sql_statement[:50]}")
+    finally:
+        conn.close()
+
 def init_database():
     conn = get_db_connection()
     if not conn:
         logger.warning("DATABASE_URL not found. Running in local state.")
         return
 
+    # 1. إنشاء الجداول الأساسية
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -140,7 +146,6 @@ def init_database():
             );
             """)
 
-            # جدول بنود المصاريف القابلة للتخصيص والإدارة
             cur.execute("""
             CREATE TABLE IF NOT EXISTS expense_categories (
                 id SERIAL PRIMARY KEY,
@@ -198,59 +203,30 @@ def init_database():
                 message_body TEXT NOT NULL
             );
             """)
-
-            # تعبئة بنود المصاريف الافتراضية إذا كانت فارغة
-            cur.execute("SELECT COUNT(*) FROM expense_categories;")
-            if cur.fetchone()["count"] == 0:
-                cur.execute("""
-                INSERT INTO expense_categories (category_name) VALUES 
-                ('وقود سيارة'),
-                ('إيجار سيارة / نقل'),
-                ('علاوة يومية (انتداب مدينة أخرى)'),
-                ('ضيافة واجتماعات عملاء'),
-                ('شحن ونثريات عينات'),
-                ('صيانة وإصلاحات طارئة')
-                ON CONFLICT DO NOTHING;
-                """)
-
         conn.commit()
     except Exception as e:
-        logger.error(f"Error updating system tables: {e}")
-        conn.rollback()
-
-    # التأسيس الأولي الآمن للبيانات
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM sales_executives;")
-            if cur.fetchone()["count"] == 0:
-                cur.execute("""
-                INSERT INTO sales_executives (name, employee_code, phone_number, region, has_target, monthly_target, achieved_sales, total_expenses, status)
-                VALUES 
-                ('أحمد الشمري', 'SE-101', '+96891112233', 'مسقط - الوسطى', TRUE, 25000.0, 27200.0, 320.0, 'نشط'),
-                ('سالم الدوسري', 'SE-102', '+96894445566', 'صحار - الباطنة', FALSE, 0.0, 13500.0, 410.0, 'نشط'),
-                ('عبدالله', '0144', '+96893904404', 'نزوى - الداخلية', FALSE, 0.0, 8400.0, 190.0, 'نشط')
-                RETURNING id;
-                """)
-                rep_ids = [r["id"] for r in cur.fetchall()]
-            else:
-                cur.execute("SELECT id FROM sales_executives ORDER BY id ASC LIMIT 3;")
-                rep_ids = [r["id"] for r in cur.fetchall()]
-
-            cur.execute("SELECT COUNT(*) FROM customer_accounts;")
-            if cur.fetchone()["count"] == 0 and rep_ids:
-                cur.execute("""
-                INSERT INTO customer_accounts (company_name, brand_name, sector, region, contact_person, phone, assigned_rep_id, assigned_rep_name, notes, whatsapp_group_id, tier, status)
-                VALUES 
-                ('شركة التغذية المتكاملة', 'مطاعم الريف', 'مطاعم وإعاشة', 'مسقط', 'م. فهد القرني', '+96899988771', %s, 'أحمد الشمري', 'الاستلام من 7:00 إلى 10:00 صباحاً من الباب الخلفي.', '120363029182371@g.us', 'A', 'نشط'),
-                ('مؤسسة التموين الحديث', 'أسواق الواحة', 'تجارة جملة', 'صحار', 'أ/ طارق المنصور', '+96893322110', %s, 'سالم الدوسري', 'طلب توريد تجريبي مجدول لكل أسبوعين.', '120363088716253@g.us', 'B', 'راكد');
-                """, (rep_ids[0], rep_ids[1] if len(rep_ids) > 1 else rep_ids[0]))
-
-        conn.commit()
-    except Exception as e:
-        logger.error(f"Error seeding data: {e}")
+        logger.error(f"Error creating tables: {e}")
         conn.rollback()
     finally:
         conn.close()
+
+    # 2. ترقية الأعمدة المنفصلة بشكل إلزامي ومستقل
+    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS has_target BOOLEAN DEFAULT FALSE;")
+    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS monthly_target NUMERIC(12, 2) DEFAULT 0.00;")
+    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS achieved_sales NUMERIC(12, 2) DEFAULT 0.00;")
+    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS total_expenses NUMERIC(12, 2) DEFAULT 0.00;")
+    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS brand_name VARCHAR(200) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS region VARCHAR(100) DEFAULT 'مسقط';")
+    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150) DEFAULT '';")
+
+    # 3. إدخال البنود الافتراضية
+    run_isolated_ddl("""
+    INSERT INTO expense_categories (category_name) VALUES 
+    ('وقود سيارة'), ('إيجار سيارة / نقل'), ('علاوة يومية (انتداب مدينة أخرى)'),
+    ('ضيافة واجتماعات عملاء'), ('شحن ونثريات عينات'), ('صيانة وإصلاحات طارئة')
+    ON CONFLICT DO NOTHING;
+    """)
 
 def start_whatsapp_service():
     global whatsapp_process
@@ -264,16 +240,24 @@ def start_whatsapp_service():
         except Exception as e:
             logger.error(f"Error launching whatsapp_service.js: {e}")
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_database()
     start_whatsapp_service()
-
-@app.on_event("shutdown")
-def shutdown_event():
+    yield
     global whatsapp_process
     if whatsapp_process:
         whatsapp_process.terminate()
+
+app = FastAPI(title="FDC Sales CRM", version="8.7.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/logo.png")
 def get_logo():
@@ -358,7 +342,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- نماذج الطلبات -----------------
+# ----------------- نماذج البيانات -----------------
 class NewRepPayload(BaseModel):
     name: str
     employee_code: str
@@ -426,7 +410,7 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_name: str
     message_text: str
 
-# ----------------- مسارات بنود المصاريف الديناميكية -----------------
+# ----------------- مسارات بنود المصاريف -----------------
 @app.get("/api/expense-categories")
 def get_expense_categories():
     conn = get_db_connection()
@@ -456,9 +440,6 @@ def add_expense_category(payload: NewExpenseCategoryPayload):
     except psycopg2.IntegrityError:
         conn.rollback()
         raise HTTPException(status_code=400, detail="هذا البند مضاف مسبقاً")
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
     finally:
         conn.close()
 
@@ -475,7 +456,7 @@ def delete_expense_category(cat_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات البيانات والعمليات -----------------
+# ----------------- مسارات فريق المبيعات والعمليات -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -487,9 +468,9 @@ def get_reps():
             reps = cur.fetchall()
             enriched = []
             for r in reps:
-                target = float(r["monthly_target"] or 0)
-                sales = float(r["achieved_sales"] or 0)
-                has_t = bool(r["has_target"])
+                target = float(r.get("monthly_target") or 0)
+                sales = float(r.get("achieved_sales") or 0)
+                has_t = bool(r.get("has_target", False))
                 rate = (sales / target * 100) if (has_t and target > 0) else 0.0
                 enriched.append({
                     "id": r["id"],
@@ -500,7 +481,7 @@ def get_reps():
                     "has_target": has_t,
                     "monthly_target": target,
                     "achieved_sales": sales,
-                    "total_expenses": float(r["total_expenses"] or 0),
+                    "total_expenses": float(r.get("total_expenses") or 0),
                     "status": r["status"],
                     "achievement_rate": rate
                 })
@@ -555,16 +536,29 @@ def add_customer(payload: NewCustomerPayload):
     try:
         with conn.cursor() as cur:
             rep_name = ""
-            if payload.assigned_rep_id:
-                cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (payload.assigned_rep_id,))
+            rep_id = payload.assigned_rep_id
+            if rep_id:
+                cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (rep_id,))
                 r = cur.fetchone()
                 if r:
                     rep_name = r["name"]
+                else:
+                    rep_id = None
 
             cur.execute("""
             INSERT INTO customer_accounts (company_name, brand_name, sector, region, contact_person, phone, assigned_rep_id, assigned_rep_name, notes, status)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'نشط') RETURNING id;
-            """, (payload.company_name, payload.brand_name, payload.sector, payload.region, payload.contact_person, payload.phone, payload.assigned_rep_id, rep_name, payload.notes))
+            """, (
+                payload.company_name.strip(),
+                (payload.brand_name or "").strip(),
+                (payload.sector or "عام").strip(),
+                (payload.region or "مسقط").strip(),
+                payload.contact_person.strip(),
+                payload.phone.strip(),
+                rep_id,
+                rep_name,
+                (payload.notes or "").strip()
+            ))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
@@ -599,7 +593,7 @@ def get_samples():
             rows = cur.fetchall()
             for r in rows:
                 r["delivery_date"] = str(r["delivery_date"])
-                r["po_value"] = float(r["po_value"] or 0)
+                r["po_value"] = float(r.get("po_value") or 0)
                 r["converted_po_id"] = r.get("converted_po_id") or "—"
             return rows
     finally:
@@ -662,15 +656,15 @@ def get_targets():
             rows = cur.fetchall()
             now = datetime.now()
             for r in rows:
-                r["target_value"] = float(r["target_value"] or 0)
-                r["po_value"] = float(r["po_value"] or 0)
+                r["target_value"] = float(r.get("target_value") or 0)
+                r["po_value"] = float(r.get("po_value") or 0)
                 start = r["started_at"]
-                delta = (r["closed_at"] if r["closed_at"] else now) - start
+                delta = (r["closed_at"] if r.get("closed_at") else now) - start
                 days = delta.days
                 hours = int(delta.seconds // 3600)
                 r["duration_text"] = f"{days} يوم و {hours} ساعة"
                 r["started_at_str"] = start.strftime("%Y-%m-%d %H:%M")
-                r["last_note_at_str"] = r["last_note_at"].strftime("%Y-%m-%d %H:%M") if r["last_note_at"] else "—"
+                r["last_note_at_str"] = r["last_note_at"].strftime("%Y-%m-%d %H:%M") if r.get("last_note_at") else "—"
             return rows
     finally:
         conn.close()
