@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Integrated Baileys Engine
+FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Multi-Agent Automation
 """
 
 import os
@@ -55,7 +55,6 @@ def get_db_connection():
         return None
 
 def run_isolated_ddl(sql_statement: str):
-    """تنفيذ أوامر تعديل الجداول في معاملة مستقلة ومعزولة تماماً لضمان ترقية الأعمدة"""
     conn = get_db_connection()
     if not conn:
         return
@@ -74,7 +73,6 @@ def init_database():
         logger.warning("DATABASE_URL not found. Running in local state.")
         return
 
-    # 1. إنشاء الجداول الأساسية
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -203,6 +201,20 @@ def init_database():
                 message_body TEXT NOT NULL
             );
             """)
+
+            # جدول وكلاء الذكاء الاصطناعي والمتابعة الميدانية
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS ai_agents (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(150) NOT NULL,
+                role_type VARCHAR(100) NOT NULL,
+                system_prompt TEXT NOT NULL,
+                trigger_schedule VARCHAR(100) DEFAULT 'DAILY_MORNING',
+                test_phone VARCHAR(30) DEFAULT '',
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
         conn.commit()
     except Exception as e:
         logger.error(f"Error creating tables: {e}")
@@ -210,7 +222,7 @@ def init_database():
     finally:
         conn.close()
 
-    # 2. ترقية الأعمدة المنفصلة بشكل إلزامي ومستقل
+    # ترقية الأعمدة المستقلة
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS has_target BOOLEAN DEFAULT FALSE;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS monthly_target NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS achieved_sales NUMERIC(12, 2) DEFAULT 0.00;")
@@ -220,7 +232,37 @@ def init_database():
     run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';")
     run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150) DEFAULT '';")
 
-    # 3. إدخال البنود الافتراضية
+    # إضافة وكلاء افتراضيين متقدمين
+    run_isolated_ddl("""
+    INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
+    VALUES 
+    (
+        'وكيل متابعة العينات واسترجاع الـ PO',
+        'SAMPLES_CONVERSION',
+        'أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق لمتابعته بخصوص العينات المسلمة التي لم يُصدر لها أمر شراء حتى الآن، واطلب منه بلباقة موافاتك بقرار الشيف أو مدير المشتريات وإرسال رقم أمر الشراء PO عند اعتماده.',
+        'DAILY_10AM',
+        '+96898996963',
+        TRUE
+    ),
+    (
+        'وكيل التذكير الصباحي بالمسارات',
+        'CALENDAR_DISPATCH',
+        'أنت منسق جدول العمليات في شركة تنمية الغذاء. قم بصياغة رسالة صباحية مشجعة وموجزة تذكر فيها عضو الفريق بالزيارات الميدانية المجدولة له اليوم، وأسماء العملاء والمواقع المستهدفة.',
+        'DAILY_08AM',
+        '+96898996963',
+        TRUE
+    ),
+    (
+        'وكيل إنعاش الأهداف والفرص الراكدة',
+        'STAGNANT_TARGETS',
+        'أنت مستشار الصفقات في شركة تنمية الغذاء. اكتب رسالة تحفيزية لعضو الفريق بخصوص الفرص البيعية التي مر عليها أكثر من 3 أيام دون أي تحديث أو ملاحظة، واقترح عليه إجراء مكالمة هاتفية أو طلب عينة دعم للإغلاق.',
+        'WEEKLY_SUNDAY',
+        '+96898996963',
+        TRUE
+    )
+    ON CONFLICT DO NOTHING;
+    """)
+
     run_isolated_ddl("""
     INSERT INTO expense_categories (category_name) VALUES 
     ('وقود سيارة'), ('إيجار سيارة / نقل'), ('علاوة يومية (انتداب مدينة أخرى)'),
@@ -249,7 +291,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="8.7.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="9.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -342,7 +384,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- نماذج البيانات -----------------
+# ----------------- نماذج الطلبات -----------------
 class NewRepPayload(BaseModel):
     name: str
     employee_code: str
@@ -404,11 +446,146 @@ class NewExpensePayload(BaseModel):
     amount: float
     notes: Optional[str] = ""
 
+class NewAgentPayload(BaseModel):
+    name: str
+    role_type: str
+    system_prompt: str
+    trigger_schedule: Optional[str] = "DAILY_MORNING"
+    test_phone: Optional[str] = ""
+
+class ToggleAgentPayload(BaseModel):
+    is_active: bool
+
 class IncomingWhatsAppMessage(BaseModel):
     chat_id: str
     sender_phone: str
     sender_name: str
     message_text: str
+
+# ----------------- مسارات وكلاء الذكاء الاصطناعي (AI Agents) -----------------
+@app.get("/api/agents")
+def get_ai_agents():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM ai_agents ORDER BY id ASC;")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/agents")
+def create_ai_agent(payload: NewAgentPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
+            VALUES (%s, %s, %s, %s, %s, TRUE) RETURNING id;
+            """, (payload.name.strip(), payload.role_type, payload.system_prompt.strip(), payload.trigger_schedule, payload.test_phone.strip()))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/{agent_id}/toggle")
+def toggle_agent_status(agent_id: int, payload: ToggleAgentPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE ai_agents SET is_active = %s WHERE id = %s;", (payload.is_active, agent_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/{agent_id}/test")
+async def test_ai_agent(agent_id: int):
+    """صياغة رسالة ومحاكاتها وإرسالها فورياً إلى رقم هاتف الاختبار المعتمد"""
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM ai_agents WHERE id = %s;", (agent_id,))
+            agent = cur.fetchone()
+            if not agent:
+                raise HTTPException(status_code=404, detail="الوكيل غير موجود")
+
+            test_target = agent.get("test_phone")
+            if not test_target:
+                raise HTTPException(status_code=400, detail="يرجى تحديد رقم هاتف للاختبار في إعدادات الوكيل أولاً")
+
+            # جلب عينات أو بيانات حقيقية لدمجها في سيناريو الرسالة
+            cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC LIMIT 1;")
+            sample = cur.fetchone()
+            sample_info = f"العميل: {sample['customer_name']}، المنتج: {sample['product_name']} ({sample['qty_free']} كرتون)" if sample else "العميل: مطاعم الريف، المنتج: صدور دجاج متبلة 4B"
+
+            cur.execute("SELECT * FROM calendar_events ORDER BY id DESC LIMIT 1;")
+            cal = cur.fetchone()
+            cal_info = f"المهمة: {cal['task_type']} لدى {cal['customer_name']} في {cal['location']}" if cal else "زيارة فحص جودة العينات لدى فندق شاطئ القرم"
+
+            # صياغة الرسالة المهنية وفق نوع مهمة الوكيل
+            if agent["role_type"] == "SAMPLES_CONVERSION":
+                message_text = (
+                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"مرحباً بك أخي عضو فريق المبيعات،\n\n"
+                    f"نرجو متابعة نتيجة فحص العينة الميدانية لدى:\n"
+                    f"📍 {sample_info}\n\n"
+                    f"💡 يُرجى التكرم بموافاتنا بملاحظات الشيف/مدير المشتريات، وفي حال تم الاعتماد نرجو تسجيل رقم أمر الشراء (PO) في النظام لإغلاق التحويل.\n\n"
+                    f"شركة تنمية الغذاء | نظام المتابعة الذكية"
+                )
+            elif agent["role_type"] == "CALENDAR_DISPATCH":
+                message_text = (
+                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"صباح الخير والنشاط،\n\n"
+                    f"تذكير بالزيارات والمهام المجدولة لك اليوم:\n"
+                    f"🗓️ {cal_info}\n\n"
+                    f"نتمنى لك يوماً موفقاً ومبيعات مثمرة!\n\n"
+                    f"شركة تنمية الغذاء | إدارة العمليات"
+                )
+            else:
+                message_text = (
+                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
+                    f"━━━━━━━━━━━━━━━━━━\n"
+                    f"مرحباً بك، هذا تنبيه آلي صادر وفق التوجيه المحدد:\n"
+                    f"«{agent['system_prompt'][:120]}...»\n\n"
+                    f"حالة النظام: متصل بنجاح وجاهز للمتابعة الميدانية.\n\n"
+                    f"شركة تنمية الغذاء | FDC Sales CRM"
+                )
+
+        # إرسال الرسالة فعلياً عبر محرك Baileys
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "http://127.0.0.1:3001/send-message",
+                json={"phone_or_group": test_target, "message": message_text},
+                timeout=6.0
+            )
+            if resp.status_code == 200:
+                return {
+                    "status": "SUCCESS",
+                    "to": test_target,
+                    "message_preview": message_text
+                }
+            else:
+                err_data = resp.json()
+                raise HTTPException(status_code=400, detail=err_data.get("error", "فشل إرسال الرسالة عبر الواتساب"))
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error testing agent: {e}")
+        raise HTTPException(status_code=500, detail=f"خطأ أثناء تجربة الوكيل: {str(e)}")
+    finally:
+        conn.close()
 
 # ----------------- مسارات بنود المصاريف -----------------
 @app.get("/api/expense-categories")
@@ -764,6 +941,17 @@ async def get_whatsapp_status():
     except Exception:
         pass
     return {"connected": False, "phone": None}
+
+@app.get("/api/whatsapp/discovered-groups")
+async def get_discovered_groups():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/groups", timeout=4.0)
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    return []
 
 @app.get("/api/whatsapp/qr")
 async def get_whatsapp_qr():
