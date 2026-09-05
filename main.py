@@ -710,4 +710,321 @@ def get_customers():
 def add_customer(payload: NewCustomerPayload):
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=5
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            rep_name = ""
+            rep_id = payload.assigned_rep_id
+            if rep_id:
+                cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (rep_id,))
+                r = cur.fetchone()
+                if r:
+                    rep_name = r["name"]
+                else:
+                    rep_id = None
+
+            cur.execute("""
+            INSERT INTO customer_accounts (company_name, brand_name, sector, region, contact_person, phone, assigned_rep_id, assigned_rep_name, notes, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'نشط') RETURNING id;
+            """, (
+                payload.company_name.strip(),
+                (payload.brand_name or "").strip(),
+                (payload.sector or "عام").strip(),
+                (payload.region or "مسقط").strip(),
+                payload.contact_person.strip(),
+                payload.phone.strip(),
+                rep_id,
+                rep_name,
+                (payload.notes or "").strip()
+            ))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل حفظ العميل: {str(e)}")
+    finally:
+        conn.close()
+
+@app.post("/api/customers/group")
+def update_customer_group(payload: UpdateCustomerGroupPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE customer_accounts SET whatsapp_group_id = %s WHERE id = %s;",
+                        (payload.whatsapp_group_id.strip(), payload.customer_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.get("/api/samples")
+def get_samples():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC;")
+            rows = cur.fetchall()
+            for r in rows:
+                r["delivery_date"] = str(r["delivery_date"])
+                r["po_value"] = float(r.get("po_value") or 0)
+                r["converted_po_id"] = r.get("converted_po_id") or "—"
+            return rows
+    finally:
+        conn.close()
+
+@app.post("/api/samples")
+def add_sample(payload: NewSamplePayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO sample_deliveries (customer_name, rep_name, product_name, qty_free, delivery_date, status, po_value, source)
+            VALUES (%s, %s, %s, %s, %s, 'PENDING', 0.0, 'يدوي') RETURNING id;
+            """, (payload.customer_name, payload.rep_name, payload.product_name, payload.qty_free, payload.delivery_date))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.get("/api/calendar")
+def get_calendar():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM calendar_events ORDER BY id DESC;")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/calendar")
+def add_calendar_event(payload: NewCalendarEventPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, route_code, execution_status)
+            VALUES (%s, %s, %s, %s, %s, %s, 'PENDING') RETURNING id;
+            """, (payload.customer_name, payload.rep_name, payload.task_type, payload.scheduled_at, payload.location, payload.route_code or "R-01"))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.get("/api/targets")
+def get_targets():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sales_targets ORDER BY status DESC, id DESC;")
+            rows = cur.fetchall()
+            now = datetime.now()
+            for r in rows:
+                r["target_value"] = float(r.get("target_value") or 0)
+                r["po_value"] = float(r.get("po_value") or 0)
+                start = r["started_at"]
+                delta = (r["closed_at"] if r.get("closed_at") else now) - start
+                days = delta.days
+                hours = int(delta.seconds // 3600)
+                r["duration_text"] = f"{days} يوم و {hours} ساعة"
+                r["started_at_str"] = start.strftime("%Y-%m-%d %H:%M")
+                r["last_note_at_str"] = r["last_note_at"].strftime("%Y-%m-%d %H:%M") if r.get("last_note_at") else "—"
+            return rows
+    finally:
+        conn.close()
+
+@app.post("/api/targets")
+def add_target(payload: NewTargetPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT company_name FROM customer_accounts WHERE id = %s;", (payload.customer_id,))
+            c = cur.fetchone()
+            cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (payload.rep_id,))
+            r = cur.fetchone()
+            if not c or not r:
+                raise HTTPException(status_code=404, detail="العميل أو المندوب غير موجود")
+
+            cur.execute("""
+            INSERT INTO sales_targets (title, customer_id, customer_name, rep_id, rep_name, target_value, last_note, last_note_at, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), 'IN_PROGRESS') RETURNING id;
+            """, (payload.title, payload.customer_id, c["company_name"], payload.rep_id, r["name"], payload.target_value, payload.initial_note or ""))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.post("/api/targets/{target_id}/note")
+def update_target_note(target_id: int, payload: UpdateTargetNotePayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE sales_targets SET last_note = %s, last_note_at = NOW() WHERE id = %s;", (payload.note, target_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/targets/{target_id}/close")
+def close_target_with_po(target_id: int, payload: CloseTargetPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT rep_id FROM sales_targets WHERE id = %s;", (target_id,))
+            tgt = cur.fetchone()
+            if not tgt:
+                raise HTTPException(status_code=404, detail="الهدف غير موجود")
+
+            cur.execute("""
+            UPDATE sales_targets 
+            SET status = 'CLOSED', closed_at = NOW(), po_number = %s, po_value = %s, po_attachment_url = %s 
+            WHERE id = %s;
+            """, (payload.po_number, payload.po_value, payload.po_attachment_url or "", target_id))
+
+            cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s WHERE id = %s;", (payload.po_value, tgt["rep_id"]))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/expenses")
+def add_expense(payload: NewExpensePayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (payload.rep_id,))
+            rep = cur.fetchone()
+            if not rep:
+                raise HTTPException(status_code=404, detail="المندوب غير موجود")
+
+            cur.execute("""
+            INSERT INTO expenses_log (rep_id, rep_name, expense_type, amount, notes)
+            VALUES (%s, %s, %s, %s, %s);
+            """, (payload.rep_id, rep["name"], payload.expense_type, payload.amount, payload.notes or ""))
+
+            cur.execute("UPDATE sales_executives SET total_expenses = total_expenses + %s WHERE id = %s;", (payload.amount, payload.rep_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.get("/api/whatsapp/status")
+async def get_whatsapp_status():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=1.5)
+            if resp.status_code == 200:
+                data = resp.json()
+                return {"connected": bool(data.get("connected")), "phone": data.get("user")}
+    except Exception:
+        pass
+    return {"connected": False, "phone": None}
+
+@app.get("/api/whatsapp/discovered-groups")
+async def get_discovered_groups():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/groups", timeout=4.0)
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    return []
+
+@app.get("/api/whatsapp/qr")
+async def get_whatsapp_qr():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=2.5)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("connected"):
+                    return {"connected": True, "user": data.get("user")}
+                qr_base64 = data.get("qr")
+                if qr_base64:
+                    clean_b64 = qr_base64.split(",")[-1].strip()
+                    return Response(
+                        content=base64.b64decode(clean_b64),
+                        media_type="image/png",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+                    )
+    except Exception as e:
+        logger.warning(f"Waiting for Baileys: {e}")
+    raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب المشفر...")
+
+@app.get("/api/whatsapp/logs")
+def get_whatsapp_logs():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM whatsapp_logs ORDER BY id DESC LIMIT 50;")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/whatsapp/webhook")
+def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, company_name FROM customer_accounts WHERE whatsapp_group_id = %s;", (msg.chat_id,))
+            customer = cur.fetchone()
+
+            cur.execute("SELECT id, name FROM sales_executives WHERE phone_number = %s;", (msg.sender_phone,))
+            rep = cur.fetchone()
+
+            if not customer and not rep:
+                return {"status": "IGNORED", "reason": "خارج نطاق المجموعات أو الأرقام المعتمدة"}
+
+            cur.execute("""
+            INSERT INTO whatsapp_logs (created_at, sender_name, is_external_call, message_body)
+            VALUES (%s, %s, FALSE, %s);
+            """, (datetime.now().strftime("%H:%M"), msg.sender_name, msg.message_text))
+            conn.commit()
+            return {"status": "PROCESSED", "target": customer["company_name"] if customer else rep["name"]}
+    finally:
+        conn.close()
+
+@app.get("/", response_class=HTMLResponse)
+def serve_dashboard():
+    dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>dashboard.html not found</h1>"
+
+if __name__ == "__main__":
+    import uvicorn
+    raw_port = os.getenv("PORT", "8000")
+    try:
+        clean_port = int(raw_port)
+    except (ValueError, TypeError):
+        clean_port = 8000
+    uvicorn.run("main:app", host="0.0.0.0", port=clean_port)
