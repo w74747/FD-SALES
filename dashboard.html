@@ -63,7 +63,6 @@
                     <span>🎯</span> <span>الأهداف والفرص البيعية</span>
                 </button>
 
-                <!-- قسم فريق المبيعات بالمسمى الجديد -->
                 <button onclick="switchTab('reps')" id="nav-reps" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>👥</span> <span>فريق المبيعات</span>
                 </button>
@@ -80,8 +79,15 @@
                     <span>📅</span> <span>تقويم العمليات والمسارات</span>
                 </button>
 
-                <button onclick="switchTab('whatsapp')" id="nav-whatsapp" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>📡</span> <span>رادار المجموعات والمكالمات</span>
+                <div class="pt-3 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">خدمات الواتساب والميدان</div>
+
+                <button onclick="switchTab('whatsapp-feed')" id="nav-whatsapp-feed" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>📡</span> <span>رادار الرسائل والمحادثات</span>
+                </button>
+
+                <!-- قسم مستقل خاص بضبط وإدارة نطاق الواتساب في القائمة الجانبية -->
+                <button onclick="switchTab('whatsapp-settings')" id="nav-whatsapp-settings" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>⚙️</span> <span>إعدادات ونطاق الواتساب</span>
                 </button>
 
                 <div class="pt-4 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">الإدارة والقيود المالية</div>
@@ -109,6 +115,7 @@
             </div>
 
             <div class="flex items-center gap-3">
+                <!-- زر حالة الواتساب السريع والربط عبر QR -->
                 <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border" id="top-bar-wa-btn">
                     <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" id="top-bar-wa-dot"></span>
                     <span id="top-bar-wa-text">واتساب: فحص الاتصال...</span>
@@ -173,7 +180,7 @@
                 </div>
             </div>
 
-            <!-- تبويب 3: فريق المبيعات المحدث -->
+            <!-- تبويب 3: فريق المبيعات -->
             <div id="tab-reps" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
@@ -181,7 +188,6 @@
                             <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
                             <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج والمصاريف</div>
                         </div>
-                        <!-- زر إضافة عضو فريق مبيعات جديد -->
                         <button onclick="openNewRepModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة عضو جديد</button>
                     </div>
                     <div id="reps-grid-cards" class="grid grid-cols-3 gap-4"></div>
@@ -246,7 +252,7 @@
                 </div>
             </div>
 
-            <!-- تبويب 6: تقويم العمليات والمسارات الميدانية -->
+            <!-- تبويب 6: تقويم العمليات -->
             <div id="tab-calendar" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
@@ -260,45 +266,143 @@
                 </div>
             </div>
 
-            <!-- تبويب 7: رادار الواتساب -->
-            <div id="tab-whatsapp" class="hidden space-y-4">
+            <!-- تبويب 7: رادار رسائل الواتساب -->
+            <div id="tab-whatsapp-feed" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
                         <div>
-                            <h3 class="font-bold text-sm brand-primary-text">المجموعات المراقبة والمحادثات الميدانية</h3>
-                            <div class="text-xs text-gray-500">مراقبة محادثات مجموعات العملاء المحددة حصراً</div>
+                            <h3 class="font-bold text-sm brand-primary-text">رادار الرسائل والمحادثات الملتقطة</h3>
+                            <div class="text-xs text-gray-500">المحادثات الواردة حصراً من مجموعات العملاء المعتمدة أو أعضاء فريق المبيعات</div>
                         </div>
-                        <button onclick="openWhatsAppModal()" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">إدارة اتصال ونطاق الواتساب</button>
+                        <button onclick="switchTab('whatsapp-settings')" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">⚙️ ضبط النطاق والمجموعات</button>
                     </div>
                     <div class="space-y-2.5 text-xs" id="whatsapp-feed-list"></div>
                 </div>
             </div>
 
+            <!-- تبويب 8: قسم مستقل في القائمة لإعدادات ونطاق الواتساب الميداني مع أداة الاستكشاف المدمجة -->
+            <div id="tab-whatsapp-settings" class="hidden space-y-6">
+                
+                <!-- بطاقة شرح النظام ونطاق المراقبة -->
+                <div class="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="text-base">🛡️</span>
+                        <h3 class="font-bold text-sm text-[#3A056A]">سياسة جدار الحماية وحصر المراقبة (Zero Intrusion Whitelist)</h3>
+                    </div>
+                    <p class="text-gray-700 leading-relaxed">
+                        يعمل رادار النظام بمبدأ <strong>القائمة البيضاء الصارمة</strong>: لا يسجل النظام أي رسالة شخصية أو محادثة خاصة، بل يقتصر حصراً على <strong>مجموعات العملاء المربوطة أدناه</strong>، والرسائل الصادرة من <strong>أرقام أعضاء فريق المبيعات المسجلة</strong>.
+                    </p>
+                </div>
+
+                <!-- أداة استكشاف واستخراج المجموعات المدمجة تلقائياً -->
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="font-bold text-sm brand-primary-text">أداة استخراج المجموعات المدمجة تلقائياً 🔍</h4>
+                            <div class="text-xs text-gray-500">تقوم هذه الأداة بفحص تطبيق الواتساب المتصل وجلب كافة المجموعات المشترك بها لاستخراج المعرف وربطه مباشرة بنقرة زر واحدة.</div>
+                        </div>
+                        <button onclick="fetchDiscoveredGroups()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5">
+                            <span>🔄</span> <span>فحص وجلب مجموعات الواتساب</span>
+                        </button>
+                    </div>
+                    
+                    <div id="discovered-groups-container" class="hidden border rounded-xl p-3 bg-gray-50 space-y-2">
+                        <div class="font-bold text-xs text-gray-700">المجموعات المكتشفة في حسابك:</div>
+                        <div id="discovered-groups-list" class="space-y-1.5 max-h-48 overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <!-- نموذج الربط اليدوي للمجموعات -->
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
+                    <h4 class="font-bold text-sm brand-primary-text">ربط مجموعة واتساب بحساب عميل</h4>
+                    <div class="grid grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <label class="block font-bold mb-1">العميل المستهدف:</label>
+                            <select id="settings-wa-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block font-bold mb-1">رمز معرّف المجموعة (Group ID):</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="settings-wa-group-id" class="w-full p-2 border rounded-lg font-mono" placeholder="1203630XXXXXXXX@g.us">
+                                <button onclick="submitSettingsAssignGroup()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg whitespace-nowrap">حفظ وربط</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- جدول المجموعات المراقبة حالياً مع إمكانية فك الربط -->
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
+                    <h4 class="font-bold text-sm brand-primary-text">المجموعات المعتمدة الخاضعة للمراقبة حالياً</h4>
+                    <table class="w-full text-right text-xs border">
+                        <thead class="bg-[#F5F0FC] text-[#3A056A]">
+                            <tr>
+                                <th class="p-2.5">العميل / الشركة</th>
+                                <th class="p-2.5">العلامة التجارية</th>
+                                <th class="p-2.5">رمز معرّف المجموعة (WhatsApp Group ID)</th>
+                                <th class="p-2.5">حالة المراقبة</th>
+                                <th class="p-2.5">إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="settings-monitored-groups-tbody" class="divide-y"></tbody>
+                    </table>
+                </div>
+
+                <!-- أرقام أعضاء فريق المبيعات المعتمدة للتفاعل -->
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
+                    <h4 class="font-bold text-sm brand-primary-text">أرقام أعضاء فريق المبيعات المصرح لهم بالميدان</h4>
+                    <div id="settings-reps-whitelist-list" class="grid grid-cols-3 gap-3"></div>
+                </div>
+
+            </div>
+
         </div>
     </main>
 
-    <!-- مودال: إضافة عضو فريق مبيعات جديد -->
+    <!-- نافذة QR الواتساب الخفيفة والمستقلة -->
+    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-[420px] space-y-4 text-xs text-center">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm brand-primary-text">ربط جهاز الواتساب</h3>
+                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">مشفر وآمن ✓</span>
+            </div>
+
+            <!-- بطاقة عند الاتصال الناجح -->
+            <div id="whatsapp-connected-card" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+                <div class="w-12 h-12 bg-emerald-500 text-white text-2xl flex items-center justify-center rounded-full mx-auto">✓</div>
+                <div class="font-bold text-emerald-900 text-sm">الجلسة متصلة وتعمل بنجاح!</div>
+                <div class="text-xs text-emerald-700">رقم الهاتف المقترن: <span id="connected-phone-display" class="font-mono font-bold"></span></div>
+                <p class="text-[10px] text-gray-500 mt-1">لإدارة المجموعات وتحديد نطاق المراقبة، توجه إلى قسم "إعدادات ونطاق الواتساب" من القائمة الجانبية.</p>
+            </div>
+
+            <!-- بطاقة عند انتظار المسح عبر الـ QR -->
+            <div id="whatsapp-qr-wrapper" class="space-y-3">
+                <div class="font-bold text-gray-700">امسح الرمز لربط الهاتف بالنظام:</div>
+                <div class="relative w-48 h-48 mx-auto flex items-center justify-center bg-white border rounded-lg shadow-sm">
+                    <img id="whatsapp-qr-image" src="" alt="WhatsApp QR" class="w-44 h-44 object-contain">
+                    <div id="whatsapp-qr-loader" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-2 text-center text-gray-500 text-[11px]">
+                        <span class="animate-spin text-2xl mb-1">⚙️</span>
+                        <span id="whatsapp-loader-text">جاري الاتصال بمحرك الواتساب...</span>
+                    </div>
+                </div>
+                <p class="text-[10px] text-gray-400">واتساب ⬅️ الأجهزة المرتبطة ⬅️ ربط جهاز</p>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t">
+                <button onclick="closeWhatsAppModal()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- باقي المودالات (إضافة عضو، إضافة عميل، تسليم عينة، جدولة مهمة، هدف، قيد مصاريف) -->
     <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
-            <div>
-                <label class="block font-bold mb-1">الاسم الكامل:</label>
-                <input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: عبدالله">
-            </div>
+            <div><label class="block font-bold mb-1">الاسم الكامل:</label><input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: عبدالله"></div>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">الكود الوظيفي:</label>
-                    <input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="0144">
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">المنطقة البيعية:</label>
-                    <input type="text" id="rep-region-input" class="w-full p-2 border rounded-lg" placeholder="نزوى - الداخلية">
-                </div>
+                <div><label class="block font-bold mb-1">الكود الوظيفي:</label><input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="0144"></div>
+                <div><label class="block font-bold mb-1">المنطقة البيعية:</label><input type="text" id="rep-region-input" class="w-full p-2 border rounded-lg" placeholder="نزوى - الداخلية"></div>
             </div>
-            <div>
-                <label class="block font-bold mb-1">رقم الهاتف المعتمد (الرقم المربوط بالنظام):</label>
-                <input type="text" id="rep-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX">
-            </div>
+            <div><label class="block font-bold mb-1">رقم الهاتف المعتمد:</label><input type="text" id="rep-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX"></div>
             <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
                 <div class="flex items-center justify-between">
                     <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
@@ -316,48 +420,23 @@
         </div>
     </div>
 
-    <!-- مودال: إضافة عميل جديد -->
     <div id="new-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة حساب عميل جديد</h3>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">اسم العميل (الشركة):</label>
-                    <input type="text" id="cust-company-name" class="w-full p-2 border rounded-lg" placeholder="شركة التغذية المتكاملة">
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">اسم العلامة التجارية (Brand):</label>
-                    <input type="text" id="cust-brand-name" class="w-full p-2 border rounded-lg" placeholder="مطاعم الريف">
-                </div>
+                <div><label class="block font-bold mb-1">اسم العميل (الشركة):</label><input type="text" id="cust-company-name" class="w-full p-2 border rounded-lg" placeholder="شركة التغذية المتكاملة"></div>
+                <div><label class="block font-bold mb-1">اسم العلامة التجارية:</label><input type="text" id="cust-brand-name" class="w-full p-2 border rounded-lg" placeholder="مطاعم الريف"></div>
             </div>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">المنطقة:</label>
-                    <input type="text" id="cust-region" class="w-full p-2 border rounded-lg" value="مسقط">
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">القطاع:</label>
-                    <input type="text" id="cust-sector" class="w-full p-2 border rounded-lg" placeholder="مطاعم / جملة / فنادق">
-                </div>
+                <div><label class="block font-bold mb-1">المنطقة:</label><input type="text" id="cust-region" class="w-full p-2 border rounded-lg" value="مسقط"></div>
+                <div><label class="block font-bold mb-1">القطاع:</label><input type="text" id="cust-sector" class="w-full p-2 border rounded-lg" placeholder="مطاعم / فنادق"></div>
             </div>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">اسم المسؤول:</label>
-                    <input type="text" id="cust-contact-person" class="w-full p-2 border rounded-lg" placeholder="علي">
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">رقم التواصل:</label>
-                    <input type="text" id="cust-phone" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX">
-                </div>
+                <div><label class="block font-bold mb-1">اسم المسؤول:</label><input type="text" id="cust-contact-person" class="w-full p-2 border rounded-lg" placeholder="علي"></div>
+                <div><label class="block font-bold mb-1">رقم التواصل:</label><input type="text" id="cust-phone" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX"></div>
             </div>
-            <div>
-                <label class="block font-bold mb-1">تعيين عضو الفريق المتابع (من فريق المبيعات المعتمد):</label>
-                <select id="cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
-            </div>
-            <div>
-                <label class="block font-bold mb-1">تعليمات وملاحظات العميل:</label>
-                <textarea id="cust-notes" rows="2" class="w-full p-2 border rounded-lg" placeholder="أوقات الاستلام، اشتراطات معينة..."></textarea>
-            </div>
+            <div><label class="block font-bold mb-1">عضو الفريق المتابع:</label><select id="cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">تعليمات وملاحظات العميل:</label><textarea id="cust-notes" rows="2" class="w-full p-2 border rounded-lg" placeholder="أوقات الاستلام..."></textarea></div>
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeNewCustomerModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitNewCustomer()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العميل</button>
@@ -365,261 +444,83 @@
         </div>
     </div>
 
-    <!-- مودال: تسليم عينة جديدة -->
     <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينة جديدة</h3>
-            <div>
-                <label class="block font-bold mb-1">العميل المستلم:</label>
-                <select id="sample-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
-            </div>
-            <div>
-                <label class="block font-bold mb-1">عضو الفريق المسلّم:</label>
-                <select id="sample-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
-            </div>
-            <div>
-                <label class="block font-bold mb-1">المنتج المسلّم:</label>
-                <input type="text" id="sample-product-name" class="w-full p-2 border rounded-lg" placeholder="مثال: صدور دجاج متبلة 4B">
-            </div>
+            <div><label class="block font-bold mb-1">العميل المستلم:</label><select id="sample-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">عضو الفريق المسلّم:</label><select id="sample-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">المنتج المسلّم:</label><input type="text" id="sample-product-name" class="w-full p-2 border rounded-lg" placeholder="صدور دجاج متبلة"></div>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">الكمية المجانية:</label>
-                    <input type="number" id="sample-qty" class="w-full p-2 border rounded-lg" value="10">
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">تاريخ التسليم:</label>
-                    <input type="date" id="sample-date" class="w-full p-2 border rounded-lg" value="2026-09-05">
-                </div>
+                <div><label class="block font-bold mb-1">الكمية:</label><input type="number" id="sample-qty" class="w-full p-2 border rounded-lg" value="10"></div>
+                <div><label class="block font-bold mb-1">التاريخ:</label><input type="date" id="sample-date" class="w-full p-2 border rounded-lg" value="2026-09-05"></div>
             </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العينة</button>
-            </div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العينة</button></div>
         </div>
     </div>
 
-    <!-- مودال: جدولة مهمة جديدة -->
     <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية جديدة</h3>
-            <div>
-                <label class="block font-bold mb-1">العميل المستهدف:</label>
-                <select id="cal-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
-            </div>
-            <div>
-                <label class="block font-bold mb-1">عضو الفريق المكلّف:</label>
-                <select id="cal-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
-            </div>
-            <div>
-                <label class="block font-bold mb-1">نوع المهمة:</label>
-                <input type="text" id="cal-task-type" class="w-full p-2 border rounded-lg" placeholder="مثال: زيارة متابعة عينات وتفاوض">
-            </div>
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية</h3>
+            <div><label class="block font-bold mb-1">العميل المستهدف:</label><select id="cal-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">عضو الفريق المكلّف:</label><select id="cal-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">نوع المهمة:</label><input type="text" id="cal-task-type" class="w-full p-2 border rounded-lg" placeholder="زيارة فحص جودة وتفاوض"></div>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">الموعد والتوقيت:</label>
-                    <input type="text" id="cal-scheduled-at" class="w-full p-2 border rounded-lg" value="2026-09-06 10:00">
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">الموقع أو الفرع:</label>
-                    <input type="text" id="cal-location" class="w-full p-2 border rounded-lg" placeholder="فرع مسقط الرئيسي">
-                </div>
+                <div><label class="block font-bold mb-1">الموعد:</label><input type="text" id="cal-scheduled-at" class="w-full p-2 border rounded-lg" value="2026-09-06 10:00"></div>
+                <div><label class="block font-bold mb-1">الموقع:</label><input type="text" id="cal-location" class="w-full p-2 border rounded-lg" placeholder="مقر العميل"></div>
             </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeNewCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تأكيد الجدولة</button>
-            </div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تأكيد الجدولة</button></div>
         </div>
     </div>
 
-    <!-- مودال: إضافة هدف بيعي جديد -->
     <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي جديد (Target Pipeline)</h3>
-            <div>
-                <label class="block font-bold mb-1">مسمى الهدف البيعي:</label>
-                <input type="text" id="tgt-title" class="w-full p-2 border rounded-lg" placeholder="توريد دواجن طازجة أسبوعي">
-            </div>
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي جديد</h3>
+            <div><label class="block font-bold mb-1">مسمى الهدف:</label><input type="text" id="tgt-title" class="w-full p-2 border rounded-lg" placeholder="توريد دواجن طازجة أسبوعي"></div>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">العميل المستهدف:</label>
-                    <select id="tgt-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">عضو الفريق المكلّف:</label>
-                    <select id="tgt-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
-                </div>
+                <div><label class="block font-bold mb-1">العميل المستهدف:</label><select id="tgt-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+                <div><label class="block font-bold mb-1">عضو الفريق المكلّف:</label><select id="tgt-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
             </div>
-            <div>
-                <label class="block font-bold mb-1">القيمة المتوقعة للهدف (ر.ع):</label>
-                <input type="number" id="tgt-value" class="w-full p-2 border rounded-lg" value="5000">
-            </div>
-            <div>
-                <label class="block font-bold mb-1">ملاحظة البداية وأول خطوة من الفريق:</label>
-                <textarea id="tgt-note" rows="2" class="w-full p-2 border rounded-lg" placeholder="تم التواصل وتحديد موعد تجربة العينات..."></textarea>
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeNewTargetModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewTarget()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">بدء العداد وحفظ الهدف</button>
-            </div>
+            <div><label class="block font-bold mb-1">القيمة المتوقعة (ر.ع):</label><input type="number" id="tgt-value" class="w-full p-2 border rounded-lg" value="5000"></div>
+            <div><label class="block font-bold mb-1">ملاحظة البداية:</label><textarea id="tgt-note" rows="2" class="w-full p-2 border rounded-lg" placeholder="تم الاتصال بالعميل..."></textarea></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewTargetModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewTarget()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">بدء العداد وحفظ الهدف</button></div>
         </div>
     </div>
 
-    <!-- مودال: قيد مصاريف عامة -->
     <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[470px] space-y-3 text-xs">
             <h3 class="font-bold text-sm text-amber-800 border-b pb-2">قيد مصاريف ميدانية وتشغيلية</h3>
-            <div>
-                <label class="block font-bold mb-1">عضو فريق المبيعات:</label>
-                <select id="exp-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
-            </div>
+            <div><label class="block font-bold mb-1">عضو فريق المبيعات:</label><select id="exp-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <div class="flex justify-between items-center mb-1">
-                        <label class="font-bold">نوع وبند المصروف:</label>
-                        <button onclick="openManageCategoriesModal()" class="text-[10px] text-purple-700 underline font-bold hover:text-purple-900">إدارة البنود ⚙️</button>
-                    </div>
-                    <select id="exp-type-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]"></select>
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">قيمة المصروف (ر.ع):</label>
-                    <input type="number" id="exp-amount" class="w-full p-2 border rounded-lg font-bold text-amber-900" value="25">
-                </div>
+                <div><label class="block font-bold mb-1">نوع وبند المصروف:</label><select id="exp-type-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]"></select></div>
+                <div><label class="block font-bold mb-1">قيمة المصروف (ر.ع):</label><input type="number" id="exp-amount" class="w-full p-2 border rounded-lg font-bold text-amber-900" value="25"></div>
             </div>
-            <div>
-                <label class="block font-bold mb-1">ملاحظات وبيان المصروف:</label>
-                <input type="text" id="exp-notes" class="w-full p-2 border rounded-lg" placeholder="رحلة عمل لمتابعة العملاء">
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeExpenseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitExpense()" class="px-4 py-2 bg-amber-600 text-white font-bold rounded-lg">قيد المصروف</button>
-            </div>
+            <div><label class="block font-bold mb-1">ملاحظات وبيان المصروف:</label><input type="text" id="exp-notes" class="w-full p-2 border rounded-lg" placeholder="رحلة عمل لمتابعة العملاء"></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeExpenseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitExpense()" class="px-4 py-2 bg-amber-600 text-white font-bold rounded-lg">قيد المصروف</button></div>
         </div>
     </div>
 
-    <!-- مودال: إدارة بنود وأنواع المصاريف -->
-    <div id="manage-categories-modal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl p-6 w-[440px] space-y-3 text-xs">
-            <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">إدارة بنود وأنواع المصاريف المعتمدة</h3>
-                <span class="text-[10px] text-gray-500">تخصيص القائمة المنسدلة</span>
-            </div>
-            <div class="flex gap-2">
-                <input type="text" id="new-category-name-input" class="flex-1 p-2 border rounded-lg" placeholder="اسم بند جديد...">
-                <button onclick="submitNewCategory()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow-xs">+ إضافة</button>
-            </div>
-            <div class="space-y-1.5">
-                <div class="font-bold text-gray-700">البنود الحالية المسجلة في النظام:</div>
-                <div id="categories-list-container" class="space-y-1 max-h-48 overflow-y-auto border p-2 rounded-lg bg-gray-50"></div>
-            </div>
-            <div class="flex justify-end pt-2 border-t">
-                <button onclick="closeManageCategoriesModal()" class="px-4 py-1.5 border rounded-lg">إغلاق</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- مودال: تحديث ملاحظة الهدف -->
     <div id="target-note-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-5 w-[420px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديث ملاحظات الهدف</h3>
             <input type="hidden" id="target-note-id">
-            <div>
-                <label class="block font-bold mb-1">الملاحظة الجديدة:</label>
-                <textarea id="target-new-note-text" rows="3" class="w-full p-2 border rounded-lg"></textarea>
-            </div>
-            <div class="flex justify-end gap-2">
-                <button onclick="closeTargetNoteModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitTargetNote()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ الملاحظة</button>
-            </div>
+            <div><label class="block font-bold mb-1">الملاحظة الجديدة:</label><textarea id="target-new-note-text" rows="3" class="w-full p-2 border rounded-lg"></textarea></div>
+            <div class="flex justify-end gap-2"><button onclick="closeTargetNoteModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitTargetNote()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ الملاحظة</button></div>
         </div>
     </div>
 
-    <!-- مودال: إغلاق الهدف بـ PO -->
     <div id="close-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
             <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">إغلاق الهدف بنجاح وتحويله لأمر شراء (PO)</h3>
             <input type="hidden" id="close-target-id">
-            <div>
-                <label class="block font-bold mb-1">رقم أمر الشراء (PO Number):</label>
-                <input type="text" id="close-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX">
-            </div>
-            <div>
-                <label class="block font-bold mb-1">قيمة أمر الشراء المحققة (ر.ع):</label>
-                <input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0">
-            </div>
-            <div>
-                <label class="block font-bold mb-1">رابط أو مستند أمر الشراء:</label>
-                <input type="text" id="close-po-url" class="w-full p-2 border rounded-lg" placeholder="رابط درايف أو مرجع السند">
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeTargetCloseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitCloseTarget()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الإغلاق والترحيل</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- مودال: إدارة اتصال ونطاق الواتساب -->
-    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl p-6 w-[580px] space-y-4 text-xs max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">إدارة اتصال ونطاق رادار الواتساب</h3>
-                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">نطاق مقيد وآمن ✓</span>
-            </div>
-
-            <!-- بطاقة الاتصال -->
-            <div class="text-center p-3 bg-gray-50 rounded-xl border border-gray-200">
-                <div id="whatsapp-connected-card" class="hidden p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-1">
-                    <div class="w-9 h-9 bg-emerald-500 text-white text-lg flex items-center justify-center rounded-full mx-auto">✓</div>
-                    <div class="font-bold text-emerald-900 text-xs">تم ربط جلسة WhatsApp بنجاح!</div>
-                    <div class="text-[11px] text-emerald-700">الرقم المقترن: <span id="connected-phone-display" class="font-mono font-bold"></span></div>
-                </div>
-
-                <div id="whatsapp-qr-wrapper">
-                    <div class="font-bold text-gray-700 mb-2">ربط الجهاز عبر رمز الاستجابة السريعة (QR)</div>
-                    <div class="relative w-44 h-44 mx-auto flex items-center justify-center bg-white border rounded-lg shadow-sm">
-                        <img id="whatsapp-qr-image" src="" alt="WhatsApp QR" class="w-40 h-40 object-contain">
-                        <div id="whatsapp-qr-loader" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-2 text-center text-gray-500 text-[11px]">
-                            <span class="animate-spin text-2xl mb-1">⚙️</span>
-                            <span id="whatsapp-loader-text">جاري الاتصال بمحرك الواتساب...</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- حصر المجموعات المراقبة -->
-            <div class="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-2">
-                <div class="font-bold text-[#3A056A]">تعيين مجموعة واتساب لعميل معتمد (حصر المراقبة):</div>
-                <div class="grid grid-cols-3 gap-2">
-                    <div class="col-span-1">
-                        <select id="wa-assign-customer-select" class="w-full p-1.5 border rounded bg-white"></select>
-                    </div>
-                    <div class="col-span-2 flex gap-1">
-                        <input type="text" id="wa-assign-group-id" class="w-full p-1.5 border rounded font-mono" placeholder="معرف المجموعة مثلا: 1203630... @g.us">
-                        <button onclick="submitAssignGroup()" class="px-3 py-1 brand-primary-bg text-white font-bold rounded">ربط</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- قائمة المجموعات النشطة المراقبة -->
-            <div class="space-y-1.5">
-                <div class="font-bold text-gray-700">المجموعات المعتمدة الخاضعة للمراقبة حالياً:</div>
-                <div class="space-y-1 max-h-28 overflow-y-auto" id="whatsapp-groups-list"></div>
-            </div>
-
-            <!-- أرقام فريق المبيعات المصرح لهم بالتفاعل -->
-            <div class="space-y-1.5">
-                <div class="font-bold text-gray-700">أرقام فريق المبيعات المعتمدة للتفاعل:</div>
-                <div class="p-2 bg-gray-50 border rounded-lg space-y-1 max-h-24 overflow-y-auto" id="whatsapp-reps-list"></div>
-                <p class="text-[10px] text-amber-700">⚠️ أي رسائل خارج هذه المجموعات أو من غير أعضاء فريق المبيعات والعملاء أعلاه يتم تجاهلها فوراً.</p>
-            </div>
-
-            <div class="flex justify-end pt-2 border-t">
-                <button onclick="closeWhatsAppModal()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs">إغلاق</button>
-            </div>
+            <div><label class="block font-bold mb-1">رقم أمر الشراء (PO):</label><input type="text" id="close-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX"></div>
+            <div><label class="block font-bold mb-1">قيمة أمر الشراء (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0"></div>
+            <div><label class="block font-bold mb-1">رابط المستند المرفق:</label><input type="text" id="close-po-url" class="w-full p-2 border rounded-lg" placeholder="رابط درايف أو مرجع السند"></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeTargetCloseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitCloseTarget()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الإغلاق والترحيل</button></div>
         </div>
     </div>
 
     <script>
-        const tabs = ['overview', 'targets', 'reps', 'customers', 'samples', 'calendar', 'whatsapp'];
+        const tabs = ['overview', 'targets', 'reps', 'customers', 'samples', 'calendar', 'whatsapp-feed', 'whatsapp-settings'];
         const titles = {
             overview: 'لوحة التحكم العامة',
             targets: 'الأهداف والفرص البيعية (Target Pipeline)',
@@ -627,7 +528,8 @@
             customers: 'دليل حسابات العملاء المعتمدة',
             samples: 'سجل حركة العينات والتحويل التجاري',
             calendar: 'تقويم العمليات والمسارات الميدانية',
-            whatsapp: 'رادار مجموعات العملاء والمكالمات'
+            'whatsapp-feed': 'رادار الرسائل والمحادثات',
+            'whatsapp-settings': 'إعدادات ونطاق الواتساب الميداني'
         };
 
         function switchTab(id) {
@@ -722,6 +624,79 @@
             clearInterval(waPollingTimer);
         }
 
+        // أداة استكشاف المجموعات المدمجة تلقائياً
+        async function fetchDiscoveredGroups() {
+            const container = document.getElementById('discovered-groups-container');
+            const list = document.getElementById('discovered-groups-list');
+            container.classList.remove('hidden');
+            list.innerHTML = '<div class="text-xs text-gray-500 p-2">جاري قراءة المجموعات من جلسة الواتساب النشطة...</div>';
+
+            try {
+                const res = await fetch('/api/whatsapp/discovered-groups');
+                const groups = await res.json();
+
+                if (groups.length === 0) {
+                    list.innerHTML = '<div class="text-xs text-amber-700 p-2 bg-amber-50 rounded">لم يتم العثور على مجموعات في هذا الحساب، أو أن الجلسة غير متصلة حالياً.</div>';
+                    return;
+                }
+
+                list.innerHTML = groups.map(g => `
+                    <div class="flex justify-between items-center bg-white p-2.5 rounded-lg border text-xs shadow-2xs">
+                        <div>
+                            <span class="font-bold text-gray-800">${g.subject}</span>
+                            <span class="text-[10px] text-gray-400 block font-mono">${g.id} (${g.participants_count} عضو)</span>
+                        </div>
+                        <button onclick="useDiscoveredGroupId('${g.id}')" class="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[11px]">
+                            استخدام هذا المعرّف ↙
+                        </button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                list.innerHTML = '<div class="text-xs text-red-600 p-2">تعذر قراءة المجموعات حالياً.</div>';
+            }
+        }
+
+        function useDiscoveredGroupId(gid) {
+            document.getElementById('settings-wa-group-id').value = gid;
+            window.scrollTo({ top: 350, behavior: 'smooth' });
+        }
+
+        async function submitSettingsAssignGroup() {
+            const custId = parseInt(document.getElementById('settings-wa-customer-select').value);
+            const gid = document.getElementById('settings-wa-group-id').value.trim();
+
+            if (!gid) {
+                alert("يرجى تحديد أو لصق رمز معرّف المجموعة");
+                return;
+            }
+
+            const res = await fetch('/api/customers/group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: custId, whatsapp_group_id: gid })
+            });
+
+            if (res.ok) {
+                document.getElementById('settings-wa-group-id').value = '';
+                await loadAllData();
+                alert("تم ربط المجموعة بالعميل بنجاح وتفعيل رادار المراقبة لها ✓");
+            } else {
+                alert("حدث خطأ أثناء حفظ الربط");
+            }
+        }
+
+        async function unassignGroup(custId) {
+            if (!confirm("هل أنت متأكد من فك ربط هذه المجموعة وإيقاف مراقبتها؟")) return;
+            const res = await fetch('/api/customers/group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: custId, whatsapp_group_id: "" })
+            });
+            if (res.ok) {
+                await loadAllData();
+            }
+        }
+
         function toggleTargetInput(checked) {
             document.getElementById('rep-target-box').classList.toggle('hidden', !checked);
         }
@@ -743,15 +718,6 @@
 
         function openExpenseModal() { document.getElementById('expense-modal').classList.remove('hidden'); }
         function closeExpenseModal() { document.getElementById('expense-modal').classList.add('hidden'); }
-
-        function openManageCategoriesModal() { 
-            loadExpenseCategories();
-            document.getElementById('manage-categories-modal').classList.remove('hidden'); 
-        }
-        function closeManageCategoriesModal() { 
-            document.getElementById('manage-categories-modal').classList.add('hidden'); 
-            loadExpenseCategories();
-        }
 
         function openTargetNoteModal(id, currentNote) {
             document.getElementById('target-note-id').value = id;
@@ -832,65 +798,13 @@
             try {
                 const res = await fetch('/api/expense-categories');
                 const categories = await res.json();
-                
                 const selectEl = document.getElementById('exp-type-select');
-                const listContainer = document.getElementById('categories-list-container');
-                
                 if (selectEl) {
                     selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
                 }
-                
-                if (listContainer) {
-                    listContainer.innerHTML = categories.map(c => `
-                        <div class="flex justify-between items-center bg-white p-2 rounded border text-[11px]">
-                            <span class="font-bold text-gray-800">${c.category_name}</span>
-                            <button onclick="deleteCategory(${c.id})" class="text-red-500 hover:text-red-700 font-bold px-1.5 py-0.5 rounded hover:bg-red-50">حذف ✕</button>
-                        </div>
-                    `).join('');
-                }
-            } catch (e) {
-                console.error("Error loading categories", e);
-            }
+            } catch (e) {}
         }
 
-        async function submitNewCategory() {
-            const input = document.getElementById('new-category-name-input');
-            const name = input.value.trim();
-            if (!name) {
-                alert("يرجى كتابة اسم البند أولاً");
-                return;
-            }
-            try {
-                const res = await fetch('/api/expense-categories', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ category_name: name })
-                });
-                if (res.ok) {
-                    input.value = '';
-                    await loadExpenseCategories();
-                } else {
-                    const err = await res.json().catch(() => ({}));
-                    alert(err.detail || "تعذر إضافة البند");
-                }
-            } catch (e) {
-                alert("خطأ في الاتصال بالخادم");
-            }
-        }
-
-        async function deleteCategory(id) {
-            if (!confirm("هل أنت متأكد من حذف هذا البند من قائمة المصاريف؟")) return;
-            try {
-                const res = await fetch(`/api/expense-categories/${id}`, { method: 'DELETE' });
-                if (res.ok) {
-                    await loadExpenseCategories();
-                }
-            } catch (e) {
-                alert("تعذر حذف البند");
-            }
-        }
-
-        // حفظ عضو فريق مبيعات جديد
         async function submitNewRep() {
             const name = document.getElementById('rep-name-input').value.trim();
             const code = document.getElementById('rep-code-input').value.trim();
@@ -933,7 +847,6 @@
             }
         }
 
-        // حفظ عميل جديد
         async function submitNewCustomer() {
             const company = document.getElementById('cust-company-name').value.trim();
             const brand = document.getElementById('cust-brand-name').value.trim();
@@ -976,30 +889,6 @@
                 }
             } catch (e) {
                 alert("تعذر الاتصال بالسيرفر لحفظ العميل");
-            }
-        }
-
-        async function submitAssignGroup() {
-            const customerId = parseInt(document.getElementById('wa-assign-customer-select').value);
-            const groupId = document.getElementById('wa-assign-group-id').value.trim();
-
-            if (!groupId) {
-                alert("يرجى إدخال معرف المجموعة (GroupID)");
-                return;
-            }
-
-            const res = await fetch('/api/customers/group', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ customer_id: customerId, whatsapp_group_id: groupId })
-            });
-
-            if (res.ok) {
-                document.getElementById('wa-assign-group-id').value = '';
-                await loadAllData();
-                alert("تم ربط المجموعة بنجاح وتفعيل المراقبة الحصرية لها ✓");
-            } else {
-                alert("حدث خطأ أثناء تعيين المجموعة");
             }
         }
 
@@ -1206,11 +1095,14 @@
             document.getElementById('sample-rep-select').innerHTML = repNamesOnlyHTML;
             document.getElementById('cal-rep-select').innerHTML = repNamesOnlyHTML;
 
-            // قائمة أرقام المبيعات لنافذة الواتساب
-            document.getElementById('whatsapp-reps-list').innerHTML = reps.map(r => `
-                <div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border">
-                    <span>${r.name} (${r.region}):</span>
-                    <span class="font-mono font-bold text-[#3A056A]">${r.phone_number}</span>
+            // بطاقات أرقام أعضاء الفريق في قسم إعدادات الواتساب
+            document.getElementById('settings-reps-whitelist-list').innerHTML = reps.map(r => `
+                <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-xl flex justify-between items-center text-xs">
+                    <div>
+                        <div class="font-bold text-[#3A056A]">${r.name}</div>
+                        <div class="text-[10px] text-gray-500">${r.region}</div>
+                    </div>
+                    <span class="font-mono font-bold text-purple-900 bg-white px-2 py-1 rounded border">${r.phone_number}</span>
                 </div>
             `).join('');
 
@@ -1237,19 +1129,19 @@
             document.getElementById('tgt-customer-select').innerHTML = custOptionsHTML;
             document.getElementById('sample-customer-select').innerHTML = custNamesOnlyHTML;
             document.getElementById('cal-customer-select').innerHTML = custNamesOnlyHTML;
-            document.getElementById('wa-assign-customer-select').innerHTML = custOptionsHTML;
+            document.getElementById('settings-wa-customer-select').innerHTML = custOptionsHTML;
 
-            // قائمة المجموعات النشطة لنافذة الواتساب
-            const monitoredGroups = custs.filter(c => c.whatsapp_group_id);
-            document.getElementById('whatsapp-groups-list').innerHTML = monitoredGroups.length > 0 ? monitoredGroups.map(c => `
-                <div class="p-1.5 border rounded-lg flex justify-between items-center bg-white text-[11px]">
-                    <div>
-                        <span class="font-bold text-gray-800">${c.company_name}</span>
-                        <span class="text-[10px] text-gray-500 block font-mono">${c.whatsapp_group_id}</span>
-                    </div>
-                    <span class="text-emerald-700 font-bold text-[10px]">مراقبة نشطة ✓</span>
-                </div>
-            `).join('') : '<div class="text-gray-400 text-[11px] p-2 bg-white rounded border text-center">لا توجد مجموعات مربوطة حالياً. استخدم الخانة أعلاه لربط مجموعة بالعميل.</div>';
+            // تعبئة جدول المجموعات المراقبة في قسم إعدادات الواتساب
+            const monitoredCusts = custs.filter(c => c.whatsapp_group_id);
+            document.getElementById('settings-monitored-groups-tbody').innerHTML = monitoredCusts.length > 0 ? monitoredCusts.map(c => `
+                <tr>
+                    <td class="p-2.5 font-bold">${c.company_name}</td>
+                    <td class="p-2.5 font-semibold text-purple-900">${c.brand_name || '—'}</td>
+                    <td class="p-2.5 font-mono text-purple-800">${c.whatsapp_group_id}</td>
+                    <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">مراقبة حصرية نشطة ✓</span></td>
+                    <td class="p-2.5"><button onclick="unassignGroup(${c.id})" class="text-red-600 hover:text-red-800 underline text-[11px]">فك الربط</button></td>
+                </tr>
+            `).join('') : '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد مجموعات مربوطة حالياً. استخدم الأداة أعلاه لربط المجموعات بنقرة واحدة.</td></tr>';
 
             // 3. جلب الأهداف
             const tgtRes = await fetch('/api/targets');
@@ -1327,7 +1219,7 @@
                 <div class="p-3.5 rounded-xl border brand-border brand-tint flex justify-between items-center text-xs">
                     <div>
                         <div class="font-bold text-gray-800">${e.task_type}</div>
-                        <div class="text-gray-500 mt-0.5">العميل: ${e.customer_name} | المسؤول: ${e.rep_name} | الموعد: ${e.scheduled_at}</div>
+                        <div class="text-gray-500 mt-0.5">العميل: ${e.customer_name} | عضو الفريق: ${e.rep_name} | الموعد: ${e.scheduled_at}</div>
                     </div>
                     <span class="px-2.5 py-1 rounded text-xs font-bold bg-amber-100 text-amber-800">${e.execution_status}</span>
                 </div>
