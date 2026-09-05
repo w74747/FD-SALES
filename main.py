@@ -215,6 +215,38 @@ def init_database():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
+
+            # إدخال الوكلاء الافتراضيين مرة واحدة فقط لمنع التكرار
+            cur.execute("SELECT COUNT(*) FROM ai_agents;")
+            if cur.fetchone()["count"] == 0:
+                cur.execute("""
+                INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
+                VALUES 
+                (
+                    'وكيل متابعة العينات واسترجاع الـ PO',
+                    'SAMPLES_CONVERSION',
+                    'أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق لمتابعة العينات المسلمة التي لم يُصدر لها أمر شراء حتى الآن، واطلب منه بلباقة موافاتك بقرار الشيف أو مدير المشتريات وإرسال رقم أمر الشراء PO عند اعتماده.',
+                    'DAILY_10AM',
+                    '+96899988771',
+                    TRUE
+                ),
+                (
+                    'وكيل التذكير الصباحي بالمسارات',
+                    'CALENDAR_DISPATCH',
+                    'أنت منسق جدول العمليات في شركة تنمية الغذاء. قم بصياغة رسالة صباحية مشجعة وموجزة تذكر فيها عضو الفريق بالزيارات الميدانية المجدولة له اليوم، وأسماء العملاء والمواقع المستهدفة.',
+                    'DAILY_08AM',
+                    '+96899988771',
+                    TRUE
+                ),
+                (
+                    'وكيل إنعاش الأهداف والفرص الراكدة',
+                    'STAGNANT_TARGETS',
+                    'أنت مستشار الصفقات في شركة تنمية الغذاء. اكتب رسالة تحفيزية لعضو الفريق بخصوص الفرص البيعية التي مر عليها أكثر من 3 أيام دون أي تحديث، واقترح عليه إجراء مكالمة هاتفية أو طلب عينة دعم للإغلاق.',
+                    'WEEKLY_SUNDAY',
+                    '+96899988771',
+                    TRUE
+                );
+                """)
         conn.commit()
     except Exception as e:
         logger.error(f"Error creating tables: {e}")
@@ -226,47 +258,6 @@ def init_database():
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS monthly_target NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS achieved_sales NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS total_expenses NUMERIC(12, 2) DEFAULT 0.00;")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS brand_name VARCHAR(200) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS region VARCHAR(100) DEFAULT 'مسقط';")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150) DEFAULT '';")
-
-    run_isolated_ddl("""
-    INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
-    VALUES 
-    (
-        'وكيل متابعة العينات واسترجاع الـ PO',
-        'SAMPLES_CONVERSION',
-        'أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق لمتابعة العينات المسلمة التي لم يُصدر لها أمر شراء حتى الآن، واطلب منه بلباقة موافاتك بقرار الشيف أو مدير المشتريات وإرسال رقم أمر الشراء PO عند اعتماده.',
-        'DAILY_10AM',
-        '+96898996963',
-        TRUE
-    ),
-    (
-        'وكيل التذكير الصباحي بالمسارات',
-        'CALENDAR_DISPATCH',
-        'أنت منسق جدول العمليات في شركة تنمية الغذاء. قم بصياغة رسالة صباحية مشجعة وموجزة تذكر فيها عضو الفريق بالزيارات الميدانية المجدولة له اليوم، وأسماء العملاء والمواقع المستهدفة.',
-        'DAILY_08AM',
-        '+96898996963',
-        TRUE
-    ),
-    (
-        'وكيل إنعاش الأهداف والفرص الراكدة',
-        'STAGNANT_TARGETS',
-        'أنت مستشار الصفقات في شركة تنمية الغذاء. اكتب رسالة تحفيزية لعضو الفريق بخصوص الفرص البيعية التي مر عليها أكثر من 3 أيام دون أي تحديث، واقترح عليه إجراء مكالمة هاتفية أو طلب عينة دعم للإغلاق.',
-        'WEEKLY_SUNDAY',
-        '+96898996963',
-        TRUE
-    )
-    ON CONFLICT DO NOTHING;
-    """)
-
-    run_isolated_ddl("""
-    INSERT INTO expense_categories (category_name) VALUES 
-    ('وقود سيارة'), ('إيجار سيارة / نقل'), ('علاوة يومية (انتداب مدينة أخرى)'),
-    ('ضيافة واجتماعات عملاء'), ('شحن ونثريات عينات'), ('صيانة وإصلاحات طارئة')
-    ON CONFLICT DO NOTHING;
-    """)
 
 def start_whatsapp_service():
     global whatsapp_process
@@ -289,7 +280,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="9.5.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="10.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -301,7 +292,6 @@ app.add_middleware(
 
 @app.get("/logo.png")
 def get_logo():
-    """تقديم الشعار مع كسر التخزين المؤقت (Cache Busting) تلقائياً"""
     try:
         from logo_data import LOGO_BASE64
         if LOGO_BASE64:
@@ -389,7 +379,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- نماذج البيانات -----------------
+# ----------------- نماذج الطلبات -----------------
 class NewRepPayload(BaseModel):
     name: str
     employee_code: str
@@ -458,6 +448,13 @@ class NewAgentPayload(BaseModel):
     trigger_schedule: Optional[str] = "DAILY_MORNING"
     test_phone: Optional[str] = ""
 
+class UpdateAgentPayload(BaseModel):
+    name: str
+    role_type: str
+    system_prompt: str
+    trigger_schedule: str
+    test_phone: str
+
 class ToggleAgentPayload(BaseModel):
     is_active: bool
 
@@ -467,7 +464,7 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_name: str
     message_text: str
 
-# ----------------- مسارات وكلاء الذكاء الاصطناعي -----------------
+# ----------------- مسارات وكلاء الذكاء الاصطناعي (AI Agents CRUD) -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -494,6 +491,38 @@ def create_ai_agent(payload: NewAgentPayload):
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.put("/api/agents/{agent_id}")
+def update_ai_agent(agent_id: int, payload: UpdateAgentPayload):
+    """تحديث بيانات الوكيل وبخاصة رقم هاتف الاختبار والبرومبت"""
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE ai_agents 
+            SET name = %s, role_type = %s, system_prompt = %s, trigger_schedule = %s, test_phone = %s 
+            WHERE id = %s;
+            """, (payload.name.strip(), payload.role_type, payload.system_prompt.strip(), payload.trigger_schedule, payload.test_phone.strip(), agent_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.delete("/api/agents/{agent_id}")
+def delete_ai_agent(agent_id: int):
+    """حذف الوكيل نهائياً من النظام"""
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM ai_agents WHERE id = %s;", (agent_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
     finally:
         conn.close()
 
