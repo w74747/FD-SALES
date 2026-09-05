@@ -26,7 +26,8 @@ async function startWhatsApp() {
     sock = makeWASocket({
       auth: state,
       logger: pino({ level: 'silent' }),
-      printQRInTerminal: false
+      printQRInTerminal: false,
+      browser: ['FDC Sales CRM', 'Chrome', '1.0.0']
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -35,14 +36,12 @@ async function startWhatsApp() {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        console.log('[Baileys] تم توليد رمز QR حقيقي جديد.');
         latestQR = await QRCode.toDataURL(qr);
         isConnected = false;
       }
 
       if (connection === 'close') {
         const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-        console.log('[Baileys] انقطع الاتصال، إعادة المحاولة:', shouldReconnect);
         isConnected = false;
         latestQR = null;
         connectedUser = null;
@@ -75,23 +74,70 @@ async function startWhatsApp() {
           sender_name: senderName,
           message_text: text
         });
-      } catch (e) {
-        console.error('[Baileys Webhook Error]:', e.message);
-      }
+      } catch (e) {}
     });
 
   } catch (err) {
-    console.error('[Baileys Fatal Error]:', err);
     setTimeout(startWhatsApp, 5000);
   }
 }
 
+// مسار فحص الحالة
 app.get('/qr-status', (req, res) => {
   res.json({
     connected: isConnected,
     user: connectedUser,
     qr: latestQR
   });
+});
+
+// أداة استخراج المجموعات
+app.get('/groups', async (req, res) => {
+  if (!isConnected || !sock) {
+    return res.json([]);
+  }
+  try {
+    const groups = await sock.groupFetchAllParticipating();
+    const result = Object.values(groups).map(g => ({
+      id: g.id,
+      subject: g.subject,
+      participants_count: g.participants?.length || 0
+    }));
+    res.json(result);
+  } catch (e) {
+    res.json([]);
+  }
+});
+
+// مسار إرسال الرسائل الصادرة للوكلاء الأذكياء واختبارات النظام
+app.post('/send-message', async (req, res) => {
+  if (!isConnected || !sock) {
+    return res.status(503).json({ error: 'جلسة الواتساب غير متصلة حالياً' });
+  }
+
+  const { phone_or_group, message } = req.body;
+  if (!phone_or_group || !message) {
+    return res.status(400).json({ error: 'يرجى تحديد الرقم والرسالة' });
+  }
+
+  try {
+    let cleanTarget = phone_or_group.replace(/[^0-9@a-z\._-]/gi, '');
+    let jid = '';
+
+    if (cleanTarget.endsWith('@g.us')) {
+      jid = cleanTarget;
+    } else {
+      if (cleanTarget.startsWith('+')) cleanTarget = cleanTarget.substring(1);
+      jid = `${cleanTarget}@s.whatsapp.net`;
+    }
+
+    await sock.sendMessage(jid, { text: message });
+    console.log(`[Baileys Sent] تم إرسال رسالة بنجاح إلى ${jid}`);
+    return res.json({ status: 'SENT', to: jid });
+  } catch (e) {
+    console.error('[Baileys Send Error]:', e);
+    return res.status(500).json({ error: e.message });
+  }
 });
 
 startWhatsApp();
