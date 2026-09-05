@@ -12,14 +12,48 @@
         .brand-primary-text { color: #3A056A; }
         .brand-border { border-color: #E4D9F5; }
         .brand-tint { background-color: #F5F0FC; }
+
+        /* إعدادات الطباعة الصارمة لعزل الجداول والتقارير */
+        @media print {
+            aside, header, button, .no-print, #auth-overlay {
+                display: none !important;
+            }
+            body, main {
+                background: #FFFFFF !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            .tab-content:not(.hidden) {
+                display: block !important;
+                width: 100% !important;
+                padding: 10mm !important;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                font-size: 10pt !important;
+            }
+            th, td {
+                border: 1px solid #CBD5E1 !important;
+                padding: 8px !important;
+            }
+            th {
+                background-color: #3A056A !important;
+                color: #FFFFFF !important;
+                -webkit-print-color-adjust: exact;
+            }
+        }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4">
+    <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
-                <img src="/logo.png?v=2026" alt="شعار شركة تنمية الغذاء" class="max-h-16 w-auto max-w-full object-contain block">
+                <div class="bg-white p-2 rounded-xl border border-gray-100 shadow-sm inline-block">
+                    <img src="/logo.png?v=2026" alt="شعار شركة تنمية الغذاء" class="max-h-16 w-auto max-w-full object-contain block">
+                </div>
             </div>
             <h2 class="text-base font-bold text-gray-800">التحقق الأمني الثنائي (2FA)</h2>
             <p class="text-xs text-gray-500">يرجى إدخال رمز التحقق المكون من 6 أرقام من تطبيق Google Authenticator</p>
@@ -42,7 +76,7 @@
         </div>
     </div>
 
-    <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl">
+    <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
                 <div class="w-full h-full bg-white rounded-xl p-2 flex items-center justify-center shadow-sm">
@@ -91,10 +125,14 @@
                     <span>⚙️</span> <span>إعدادات ونطاق الواتساب</span>
                 </button>
 
-                <div class="pt-4 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">الإدارة والقيود المالية</div>
+                <div class="pt-4 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">الإدارة والتقارير التنفيذية</div>
 
                 <button onclick="openExpenseModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-amber-600/90 text-white hover:bg-amber-600 text-right">
                     <span>💰</span> <span>قيد مصاريف ميدانية</span>
+                </button>
+
+                <button onclick="openReportModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-[#C194FB]/20 text-purple-100 border border-[#C194FB]/40 hover:bg-[#C194FB]/30 text-right mt-1.5">
+                    <span>📄</span> <span>مركز التقارير الرسمية (A4)</span>
                 </button>
             </div>
 
@@ -107,7 +145,7 @@
     </aside>
 
     <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
-        <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs">
+        <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs no-print">
             <div class="flex items-center gap-3">
                 <span class="text-xs text-gray-400 font-medium">نظام المبيعات التنفيذي</span>
                 <span class="text-gray-300">/</span>
@@ -120,6 +158,10 @@
                     <span id="top-bar-wa-text">واتساب: فحص الاتصال...</span>
                 </button>
 
+                <button onclick="openReportModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 flex items-center gap-2">
+                    <span>🖨️</span> <span>إصدار تقرير رسمي</span>
+                </button>
+
                 <button onclick="logoutSession()" title="تسجيل الخروج" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                 </button>
@@ -128,8 +170,8 @@
 
         <div class="flex-1 overflow-y-auto p-6 space-y-6">
 
-            <div id="tab-overview" class="space-y-6">
-                <div class="grid grid-cols-3 gap-4">
+            <div id="tab-overview" class="tab-content space-y-6">
+                <div class="grid grid-cols-3 gap-4 no-print">
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
                         <div class="text-[11px] text-gray-500 font-bold">إجمالي المبيعات المحققة</div>
                         <div class="text-2xl font-black brand-primary-text mt-1" id="kpi-total-sales">0.0 ر.ع</div>
@@ -145,8 +187,9 @@
                 </div>
 
                 <div class="bg-white rounded-xl border brand-border shadow-xs overflow-hidden">
-                    <div class="p-4 border-b brand-border flex justify-between items-center bg-gray-50/60">
+                    <div class="p-4 border-b brand-border flex justify-between items-center bg-gray-50/60 no-print">
                         <h3 class="font-bold text-xs brand-primary-text">ملخص أداء فريق المبيعات والمصروفات</h3>
+                        <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">طباعة التقرير</button>
                     </div>
                     <table class="w-full text-right text-xs">
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
@@ -164,9 +207,9 @@
                 </div>
             </div>
 
-            <div id="tab-targets" class="hidden space-y-4">
+            <div id="tab-targets" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">الأهداف والفرص البيعية (Target Pipeline)</h3>
                             <div class="text-xs text-gray-500">متابعة الفرص مع عداد الوقت الحي حتى تحقيق أول أمر شراء (PO)</div>
@@ -177,9 +220,9 @@
                 </div>
             </div>
 
-            <div id="tab-reps" class="hidden space-y-4">
+            <div id="tab-reps" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
                             <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج والمصاريف</div>
@@ -190,16 +233,18 @@
                 </div>
             </div>
 
-            <div id="tab-customers" class="hidden space-y-4">
+            <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">دليل حسابات العملاء المعتمدة</h3>
                             <div class="text-xs text-gray-500">الشركات، العلامات التجارية، ومسؤولو التواصل</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openNewCustomerModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة عميل جديد</button>
-                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">طباعة الدليل</button>
+                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50 flex items-center gap-1.5">
+                                <span>🖨️</span> <span>طباعة دليل العملاء (A4)</span>
+                            </button>
                         </div>
                     </div>
                     <table class="w-full text-right text-xs border border-[#E4D9F5]">
@@ -220,14 +265,17 @@
                 </div>
             </div>
 
-            <div id="tab-samples" class="hidden space-y-4">
+            <div id="tab-samples" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">سجل حركة العينات المجانية والتحويل التجاري</h3>
                             <div class="text-xs text-gray-500">رصد تسليم العينات وربطها بالعميل وعضو الفريق المعتمد</div>
                         </div>
-                        <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ تسليم عينة جديدة</button>
+                        <div class="flex gap-2">
+                            <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ تسليم عينة جديدة</button>
+                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">🖨️ طباعة السجل</button>
+                        </div>
                     </div>
                     <table class="w-full text-right text-xs">
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
@@ -246,22 +294,25 @@
                 </div>
             </div>
 
-            <div id="tab-calendar" class="hidden space-y-4">
+            <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">تقويم العمليات والزيارات الميدانية المعتمدة</h3>
                             <div class="text-xs text-gray-500">جدولة وتكليف المهام لأعضاء فريق المبيعات</div>
                         </div>
-                        <button onclick="openNewCalendarModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ جدولة مهمة جديدة</button>
+                        <div class="flex gap-2">
+                            <button onclick="openNewCalendarModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ جدولة مهمة جديدة</button>
+                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">🖨️ طباعة التقويم</button>
+                        </div>
                     </div>
                     <div class="space-y-3" id="calendar-events-list"></div>
                 </div>
             </div>
 
-            <div id="tab-agents" class="hidden space-y-6">
+            <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">منظومة وكلاء الذكاء الاصطناعي للمتابعة الميدانية (AI Agents) 🤖</h3>
                             <div class="text-xs text-gray-500">وكلاء متخصصون لمتابعة العينات، الأهداف، والمهام عبر إرسال رسائل WhatsApp مخصصة وتجربتها على هاتفك أولاً.</div>
@@ -273,9 +324,9 @@
                 </div>
             </div>
 
-            <div id="tab-whatsapp-feed" class="hidden space-y-4">
+            <div id="tab-whatsapp-feed" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">رادار الرسائل والمحادثات الملتقطة</h3>
                             <div class="text-xs text-gray-500">المحادثات الواردة حصراً من مجموعات العملاء المعتمدة أو أعضاء فريق المبيعات</div>
@@ -286,9 +337,8 @@
                 </div>
             </div>
 
-            <div id="tab-whatsapp-settings" class="hidden space-y-6">
-                
-                <div class="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-2 text-xs">
+            <div id="tab-whatsapp-settings" class="tab-content hidden space-y-6">
+                <div class="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-2 text-xs no-print">
                     <div class="flex items-center gap-2">
                         <span class="text-base">🛡️</span>
                         <h3 class="font-bold text-sm text-[#3A056A]">سياسة جدار الحماية وحصر المراقبة (Zero Intrusion Whitelist)</h3>
@@ -298,7 +348,7 @@
                     </p>
                 </div>
 
-                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3 no-print">
                     <div class="flex justify-between items-center">
                         <div>
                             <h4 class="font-bold text-sm brand-primary-text">أداة استخراج المجموعات المدمجة تلقائياً 🔍</h4>
@@ -315,7 +365,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3 no-print">
                     <h4 class="font-bold text-sm brand-primary-text">ربط مجموعة واتساب بحساب عميل</h4>
                     <div class="grid grid-cols-3 gap-3 text-xs">
                         <div>
@@ -341,7 +391,7 @@
                                 <th class="p-2.5">العلامة التجارية</th>
                                 <th class="p-2.5">رمز معرّف المجموعة (WhatsApp Group ID)</th>
                                 <th class="p-2.5">حالة المراقبة</th>
-                                <th class="p-2.5">إجراء</th>
+                                <th class="p-2.5 no-print">إجراء</th>
                             </tr>
                         </thead>
                         <tbody id="settings-monitored-groups-tbody" class="divide-y"></tbody>
@@ -352,13 +402,32 @@
                     <h4 class="font-bold text-sm brand-primary-text">أرقام أعضاء فريق المبيعات المصرح لهم بالميدان</h4>
                     <div id="settings-reps-whitelist-list" class="grid grid-cols-3 gap-3"></div>
                 </div>
-
             </div>
 
         </div>
     </main>
 
-    <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="report-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">مركز إصدار التقارير التنفيذية الرسمية (A4)</h3>
+            <div>
+                <label class="block font-bold mb-1">ترويسة التوجيه الرسمية (Recipient):</label>
+                <input type="text" id="report-recipient" value="سعادة رئيس مجلس الإدارة / المدير العام" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-bold mb-1">التوصية الإدارية (قابلة للتعديل):</label>
+                <textarea id="report-custom-recommendation" rows="3" class="w-full p-2.5 border rounded-lg focus:ring-1 focus:ring-purple-600 outline-none">أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي.</textarea>
+            </div>
+            <div class="flex justify-between items-center pt-3 border-t">
+                <button onclick="previewReportOfficial()" class="px-5 py-2.5 brand-primary-bg text-white font-bold rounded-lg shadow hover:opacity-95 flex items-center gap-2">
+                    <span>🖨️</span> <span>معاينة وطباعة التقرير المعتمد (A4)</span>
+                </button>
+                <button onclick="closeReportModal()" class="px-4 py-2 border rounded-lg">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[520px] space-y-3 text-xs">
             <div class="flex justify-between items-center border-b pb-2">
                 <h3 class="font-bold text-sm brand-primary-text">إضافة وكيل ذكاء اصطناعي جديد (AI Agent)</h3>
@@ -390,7 +459,7 @@
             </div>
             <div>
                 <label class="block font-bold mb-1">توجيهات البرومبت والتعليمات المخصصة للوكيل (System Prompt):</label>
-                <textarea id="agent-prompt-input" rows="3" class="w-full p-2 border rounded-lg" placeholder="أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق..."></textarea>
+                <textarea id="agent-prompt-input" rows="3" class="w-full p-2 border rounded-lg" placeholder="أنت المنسق الميداني لشركة تنمية الغذاء..."></textarea>
             </div>
             <div>
                 <label class="block font-bold mb-1">رقم الهاتف المعتمد لاستقبال رسائل الاختبار (Test Phone):</label>
@@ -403,7 +472,7 @@
         </div>
     </div>
 
-    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[420px] space-y-4 text-xs text-center">
             <div class="flex justify-between items-center border-b pb-2">
                 <h3 class="font-bold text-sm brand-primary-text">ربط جهاز الواتساب</h3>
@@ -433,7 +502,7 @@
         </div>
     </div>
 
-    <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
             <div><label class="block font-bold mb-1">الاسم الكامل:</label><input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: عبدالله"></div>
@@ -459,7 +528,7 @@
         </div>
     </div>
 
-    <div id="new-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="new-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة حساب عميل جديد</h3>
             <div class="grid grid-cols-2 gap-2">
@@ -483,7 +552,7 @@
         </div>
     </div>
 
-    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينة جديدة</h3>
             <div><label class="block font-bold mb-1">العميل المستلم:</label><select id="sample-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
@@ -497,7 +566,7 @@
         </div>
     </div>
 
-    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية</h3>
             <div><label class="block font-bold mb-1">العميل المستهدف:</label><select id="cal-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
@@ -511,7 +580,7 @@
         </div>
     </div>
 
-    <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي جديد</h3>
             <div><label class="block font-bold mb-1">مسمى الهدف:</label><input type="text" id="tgt-title" class="w-full p-2 border rounded-lg" placeholder="توريد دواجن طازجة أسبوعي"></div>
@@ -525,7 +594,7 @@
         </div>
     </div>
 
-    <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[470px] space-y-3 text-xs">
             <h3 class="font-bold text-sm text-amber-800 border-b pb-2">قيد مصاريف ميدانية وتشغيلية</h3>
             <div><label class="block font-bold mb-1">عضو فريق المبيعات:</label><select id="exp-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
@@ -538,7 +607,7 @@
         </div>
     </div>
 
-    <div id="target-note-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="target-note-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-5 w-[420px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديث ملاحظات الهدف</h3>
             <input type="hidden" id="target-note-id">
@@ -547,7 +616,7 @@
         </div>
     </div>
 
-    <div id="close-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div id="close-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
             <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">إغلاق الهدف بنجاح وتحويله لأمر شراء (PO)</h3>
             <input type="hidden" id="close-target-id">
@@ -582,6 +651,26 @@
             document.getElementById(`tab-${id}`).classList.remove('hidden');
             document.getElementById(`nav-${id}`).className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
             document.getElementById('current-tab-title').innerText = titles[id];
+        }
+
+        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
+        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
+
+        async function previewReportOfficial() {
+            const payload = {
+                report_recipient: document.getElementById('report-recipient').value,
+                recommendation: document.getElementById('report-custom-recommendation').value
+            };
+            const res = await fetch('/api/reports/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const html = await res.text();
+            const w = window.open('', '_blank');
+            w.document.write(html);
+            w.document.close();
+            closeReportModal();
         }
 
         let waPollingTimer = null;
@@ -1290,7 +1379,7 @@
                     <td class="p-2.5 font-semibold text-purple-900">${c.brand_name || '—'}</td>
                     <td class="p-2.5 font-mono text-purple-800">${c.whatsapp_group_id}</td>
                     <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">مراقبة حصرية نشطة ✓</span></td>
-                    <td class="p-2.5"><button onclick="unassignGroup(${c.id})" class="text-red-600 hover:text-red-800 underline text-[11px]">فك الربط</button></td>
+                    <td class="p-2.5 no-print"><button onclick="unassignGroup(${c.id})" class="text-red-600 hover:text-red-800 underline text-[11px]">فك الربط</button></td>
                 </tr>
             `).join('') : '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد مجموعات مربوطة حالياً. استخدم الأداة أعلاه لربط المجموعات بنقرة واحدة.</td></tr>';
 
@@ -1335,7 +1424,7 @@
                         ${t.po_attachment_url ? `<a href="${t.po_attachment_url}" target="_blank" class="text-[10px] text-blue-700 underline block mt-1">عرض المستند المرفق 🔗</a>` : ''}
                     </div>
                     ` : `
-                    <div class="flex justify-between items-center pt-2 border-t border-gray-100">
+                    <div class="flex justify-between items-center pt-2 border-t border-gray-100 no-print">
                         <button onclick="openTargetNoteModal(${t.id}, '${escape(t.last_note || '')}')" class="px-3 py-1.5 border brand-border text-[#3A056A] font-bold rounded-lg text-[11px] hover:bg-purple-50">
                             + تحديث الملاحظة
                         </button>
