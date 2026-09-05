@@ -1,1123 +1,1495 @@
-"""
-main.py - Enterprise AI Sales CRM & Field Intelligence
-Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Hardened 2FA Security + Multi-Agent Automation
-"""
-
-import os
-import io
-import sys
-import json
-import uuid
-import base64
-import logging
-import hashlib
-import subprocess
-from datetime import datetime
-from typing import Optional, List
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Response, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
-from pydantic import BaseModel
-import psycopg2
-from psycopg2.extras import RealDictCursor
-import pyotp
-import qrcode
-import httpx
-
-try:
-    from logo_data import LOGO_BASE64
-except ImportError:
-    LOGO_BASE64 = ""
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("SalesCRM")
-
-DATABASE_URL = (
-    os.getenv("DATABASE_URL") 
-    or os.getenv("DATABASE_PUBLIC_URL") 
-    or os.getenv("POSTGRES_URL") 
-    or ""
-)
-whatsapp_process = None
-
-def get_db_connection():
-    if not DATABASE_URL:
-        logger.error("DATABASE_URL is empty.")
-        return None
-    try:
-        conn_url = DATABASE_URL
-        if conn_url.startswith("postgres://"):
-            conn_url = conn_url.replace("postgres://", "postgresql://", 1)
-        return psycopg2.connect(conn_url, cursor_factory=RealDictCursor, connect_timeout=5)
-    except Exception as e:
-        logger.error(f"Database connection error: {e}")
-        return None
-
-def run_isolated_ddl(sql_statement: str):
-    conn = get_db_connection()
-    if not conn:
-        return
-    try:
-        conn.autocommit = True
-        with conn.cursor() as cur:
-            cur.execute(sql_statement)
-    except Exception as e:
-        logger.warning(f"DDL statement bypassed ({e}): {sql_statement[:50]}")
-    finally:
-        conn.close()
-
-def init_database():
-    conn = get_db_connection()
-    if not conn:
-        logger.warning("DATABASE_URL not found. Running in local state.")
-        return
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS system_auth (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(100) UNIQUE NOT NULL,
-                totp_secret VARCHAR(64) NOT NULL,
-                is_2fa_enabled BOOLEAN DEFAULT FALSE
-            );
-            """)
-            cur.execute("SELECT COUNT(*) FROM system_auth WHERE username = 'admin';")
-            if cur.fetchone()["count"] == 0:
-                default_secret = pyotp.random_base32()
-                cur.execute(
-                    "INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES (%s, %s, %s);",
-                    ('admin', default_secret, False)
-                )
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS sales_executives (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(150) NOT NULL,
-                employee_code VARCHAR(50) UNIQUE NOT NULL,
-                phone_number VARCHAR(30) UNIQUE NOT NULL,
-                region VARCHAR(100) NOT NULL,
-                has_target BOOLEAN DEFAULT FALSE,
-                monthly_target NUMERIC(12, 2) DEFAULT 0.00,
-                achieved_sales NUMERIC(12, 2) DEFAULT 0.00,
-                total_expenses NUMERIC(12, 2) DEFAULT 0.00,
-                status VARCHAR(20) DEFAULT 'نشط'
-            );
-            """)
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS customer_accounts (
-                id SERIAL PRIMARY KEY,
-                company_name VARCHAR(200) NOT NULL,
-                brand_name VARCHAR(200) DEFAULT '',
-                sector VARCHAR(100) NOT NULL,
-                region VARCHAR(100) DEFAULT 'مسقط',
-                contact_person VARCHAR(150) NOT NULL,
-                phone VARCHAR(30) NOT NULL,
-                assigned_rep_id INT REFERENCES sales_executives(id) ON DELETE SET NULL,
-                assigned_rep_name VARCHAR(150) DEFAULT '',
-                notes TEXT DEFAULT '',
-                whatsapp_group_id VARCHAR(100) UNIQUE,
-                tier VARCHAR(10) DEFAULT 'B',
-                status VARCHAR(20) DEFAULT 'نشط'
-            );
-            """)
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS sales_targets (
-                id SERIAL PRIMARY KEY,
-                title VARCHAR(250) NOT NULL,
-                customer_id INT REFERENCES customer_accounts(id) ON DELETE CASCADE,
-                customer_name VARCHAR(200) NOT NULL,
-                rep_id INT REFERENCES sales_executives(id) ON DELETE CASCADE,
-                rep_name VARCHAR(150) NOT NULL,
-                target_value NUMERIC(12, 2) DEFAULT 0.00,
-                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_note TEXT DEFAULT '',
-                last_note_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status VARCHAR(30) DEFAULT 'IN_PROGRESS',
-                closed_at TIMESTAMP,
-                po_number VARCHAR(100),
-                po_value NUMERIC(12, 2) DEFAULT 0.00,
-                po_attachment_url TEXT DEFAULT ''
-            );
-            """)
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS expense_categories (
-                id SERIAL PRIMARY KEY,
-                category_name VARCHAR(150) UNIQUE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """)
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS expenses_log (
-                id SERIAL PRIMARY KEY,
-                rep_id INT REFERENCES sales_executives(id) ON DELETE CASCADE,
-                rep_name VARCHAR(150) NOT NULL,
-                expense_type VARCHAR(100) NOT NULL,
-                amount NUMERIC(12, 2) NOT NULL,
-                notes TEXT DEFAULT '',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """)
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS sample_deliveries (
-                id SERIAL PRIMARY KEY,
-                customer_name VARCHAR(200) NOT NULL,
-                rep_name VARCHAR(150) NOT NULL,
-                product_name VARCHAR(200) NOT NULL,
-                qty_free INT NOT NULL,
-                delivery_date DATE DEFAULT CURRENT_DATE,
-                status VARCHAR(20) DEFAULT 'PENDING',
-                converted_po_id VARCHAR(100),
-                po_value NUMERIC(12, 2) DEFAULT 0.00,
-                source VARCHAR(50) DEFAULT 'يدوي'
-            );
-            """)
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS calendar_events (
-                id SERIAL PRIMARY KEY,
-                customer_name VARCHAR(200) NOT NULL,
-                rep_name VARCHAR(150) NOT NULL,
-                task_type VARCHAR(150) NOT NULL,
-                scheduled_at VARCHAR(50) NOT NULL,
-                location VARCHAR(255) NOT NULL,
-                route_code VARCHAR(50) DEFAULT 'R-01',
-                execution_status VARCHAR(20) DEFAULT 'PENDING'
-            );
-            """)
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS whatsapp_logs (
-                id SERIAL PRIMARY KEY,
-                created_at VARCHAR(10) NOT NULL,
-                sender_name VARCHAR(150) NOT NULL,
-                is_external_call BOOLEAN DEFAULT FALSE,
-                message_body TEXT NOT NULL
-            );
-            """)
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS ai_agents (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(150) NOT NULL,
-                role_type VARCHAR(100) NOT NULL,
-                system_prompt TEXT NOT NULL,
-                trigger_schedule VARCHAR(100) DEFAULT 'DAILY_MORNING',
-                test_phone VARCHAR(30) DEFAULT '',
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """)
-        conn.commit()
-    except Exception as e:
-        logger.error(f"Error creating tables: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
-
-    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS has_target BOOLEAN DEFAULT FALSE;")
-    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS monthly_target NUMERIC(12, 2) DEFAULT 0.00;")
-    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS achieved_sales NUMERIC(12, 2) DEFAULT 0.00;")
-    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS total_expenses NUMERIC(12, 2) DEFAULT 0.00;")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS brand_name VARCHAR(200) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS region VARCHAR(100) DEFAULT 'مسقط';")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150) DEFAULT '';")
-
-    # تحديث وتصحيح الوكلاء
-    run_isolated_ddl("""
-    INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
-    VALUES 
-    (
-        'وكيل متابعة العينات واسترجاع الـ PO',
-        'SAMPLES_CONVERSION',
-        'أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق لمتابعة العينات المسلمة التي لم يُصدر لها أمر شراء حتى الآن، واطلب منه بلباقة موافاتك بقرار الشيف أو مدير المشتريات وإرسال رقم أمر الشراء PO عند اعتماده.',
-        'DAILY_10AM',
-        '+96893904404',
-        TRUE
-    ),
-    (
-        'وكيل التذكير الصباحي بالمسارات',
-        'CALENDAR_DISPATCH',
-        'أنت منسق جدول العمليات في شركة تنمية الغذاء. قم بصياغة رسالة صباحية مشجعة وموجزة تذكر فيها عضو الفريق بالزيارات الميدانية المجدولة له اليوم، وأسماء العملاء والمواقع المستهدفة.',
-        'DAILY_08AM',
-        '+96893904404',
-        TRUE
-    ),
-    (
-        'وكيل إنعاش الأهداف والفرص الراكدة',
-        'STAGNANT_TARGETS',
-        'أنت مستشار الصفقات في شركة تنمية الغذاء. اكتب رسالة تحفيزية لعضو الفريق بخصوص الفرص البيعية التي مر عليها أكثر من 3 أيام دون أي تحديث، واقترح عليه إجراء مكالمة هاتفية أو طلب عينة دعم للإغلاق.',
-        'WEEKLY_SUNDAY',
-        '+96893904404',
-        TRUE
-    )
-    ON CONFLICT DO NOTHING;
-    """)
-
-    run_isolated_ddl("""
-    INSERT INTO expense_categories (category_name) VALUES 
-    ('وقود سيارة'), ('إيجار سيارة / نقل'), ('علاوة يومية (انتداب مدينة أخرى)'),
-    ('ضيافة واجتماعات عملاء'), ('شحن ونثريات عينات'), ('صيانة وإصلاحات طارئة')
-    ON CONFLICT DO NOTHING;
-    """)
-
-def start_whatsapp_service():
-    global whatsapp_process
-    if os.path.exists("whatsapp_service.js"):
-        try:
-            whatsapp_process = subprocess.Popen(
-                ["node", "whatsapp_service.js"],
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            )
-        except Exception as e:
-            logger.error(f"Error launching whatsapp_service.js: {e}")
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    init_database()
-    start_whatsapp_service()
-    yield
-    global whatsapp_process
-    if whatsapp_process:
-        whatsapp_process.terminate()
-
-app = FastAPI(title="FDC Sales CRM", version="9.8.0", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/logo.png")
-def get_logo():
-    """تقديم الشعار مع كسر التخزين المؤقت (Cache Busting) تلقائياً"""
-    try:
-        from logo_data import LOGO_BASE64
-        if LOGO_BASE64:
-            clean_b64 = LOGO_BASE64.split(",")[-1].strip()
-            image_bytes = base64.b64decode(clean_b64)
-            etag = hashlib.md5(image_bytes).hexdigest()
-            return Response(
-                content=image_bytes,
-                media_type="image/png",
-                headers={
-                    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
-                    "Pragma": "no-cache",
-                    "Expires": "0",
-                    "ETag": etag
-                }
-            )
-    except Exception as e:
-        logger.error(f"Error loading logo: {e}")
-    raise HTTPException(status_code=404, detail="Logo not found")
-
-class Verify2FAPayload(BaseModel):
-    code: str
-
-@app.get("/api/auth/2fa/status")
-def get_2fa_status():
-    conn = get_db_connection()
-    if not conn:
-        return {"is_enabled": False}
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT is_2fa_enabled FROM system_auth WHERE username = 'admin';")
-            row = cur.fetchone()
-            return {"is_enabled": bool(row["is_2fa_enabled"]) if row else False}
-    finally:
-        conn.close()
-
-@app.get("/api/auth/2fa/qr")
-def get_2fa_qr():
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT totp_secret, is_2fa_enabled FROM system_auth WHERE username = 'admin';")
-            row = cur.fetchone()
-            if row and row["is_2fa_enabled"]:
-                raise HTTPException(status_code=403, detail="تم تفعيل التحقق الثنائي مسبقاً.")
-
-            secret = row["totp_secret"] if row else pyotp.random_base32()
-            if not row:
-                cur.execute("INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES ('admin', %s, FALSE);", (secret,))
-                conn.commit()
-
-        totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name="admin@fdc.om", issuer_name="Food Development Co - CRM")
-        qr = qrcode.QRCode(box_size=6, border=2)
-        qr.add_data(totp_uri)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="#3A056A", back_color="white")
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-        return StreamingResponse(buf, media_type="image/png")
-    finally:
-        conn.close()
-
-@app.post("/api/auth/2fa/verify")
-def verify_2fa(payload: Verify2FAPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
-            row = cur.fetchone()
-            secret = row["totp_secret"]
-
-        totp = pyotp.TOTP(secret)
-        if totp.verify(payload.code, valid_window=1):
-            with conn.cursor() as cur:
-                cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
-            conn.commit()
-            return {"status": "SUCCESS", "message": "تم التحقق بنجاح"}
-        else:
-            raise HTTPException(status_code=401, detail="الرمز غير صحيح أو انتهت صلاحيته")
-    finally:
-        conn.close()
-
-# ----------------- نماذج البيانات -----------------
-class NewRepPayload(BaseModel):
-    name: str
-    employee_code: str
-    phone_number: str
-    region: str
-    has_target: Optional[bool] = False
-    monthly_target: Optional[float] = 0.0
-
-class NewCustomerPayload(BaseModel):
-    company_name: str
-    brand_name: Optional[str] = ""
-    sector: str
-    region: Optional[str] = "مسقط"
-    contact_person: str
-    phone: str
-    assigned_rep_id: Optional[int] = None
-    notes: Optional[str] = ""
-
-class UpdateCustomerGroupPayload(BaseModel):
-    customer_id: int
-    whatsapp_group_id: str
-
-class NewSamplePayload(BaseModel):
-    customer_name: str
-    rep_name: str
-    product_name: str
-    qty_free: int
-    delivery_date: str
-
-class NewCalendarEventPayload(BaseModel):
-    customer_name: str
-    rep_name: str
-    task_type: str
-    scheduled_at: str
-    location: str
-    route_code: Optional[str] = "R-01"
-
-class NewTargetPayload(BaseModel):
-    title: str
-    customer_id: int
-    rep_id: int
-    target_value: Optional[float] = 0.0
-    initial_note: Optional[str] = ""
-
-class UpdateTargetNotePayload(BaseModel):
-    note: str
-
-class CloseTargetPayload(BaseModel):
-    po_number: str
-    po_value: float
-    po_attachment_url: Optional[str] = ""
-
-class NewExpenseCategoryPayload(BaseModel):
-    category_name: str
-
-class NewExpensePayload(BaseModel):
-    rep_id: int
-    expense_type: str
-    amount: float
-    notes: Optional[str] = ""
-
-class NewAgentPayload(BaseModel):
-    name: str
-    role_type: str
-    system_prompt: str
-    trigger_schedule: Optional[str] = "DAILY_MORNING"
-    test_phone: Optional[str] = ""
-
-class EditAgentPayload(BaseModel):
-    name: str
-    role_type: str
-    system_prompt: str
-    trigger_schedule: str
-    test_phone: str
-
-class GlobalTestPhonePayload(BaseModel):
-    test_phone: str
-
-class ToggleAgentPayload(BaseModel):
-    is_active: bool
-
-class IncomingWhatsAppMessage(BaseModel):
-    chat_id: str
-    sender_phone: str
-    sender_name: str
-    message_text: str
-
-# ----------------- مسارات وكلاء الذكاء الاصطناعي -----------------
-@app.get("/api/agents")
-def get_ai_agents():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM ai_agents ORDER BY id ASC;")
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.post("/api/agents")
-def create_ai_agent(payload: NewAgentPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
-            VALUES (%s, %s, %s, %s, %s, TRUE) RETURNING id;
-            """, (payload.name.strip(), payload.role_type, payload.system_prompt.strip(), payload.trigger_schedule, payload.test_phone.strip()))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id}
-    finally:
-        conn.close()
-
-@app.put("/api/agents/{agent_id}")
-def update_ai_agent(agent_id: int, payload: EditAgentPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            UPDATE ai_agents 
-            SET name = %s, role_type = %s, system_prompt = %s, trigger_schedule = %s, test_phone = %s 
-            WHERE id = %s;
-            """, (payload.name.strip(), payload.role_type, payload.system_prompt.strip(), payload.trigger_schedule, payload.test_phone.strip(), agent_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/global-test-phone")
-def update_global_test_phone(payload: GlobalTestPhonePayload):
-    """تحديث وتعليم رقم هاتف الاختبار لجميع الوكلاء دفعة واحدة"""
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE ai_agents SET test_phone = %s;", (payload.test_phone.strip(),))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/{agent_id}/toggle")
-def toggle_agent_status(agent_id: int, payload: ToggleAgentPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE ai_agents SET is_active = %s WHERE id = %s;", (payload.is_active, agent_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/{agent_id}/test")
-async def test_ai_agent(agent_id: int):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM ai_agents WHERE id = %s;", (agent_id,))
-            agent = cur.fetchone()
-            if not agent:
-                raise HTTPException(status_code=404, detail="الوكيل غير موجود")
-
-            test_target = agent.get("test_phone")
-            if not test_target:
-                raise HTTPException(status_code=400, detail="يرجى تحديد رقم هاتف للاختبار")
-
-            cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC LIMIT 1;")
-            sample = cur.fetchone()
-            sample_info = f"العميل: {sample['customer_name']}، المنتج: {sample['product_name']} ({sample['qty_free']} كرتون)" if sample else "العميل: مطاعم الريف، المنتج: صدور دجاج متبلة 4B"
-
-            cur.execute("SELECT * FROM calendar_events ORDER BY id DESC LIMIT 1;")
-            cal = cur.fetchone()
-            cal_info = f"المهمة: {cal['task_type']} لدى {cal['customer_name']} في {cal['location']}" if cal else "زيارة فحص جودة العينات لدى فندق شاطئ القرم"
-
-            if agent["role_type"] == "SAMPLES_CONVERSION":
-                message_text = (
-                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
-                    f"━━━━━━━━━━━━━━━━━━\n"
-                    f"مرحباً بك أخي عضو فريق المبيعات،\n\n"
-                    f"نرجو متابعة نتيجة فحص العينة الميدانية لدى:\n"
-                    f"📍 {sample_info}\n\n"
-                    f"💡 يُرجى التكرم بموافاتنا بملاحظات الشيف/مدير المشتريات، وفي حال تم الاعتماد نرجو تسجيل رقم أمر الشراء (PO) في النظام لإغلاق التحويل.\n\n"
-                    f"شركة تنمية الغذاء | نظام المتابعة الذكية"
-                )
-            elif agent["role_type"] == "CALENDAR_DISPATCH":
-                message_text = (
-                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
-                    f"━━━━━━━━━━━━━━━━━━\n"
-                    f"صباح الخير والنشاط،\n\n"
-                    f"تذكير بالزيارات والمهام المجدولة لك اليوم:\n"
-                    f"🗓️ {cal_info}\n\n"
-                    f"نتمنى لك يوماً موفقاً ومبيعات مثمرة!\n\n"
-                    f"شركة تنمية الغذاء | إدارة العمليات"
-                )
-            else:
-                message_text = (
-                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
-                    f"━━━━━━━━━━━━━━━━━━\n"
-                    f"مرحباً بك، هذا تنبيه آلي صادر وفق التوجيه المحدد:\n"
-                    f"«{agent['system_prompt'][:120]}...»\n\n"
-                    f"حالة النظام: متصل بنجاح وجاهز للمتابعة الميدانية.\n\n"
-                    f"شركة تنمية الغذاء | FDC Sales CRM"
-                )
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "http://127.0.0.1:3001/send-message",
-                json={"phone_or_group": test_target, "message": message_text},
-                timeout=6.0
-            )
-            if resp.status_code == 200:
-                return {
-                    "status": "SUCCESS",
-                    "to": test_target,
-                    "message_preview": message_text
-                }
-            else:
-                err_data = resp.json()
-                raise HTTPException(status_code=400, detail=err_data.get("error", "فشل إرسال الرسالة عبر الواتساب"))
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error testing agent: {e}")
-        raise HTTPException(status_code=500, detail=f"خطأ أثناء تجربة الوكيل: {str(e)}")
-    finally:
-        conn.close()
-
-# ----------------- مسارات بنود المصاريف -----------------
-@app.get("/api/expense-categories")
-def get_expense_categories():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, category_name FROM expense_categories ORDER BY id ASC;")
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.post("/api/expense-categories")
-def add_expense_category(payload: NewExpenseCategoryPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            name = payload.category_name.strip()
-            if not name:
-                raise HTTPException(status_code=400, detail="يرجى كتابة اسم البند")
-            cur.execute("INSERT INTO expense_categories (category_name) VALUES (%s) RETURNING id;", (name,))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id, "category_name": name}
-    except psycopg2.IntegrityError:
-        conn.rollback()
-        raise HTTPException(status_code=400, detail="هذا البند مضاف مسبقاً")
-    finally:
-        conn.close()
-
-@app.delete("/api/expense-categories/{cat_id}")
-def delete_expense_category(cat_id: int):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM expense_categories WHERE id = %s;", (cat_id,))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-# ----------------- مسارات فريق المبيعات والعمليات -----------------
-@app.get("/api/reps")
-def get_reps():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM sales_executives ORDER BY id ASC;")
-            reps = cur.fetchall()
-            enriched = []
-            for r in reps:
-                target = float(r.get("monthly_target") or 0)
-                sales = float(r.get("achieved_sales") or 0)
-                has_t = bool(r.get("has_target", False))
-                rate = (sales / target * 100) if (has_t and target > 0) else 0.0
-                enriched.append({
-                    "id": r["id"],
-                    "name": r["name"],
-                    "employee_code": r["employee_code"],
-                    "phone_number": r["phone_number"],
-                    "region": r["region"],
-                    "has_target": has_t,
-                    "monthly_target": target,
-                    "achieved_sales": sales,
-                    "total_expenses": float(r.get("total_expenses") or 0),
-                    "status": r["status"],
-                    "achievement_rate": rate
-                })
-            return enriched
-    finally:
-        conn.close()
-
-@app.post("/api/reps")
-def add_rep(payload: NewRepPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            target = payload.monthly_target if payload.has_target else 0.0
-            cur.execute("""
-            INSERT INTO sales_executives (name, employee_code, phone_number, region, has_target, monthly_target, achieved_sales, total_expenses, status)
-            VALUES (%s, %s, %s, %s, %s, %s, 0.0, 0.0, 'نشط') RETURNING id;
-            """, (payload.name, payload.employee_code, payload.phone_number, payload.region, payload.has_target, target))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=400, detail=f"فشل الحفظ: {str(e)}")
-    finally:
-        conn.close()
-
-@app.get("/api/customers")
-def get_customers():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM customer_accounts ORDER BY id ASC;")
-            rows = cur.fetchall()
-            for r in rows:
-                r["brand_name"] = r.get("brand_name") or ""
-                r["notes"] = r.get("notes") or ""
-                r["assigned_rep_name"] = r.get("assigned_rep_name") or "—"
-                r["whatsapp_group_id"] = r.get("whatsapp_group_id") or ""
-            return rows
-    finally:
-        conn.close()
-
-@app.post("/api/customers")
-def add_customer(payload: NewCustomerPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            rep_name = ""
-            rep_id = payload.assigned_rep_id
-            if rep_id:
-                cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (rep_id,))
-                r = cur.fetchone()
-                if r:
-                    rep_name = r["name"]
-                else:
-                    rep_id = None
-
-            cur.execute("""
-            INSERT INTO customer_accounts (company_name, brand_name, sector, region, contact_person, phone, assigned_rep_id, assigned_rep_name, notes, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'نشط') RETURNING id;
-            """, (
-                payload.company_name.strip(),
-                (payload.brand_name or "").strip(),
-                (payload.sector or "عام").strip(),
-                (payload.region or "مسقط").strip(),
-                payload.contact_person.strip(),
-                payload.phone.strip(),
-                rep_id,
-                rep_name,
-                (payload.notes or "").strip()
-            ))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=400, detail=f"فشل حفظ العميل: {str(e)}")
-    finally:
-        conn.close()
-
-@app.post("/api/customers/group")
-def update_customer_group(payload: UpdateCustomerGroupPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE customer_accounts SET whatsapp_group_id = %s WHERE id = %s;",
-                        (payload.whatsapp_group_id.strip(), payload.customer_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.get("/api/samples")
-def get_samples():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC;")
-            rows = cur.fetchall()
-            for r in rows:
-                r["delivery_date"] = str(r["delivery_date"])
-                r["po_value"] = float(r.get("po_value") or 0)
-                r["converted_po_id"] = r.get("converted_po_id") or "—"
-            return rows
-    finally:
-        conn.close()
-
-@app.post("/api/samples")
-def add_sample(payload: NewSamplePayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            INSERT INTO sample_deliveries (customer_name, rep_name, product_name, qty_free, delivery_date, status, po_value, source)
-            VALUES (%s, %s, %s, %s, %s, 'PENDING', 0.0, 'يدوي') RETURNING id;
-            """, (payload.customer_name, payload.rep_name, payload.product_name, payload.qty_free, payload.delivery_date))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id}
-    finally:
-        conn.close()
-
-@app.get("/api/calendar")
-def get_calendar():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM calendar_events ORDER BY id DESC;")
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.post("/api/calendar")
-def add_calendar_event(payload: NewCalendarEventPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, route_code, execution_status)
-            VALUES (%s, %s, %s, %s, %s, %s, 'PENDING') RETURNING id;
-            """, (payload.customer_name, payload.rep_name, payload.task_type, payload.scheduled_at, payload.location, payload.route_code or "R-01"))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id}
-    finally:
-        conn.close()
-
-@app.get("/api/targets")
-def get_targets():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM sales_targets ORDER BY status DESC, id DESC;")
-            rows = cur.fetchall()
-            now = datetime.now()
-            for r in rows:
-                r["target_value"] = float(r.get("target_value") or 0)
-                r["po_value"] = float(r.get("po_value") or 0)
-                start = r["started_at"]
-                delta = (r["closed_at"] if r.get("closed_at") else now) - start
-                days = delta.days
-                hours = int(delta.seconds // 3600)
-                r["duration_text"] = f"{days} يوم و {hours} ساعة"
-                r["started_at_str"] = start.strftime("%Y-%m-%d %H:%M")
-                r["last_note_at_str"] = r["last_note_at"].strftime("%Y-%m-%d %H:%M") if r.get("last_note_at") else "—"
-            return rows
-    finally:
-        conn.close()
-
-@app.post("/api/targets")
-def add_target(payload: NewTargetPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT company_name FROM customer_accounts WHERE id = %s;", (payload.customer_id,))
-            c = cur.fetchone()
-            cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (payload.rep_id,))
-            r = cur.fetchone()
-            if not c or not r:
-                raise HTTPException(status_code=404, detail="العميل أو المندوب غير موجود")
-
-            cur.execute("""
-            INSERT INTO sales_targets (title, customer_id, customer_name, rep_id, rep_name, target_value, last_note, last_note_at, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), 'IN_PROGRESS') RETURNING id;
-            """, (payload.title, payload.customer_id, c["company_name"], payload.rep_id, r["name"], payload.target_value, payload.initial_note or ""))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id}
-    finally:
-        conn.close()
-
-@app.post("/api/targets/{target_id}/note")
-def update_target_note(target_id: int, payload: UpdateTargetNotePayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE sales_targets SET last_note = %s, last_note_at = NOW() WHERE id = %s;", (payload.note, target_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/targets/{target_id}/close")
-def close_target_with_po(target_id: int, payload: CloseTargetPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT rep_id FROM sales_targets WHERE id = %s;", (target_id,))
-            tgt = cur.fetchone()
-            if not tgt:
-                raise HTTPException(status_code=404, detail="الهدف غير موجود")
-
-            cur.execute("""
-            UPDATE sales_targets 
-            SET status = 'CLOSED', closed_at = NOW(), po_number = %s, po_value = %s, po_attachment_url = %s 
-            WHERE id = %s;
-            """, (payload.po_number, payload.po_value, payload.po_attachment_url or "", target_id))
-
-            cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s WHERE id = %s;", (payload.po_value, tgt["rep_id"]))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/expenses")
-def add_expense(payload: NewExpensePayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (payload.rep_id,))
-            rep = cur.fetchone()
-            if not rep:
-                raise HTTPException(status_code=404, detail="المندوب غير موجود")
-
-            cur.execute("""
-            INSERT INTO expenses_log (rep_id, rep_name, expense_type, amount, notes)
-            VALUES (%s, %s, %s, %s, %s);
-            """, (payload.rep_id, rep["name"], payload.expense_type, payload.amount, payload.notes or ""))
-
-            cur.execute("UPDATE sales_executives SET total_expenses = total_expenses + %s WHERE id = %s;", (payload.amount, payload.rep_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.get("/api/whatsapp/status")
-async def get_whatsapp_status():
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=1.5)
-            if resp.status_code == 200:
-                data = resp.json()
-                return {"connected": bool(data.get("connected")), "phone": data.get("user")}
-    except Exception:
-        pass
-    return {"connected": False, "phone": None}
-
-@app.get("/api/whatsapp/discovered-groups")
-async def get_discovered_groups():
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get("http://127.0.0.1:3001/groups", timeout=4.0)
-            if resp.status_code == 200:
-                return resp.json()
-    except Exception:
-        pass
-    return []
-
-@app.get("/api/whatsapp/qr")
-async def get_whatsapp_qr():
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=2.5)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("connected"):
-                    return {"connected": True, "user": data.get("user")}
-                qr_base64 = data.get("qr")
-                if qr_base64:
-                    clean_b64 = qr_base64.split(",")[-1].strip()
-                    return Response(
-                        content=base64.b64decode(clean_b64),
-                        media_type="image/png",
-                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
-                    )
-    except Exception as e:
-        logger.warning(f"Waiting for Baileys: {e}")
-    raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب المشفر...")
-
-@app.get("/api/whatsapp/logs")
-def get_whatsapp_logs():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM whatsapp_logs ORDER BY id DESC LIMIT 50;")
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.post("/api/whatsapp/webhook")
-def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, company_name FROM customer_accounts WHERE whatsapp_group_id = %s;", (msg.chat_id,))
-            customer = cur.fetchone()
-
-            cur.execute("SELECT id, name FROM sales_executives WHERE phone_number = %s;", (msg.sender_phone,))
-            rep = cur.fetchone()
-
-            if not customer and not rep:
-                return {"status": "IGNORED", "reason": "خارج نطاق المجموعات أو الأرقام المعتمدة"}
-
-            cur.execute("""
-            INSERT INTO whatsapp_logs (created_at, sender_name, is_external_call, message_body)
-            VALUES (%s, %s, FALSE, %s);
-            """, (datetime.now().strftime("%H:%M"), msg.sender_name, msg.message_text))
-            conn.commit()
-            return {"status": "PROCESSED", "target": customer["company_name"] if customer else rep["name"]}
-    finally:
-        conn.close()
-
-@app.post("/api/reports/preview")
-def preview_report(req: dict):
-    recipient = req.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام")
-    recommendation = req.get("recommendation", "أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي.")
-
-    reps = get_reps()
-    logo_src = f"data:image/png;base64,{LOGO_BASE64.split(',')[-1]}" if LOGO_BASE64 else "/logo.png"
-
-    html = f"""<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="utf-8">
-    <title>التقرير التنفيذي الشامل للمبيعات</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شركة تنمية الغذاء | نظام إدارة المبيعات الميدانية والتنفيذية</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        body {{ font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; font-size: 9pt; background: #fff; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
-        th, td {{ border: 1px solid #CBD5E1; padding: 8px; text-align: right; }}
-        th {{ background: #3A056A; color: white; -webkit-print-color-adjust: exact; }}
-        .no-print {{ margin-top: 20px; text-align: center; }}
-        @media print {{ .no-print {{ display: none !important; }} }}
+        body { font-family: 'Cairo', sans-serif; background-color: #F8FAFC; color: #1E293B; }
+        .brand-primary-bg { background-color: #3A056A; }
+        .brand-primary-text { color: #3A056A; }
+        .brand-border { border-color: #E4D9F5; }
+        .brand-tint { background-color: #F5F0FC; }
+
+        /* إعدادات الطباعة الصارمة لعزل الجداول والتقارير */
+        @media print {
+            aside, header, button, .no-print, #auth-overlay {
+                display: none !important;
+            }
+            body, main {
+                background: #FFFFFF !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            .tab-content:not(.hidden) {
+                display: block !important;
+                width: 100% !important;
+                padding: 10mm !important;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                font-size: 10pt !important;
+            }
+            th, td {
+                border: 1px solid #CBD5E1 !important;
+                padding: 8px !important;
+            }
+            th {
+                background-color: #3A056A !important;
+                color: #FFFFFF !important;
+                -webkit-print-color-adjust: exact;
+            }
+        }
     </style>
 </head>
-<body>
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3A056A; padding-bottom: 10px;">
-        <div>
-            <h1 style="color: #3A056A; margin: 0; font-size: 16pt;">التقرير التنفيذي الشامل للمبيعات والعمليات الميدانية</h1>
-            <div style="color: #64748B; font-size: 9pt; margin-top: 4px;">شركة تنمية الغذاء | توجيه: {recipient}</div>
+<body class="flex h-screen overflow-hidden">
+
+    <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
+            <div class="w-full flex justify-center mb-4">
+                <div class="bg-white p-2 rounded-xl border border-gray-100 shadow-sm inline-block">
+                    <img src="/logo.png" 
+                         alt="شعار شركة تنمية الغذاء" 
+                         class="max-h-16 w-auto max-w-full object-contain block"
+                         onerror="this.onerror=null; this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLMAAAM4CAYAAAAC7vOnAAAACXBIWXMAAC4jAAAuIwF4pT92AAAgAElEQVR4nOzcQQ0AIBDAMMC/58MDH7KkVTAF2zOzAAAAAAAAAAAAAAAAAAAAAAAAAGrO7wAAAAAAAAAAAAAAAAAAAAAAAACAF2ZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAA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';" />
+                </div>
+            </div>
+            <h2 class="text-base font-bold text-gray-800">التحقق الأمني الثنائي (2FA)</h2>
+            <p class="text-xs text-gray-500">يرجى إدخال رمز التحقق المكون من 6 أرقام من تطبيق Google Authenticator</p>
+
+            <button id="qr-setup-btn" onclick="toggleSetupQR()" class="text-[11px] text-purple-700 underline block mx-auto">إظهار رمز QR لربط جهاز جديد</button>
+            <div id="qr-setup-box" class="hidden my-2">
+                <img id="qr-image" src="/api/auth/2fa/qr" alt="QR Code" class="w-40 h-40 mx-auto border p-1 rounded-lg">
+                <span class="text-[10px] text-gray-400">امسح الرمز عبر تطبيق Authenticator</span>
+            </div>
+
+            <div>
+                <input type="text" id="auth-otp-code" maxlength="6" placeholder="000000" 
+                       class="text-center tracking-widest text-2xl font-black w-48 p-2 border-2 border-purple-300 rounded-xl focus:border-[#3A056A] outline-none">
+            </div>
+            <div id="auth-error-msg" class="text-xs text-red-600 font-bold hidden"></div>
+
+            <button onclick="submit2FAVerification()" class="w-full py-2.5 bg-[#3A056A] text-white font-bold text-xs rounded-xl shadow hover:bg-purple-900 transition">
+                تأكيد الدخول
+            </button>
         </div>
-        <div style="background: #ffffff; padding: 5px; border-radius: 8px;">
-            <img src="{logo_src}" style="max-height: 55px; width: auto;" alt="Logo" />
+    </div>
+
+    <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
+        <div class="flex flex-col h-full overflow-hidden">
+            <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
+                <div class="w-full h-full bg-white rounded-xl p-2 flex items-center justify-center shadow-sm">
+                    <img src="/logo.png" 
+                         alt="Food Development Company" 
+                         class="max-w-full max-h-full w-auto h-auto object-contain block"
+                         onerror="this.onerror=null; this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLMAAAM4CAYAAAAC7vOnAAAACXBIWXMAAC4jAAAuIwF4pT92AAAgAElEQVR4nOzcQQ0AIBDAMMC/58MDH7KkVTAF2zOzAAAAAAAAAAAAAAAAAAAAAAAAAGrO7wAAAAAAAAAAAAAAAAAAAAAAAACAF2ZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYAAAAAAAAAAAAAAAAAAAAAAAAkmakBAAAAAAAAAAAAAAAAAAAAAAAASWZqAAAAAAAAAAAAAAAAAAAAAAAAQJKZGgAAAAAAAAAAAAAAAAAAAAAAAJBkpgYA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'" />
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+                <div class="text-[10px] font-bold text-[#C194FB] mb-2 px-2 uppercase tracking-wider">نظام العمليات والفرص</div>
+                
+                <button onclick="switchTab('overview')" id="nav-overview" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white transition text-right">
+                    <span>📊</span> <span>لوحة التحكم العامة</span>
+                </button>
+
+                <button onclick="switchTab('targets')" id="nav-targets" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>🎯</span> <span>الأهداف والفرص البيعية</span>
+                </button>
+
+                <button onclick="switchTab('reps')" id="nav-reps" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>👥</span> <span>فريق المبيعات</span>
+                </button>
+
+                <button onclick="switchTab('customers')" id="nav-customers" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>🏢</span> <span>دليل حسابات العملاء</span>
+                </button>
+
+                <button onclick="switchTab('samples')" id="nav-samples" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>🧪</span> <span>سجل حركة العينات (PO)</span>
+                </button>
+
+                <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>📅</span> <span>تقويم العمليات والمسارات</span>
+                </button>
+
+                <div class="pt-3 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">خدمات الذكاء والواتساب</div>
+
+                <button onclick="switchTab('agents')" id="nav-agents" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-purple-900/60 text-purple-100 hover:bg-purple-800 text-right border border-purple-400/30">
+                    <span>🤖</span> <span>وكلاء المتابعة الذكية (AI Agents)</span>
+                </button>
+
+                <button onclick="switchTab('whatsapp-feed')" id="nav-whatsapp-feed" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>📡</span> <span>رادار الرسائل والمحادثات</span>
+                </button>
+
+                <button onclick="switchTab('whatsapp-settings')" id="nav-whatsapp-settings" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>⚙️</span> <span>إعدادات ونطاق الواتساب</span>
+                </button>
+
+                <div class="pt-4 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">الإدارة والتقارير التنفيذية</div>
+
+                <button onclick="openExpenseModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-amber-600/90 text-white hover:bg-amber-600 text-right">
+                    <span>💰</span> <span>قيد مصاريف ميدانية</span>
+                </button>
+
+                <button onclick="openReportModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-[#C194FB]/20 text-purple-100 border border-[#C194FB]/40 hover:bg-[#C194FB]/30 text-right mt-1.5">
+                    <span>📄</span> <span>مركز التقارير الرسمية (A4)</span>
+                </button>
+            </div>
+
+            <div class="p-3 border-t border-[#52128e]">
+                <button onclick="logoutSession()" class="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-red-200 bg-red-950/40 hover:bg-red-900/60 rounded-lg transition border border-red-800/40">
+                    <span>تسجيل الخروج الأمني</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
+        <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs no-print">
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-400 font-medium">نظام المبيعات التنفيذي</span>
+                <span class="text-gray-300">/</span>
+                <span class="text-xs font-bold brand-primary-text" id="current-tab-title">لوحة التحكم العامة</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border" id="top-bar-wa-btn">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" id="top-bar-wa-dot"></span>
+                    <span id="top-bar-wa-text">واتساب: فحص الاتصال...</span>
+                </button>
+
+                <button onclick="openReportModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 flex items-center gap-2">
+                    <span>🖨️</span> <span>إصدار تقرير رسمي</span>
+                </button>
+
+                <button onclick="logoutSession()" title="تسجيل الخروج" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+            <div id="tab-overview" class="tab-content space-y-6">
+                <div class="grid grid-cols-3 gap-4 no-print">
+                    <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
+                        <div class="text-[11px] text-gray-500 font-bold">إجمالي المبيعات المحققة</div>
+                        <div class="text-2xl font-black brand-primary-text mt-1" id="kpi-total-sales">0.0 ر.ع</div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
+                        <div class="text-[11px] text-gray-500 font-bold">إجمالي المصاريف الميدانية</div>
+                        <div class="text-2xl font-black text-amber-700 mt-1" id="kpi-total-expenses">0.0 ر.ع</div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
+                        <div class="text-[11px] text-gray-500 font-bold">الأهداف والفرص النشطة الجارية</div>
+                        <div class="text-2xl font-black text-purple-900 mt-1" id="kpi-active-targets">0</div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl border brand-border shadow-xs overflow-hidden">
+                    <div class="p-4 border-b brand-border flex justify-between items-center bg-gray-50/60 no-print">
+                        <h3 class="font-bold text-xs brand-primary-text">ملخص أداء فريق المبيعات والمصروفات</h3>
+                        <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">طباعة التقرير</button>
+                    </div>
+                    <table class="w-full text-right text-xs">
+                        <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
+                            <tr>
+                                <th class="p-3">عضو فريق المبيعات</th>
+                                <th class="p-3">المنطقة</th>
+                                <th class="p-3">المبيعات المحققة</th>
+                                <th class="p-3">المستهدف الشهري</th>
+                                <th class="p-3">المصاريف الكلية</th>
+                                <th class="p-3">الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y brand-border" id="overview-reps-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-targets" class="tab-content hidden space-y-4">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
+                    <div class="flex justify-between items-center mb-4 no-print">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">الأهداف والفرص البيعية (Target Pipeline)</h3>
+                            <div class="text-xs text-gray-500">متابعة الفرص مع عداد الوقت الحي حتى تحقيق أول أمر شراء (PO)</div>
+                        </div>
+                        <button onclick="openNewTargetModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ إضافة فرصة جديدة</button>
+                    </div>
+                    <div id="targets-cards-container" class="grid grid-cols-2 gap-4"></div>
+                </div>
+            </div>
+
+            <div id="tab-reps" class="tab-content hidden space-y-4">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
+                    <div class="flex justify-between items-center mb-4 no-print">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
+                            <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج والمصاريف</div>
+                        </div>
+                        <button onclick="openNewRepModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة عضو جديد</button>
+                    </div>
+                    <div id="reps-grid-cards" class="grid grid-cols-3 gap-4"></div>
+                </div>
+            </div>
+
+            <div id="tab-customers" class="tab-content hidden space-y-4">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
+                    <div class="flex justify-between items-center mb-4 no-print">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">دليل حسابات العملاء المعتمدة</h3>
+                            <div class="text-xs text-gray-500">الشركات، العلامات التجارية، ومسؤولو التواصل</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="openNewCustomerModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة عميل جديد</button>
+                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50 flex items-center gap-1.5">
+                                <span>🖨️</span> <span>طباعة دليل العملاء (A4)</span>
+                            </button>
+                        </div>
+                    </div>
+                    <table class="w-full text-right text-xs border border-[#E4D9F5]">
+                        <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
+                            <tr>
+                                <th class="p-3">اسم الشركة</th>
+                                <th class="p-3">العلامة التجارية</th>
+                                <th class="p-3">المنطقة / القطاع</th>
+                                <th class="p-3">المسؤول ورقم التواصل</th>
+                                <th class="p-3">عضو الفريق المتابع</th>
+                                <th class="p-3">مجموعة الواتساب المراقبة</th>
+                                <th class="p-3">تعليمات وملاحظات العميل</th>
+                                <th class="p-3">الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y brand-border" id="customers-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-samples" class="tab-content hidden space-y-4">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
+                    <div class="flex justify-between items-center mb-4 no-print">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">سجل حركة العينات المجانية والتحويل التجاري</h3>
+                            <div class="text-xs text-gray-500">رصد تسليم العينات وربطها بالعميل وعضو الفريق المعتمد</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ تسليم عينة جديدة</button>
+                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">🖨️ طباعة السجل</button>
+                        </div>
+                    </div>
+                    <table class="w-full text-right text-xs">
+                        <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
+                            <tr>
+                                <th class="p-3">العميل</th>
+                                <th class="p-3">عضو الفريق المسلّم</th>
+                                <th class="p-3">المنتج المسلّم</th>
+                                <th class="p-3">الكمية</th>
+                                <th class="p-3">تاريخ التسليم</th>
+                                <th class="p-3">الحالة</th>
+                                <th class="p-3">أمر الشراء (PO)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y brand-border" id="samples-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-calendar" class="tab-content hidden space-y-4">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
+                    <div class="flex justify-between items-center mb-4 no-print">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">تقويم العمليات والزيارات الميدانية المعتمدة</h3>
+                            <div class="text-xs text-gray-500">جدولة وتكليف المهام لأعضاء فريق المبيعات</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="openNewCalendarModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ جدولة مهمة جديدة</button>
+                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">🖨️ طباعة التقويم</button>
+                        </div>
+                    </div>
+                    <div class="space-y-3" id="calendar-events-list"></div>
+                </div>
+            </div>
+
+            <div id="tab-agents" class="tab-content hidden space-y-6">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
+                    <div class="flex justify-between items-center no-print">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">منظومة وكلاء الذكاء الاصطناعي للمتابعة الميدانية (AI Agents) 🤖</h3>
+                            <div class="text-xs text-gray-500">وكلاء متخصصون لمتابعة العينات، الأهداف، والمهام عبر إرسال رسائل WhatsApp مخصصة وتجربتها على هاتفك أولاً.</div>
+                        </div>
+                        <button onclick="openNewAgentModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة وكيل ذكي جديد</button>
+                    </div>
+
+                    <div id="agents-grid-container" class="grid grid-cols-3 gap-4"></div>
+                </div>
+            </div>
+
+            <div id="tab-whatsapp-feed" class="tab-content hidden space-y-4">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
+                    <div class="flex justify-between items-center mb-4 no-print">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">رادار الرسائل والمحادثات الملتقطة</h3>
+                            <div class="text-xs text-gray-500">المحادثات الواردة حصراً من مجموعات العملاء المعتمدة أو أعضاء فريق المبيعات</div>
+                        </div>
+                        <button onclick="switchTab('whatsapp-settings')" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">⚙️ ضبط النطاق والمجموعات</button>
+                    </div>
+                    <div class="space-y-2.5 text-xs" id="whatsapp-feed-list"></div>
+                </div>
+            </div>
+
+            <div id="tab-whatsapp-settings" class="tab-content hidden space-y-6">
+                <div class="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-2 text-xs no-print">
+                    <div class="flex items-center gap-2">
+                        <span class="text-base">🛡️</span>
+                        <h3 class="font-bold text-sm text-[#3A056A]">سياسة جدار الحماية وحصر المراقبة (Zero Intrusion Whitelist)</h3>
+                    </div>
+                    <p class="text-gray-700 leading-relaxed">
+                        يعمل رادار النظام بمبدأ <strong>القائمة البيضاء الصارمة</strong>: لا يسجل النظام أي رسالة شخصية أو محادثة خاصة، بل يقتصر حصراً على <strong>مجموعات العملاء المربوطة أدناه</strong>، والرسائل الصادرة من <strong>أرقام أعضاء فريق المبيعات المسجلة</strong>.
+                    </p>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3 no-print">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="font-bold text-sm brand-primary-text">أداة استخراج المجموعات المدمجة تلقائياً 🔍</h4>
+                            <div class="text-xs text-gray-500">تقوم بفحص حساب الواتساب المتصل وجلب المجموعات المشترك بها لاستخراج المعرف وربطه مباشرة بنقرة زر واحدة.</div>
+                        </div>
+                        <button onclick="fetchDiscoveredGroups()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5">
+                            <span>🔄</span> <span>فحص وجلب مجموعات الواتساب</span>
+                        </button>
+                    </div>
+                    
+                    <div id="discovered-groups-container" class="hidden border rounded-xl p-3 bg-gray-50 space-y-2">
+                        <div class="font-bold text-xs text-gray-700">المجموعات المكتشفة في حسابك:</div>
+                        <div id="discovered-groups-list" class="space-y-1.5 max-h-48 overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3 no-print">
+                    <h4 class="font-bold text-sm brand-primary-text">ربط مجموعة واتساب بحساب عميل</h4>
+                    <div class="grid grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <label class="block font-bold mb-1">العميل المستهدف:</label>
+                            <select id="settings-wa-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block font-bold mb-1">رمز معرّف المجموعة (Group ID):</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="settings-wa-group-id" class="w-full p-2 border rounded-lg font-mono" placeholder="1203630XXXXXXXX@g.us">
+                                <button onclick="submitSettingsAssignGroup()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg whitespace-nowrap">حفظ وربط</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
+                    <h4 class="font-bold text-sm brand-primary-text">المجموعات المعتمدة الخاضعة للمراقبة حالياً</h4>
+                    <table class="w-full text-right text-xs border">
+                        <thead class="bg-[#F5F0FC] text-[#3A056A]">
+                            <tr>
+                                <th class="p-2.5">العميل / الشركة</th>
+                                <th class="p-2.5">العلامة التجارية</th>
+                                <th class="p-2.5">رمز معرّف المجموعة (WhatsApp Group ID)</th>
+                                <th class="p-2.5">حالة المراقبة</th>
+                                <th class="p-2.5 no-print">إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="settings-monitored-groups-tbody" class="divide-y"></tbody>
+                    </table>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
+                    <h4 class="font-bold text-sm brand-primary-text">أرقام أعضاء فريق المبيعات المصرح لهم بالميدان</h4>
+                    <div id="settings-reps-whitelist-list" class="grid grid-cols-3 gap-3"></div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <div id="report-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">مركز إصدار التقارير التنفيذية الرسمية (A4)</h3>
+            <div>
+                <label class="block font-bold mb-1">ترويسة التوجيه الرسمية (Recipient):</label>
+                <input type="text" id="report-recipient" value="سعادة رئيس مجلس الإدارة / المدير العام" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-bold mb-1">التوصية الإدارية (قابلة للتعديل):</label>
+                <textarea id="report-custom-recommendation" rows="3" class="w-full p-2.5 border rounded-lg focus:ring-1 focus:ring-purple-600 outline-none">أظهر الفريق التزاماً استثنائياً في منطقة مسقط بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار صحار لرفع معدل التحويل وتكثيف توريد العينات للقطاع الفندقي.</textarea>
+            </div>
+            <div class="flex justify-between items-center pt-3 border-t">
+                <button onclick="previewReportOfficial()" class="px-5 py-2.5 brand-primary-bg text-white font-bold rounded-lg shadow hover:opacity-95 flex items-center gap-2">
+                    <span>🖨️</span> <span>معاينة وطباعة التقرير المعتمد (A4)</span>
+                </button>
+                <button onclick="closeReportModal()" class="px-4 py-2 border rounded-lg">إغلاق</button>
+            </div>
         </div>
     </div>
-    <h3 style="color: #3A056A; margin-top: 15px;">ملخص إنجازات ومصاريف أعضاء فريق المبيعات:</h3>
-    <table>
-        <thead><tr><th>عضو الفريق</th><th>المنطقة</th><th>المبيعات المحققة</th><th>المستهدف الشهري</th><th>المصاريف الكلية</th><th>الحالة</th></tr></thead>
-        <tbody>
-            {''.join([f"<tr><td style='font-weight:bold;'>{r['name']}</td><td>{r['region']}</td><td style='color:#047857; font-weight:bold;'>{r['achieved_sales']:,.1f} ر.ع</td><td>{r['monthly_target']:,.1f} ر.ع</td><td>{r['total_expenses']:,.1f} ر.ع</td><td>{r['status']}</td></tr>" for r in reps])}
-        </tbody>
-    </table>
-    <div style="margin-top: 20px; padding: 12px; background: #F5F0FC; border: 1px dashed #C194FB; border-radius: 8px; font-size: 9.5pt; color: #1E293B;">
-        <strong style="color: #3A056A;">التوصية التنفيذية والإدارية:</strong> {recommendation}
+
+    <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-3 text-xs">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm brand-primary-text">إضافة وكيل ذكاء اصطناعي جديد (AI Agent)</h3>
+                <span class="text-[10px] text-gray-500">مساعد ميداني ذكي</span>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">اسم الوكيل:</label>
+                <input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: وكيل استرجاع العينات">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">نوع التخصص والمهام:</label>
+                    <select id="agent-role-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
+                        <option value="SAMPLES_CONVERSION">متابعة العينات وتحويلها لأوامر شراء</option>
+                        <option value="CALENDAR_DISPATCH">التذكير الصباحي بالزيارات والتقويم</option>
+                        <option value="STAGNANT_TARGETS">إنعاش الفرص والأهداف الراكدة</option>
+                        <option value="CUSTOM_ASSISTANT">مساعد ذكي مخصص</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">توقيت التشغيل والمشغّل:</label>
+                    <select id="agent-schedule-select" class="w-full p-2 border rounded-lg bg-white">
+                        <option value="DAILY_10AM">يومياً الساعة 10:00 صباحاً</option>
+                        <option value="DAILY_08AM">يومياً الساعة 08:30 صباحاً</option>
+                        <option value="WEEKLY_SUNDAY">أسبوعياً (كل يوم أحد)</option>
+                        <option value="MANUAL">تشغيل يدوي عند الطلب فقط</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">توجيهات البرومبت والتعليمات المخصصة للوكيل (System Prompt):</label>
+                <textarea id="agent-prompt-input" rows="3" class="w-full p-2 border rounded-lg" placeholder="أنت المنسق الميداني لشركة تنمية الغذاء..."></textarea>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">رقم الهاتف المعتمد لاستقبال رسائل الاختبار (Test Phone):</label>
+                <input type="text" id="agent-test-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX">
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="closeNewAgentModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ الوكيل الذكي</button>
+            </div>
+        </div>
     </div>
-    <div class="no-print">
-        <button onclick="window.print()" style="background: #3A056A; color: white; border: none; padding: 10px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; font-family: 'Cairo';">🖨️ طباعة التقرير (A4)</button>
+
+    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[420px] space-y-4 text-xs text-center">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm brand-primary-text">ربط جهاز الواتساب</h3>
+                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">مشفر وآمن ✓</span>
+            </div>
+
+            <div id="whatsapp-connected-card" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+                <div class="w-12 h-12 bg-emerald-500 text-white text-2xl flex items-center justify-center rounded-full mx-auto">✓</div>
+                <div class="font-bold text-emerald-900 text-sm">الجلسة متصلة وتعمل بنجاح!</div>
+                <div class="text-xs text-emerald-700">رقم الهاتف المقترن: <span id="connected-phone-display" class="font-mono font-bold"></span></div>
+            </div>
+
+            <div id="whatsapp-qr-wrapper" class="space-y-3">
+                <div class="font-bold text-gray-700">امسح الرمز لربط الهاتف بالنظام:</div>
+                <div class="relative w-48 h-48 mx-auto flex items-center justify-center bg-white border rounded-lg shadow-sm">
+                    <img id="whatsapp-qr-image" src="" alt="WhatsApp QR" class="w-44 h-44 object-contain">
+                    <div id="whatsapp-qr-loader" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-2 text-center text-gray-500 text-[11px]">
+                        <span class="animate-spin text-2xl mb-1">⚙️</span>
+                        <span id="whatsapp-loader-text">جاري الاتصال بمحرك الواتساب...</span>
+                    </div>
+                </div>
+                <p class="text-[10px] text-gray-400">واتساب ⬅️ الأجهزة المرتبطة ⬅️ ربط جهاز</p>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t">
+                <button onclick="closeWhatsAppModal()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs">إغلاق</button>
+            </div>
+        </div>
     </div>
+
+    <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
+            <div><label class="block font-bold mb-1">الاسم الكامل:</label><input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: عبدالله"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">الكود الوظيفي:</label><input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="0144"></div>
+                <div><label class="block font-bold mb-1">المنطقة البيعية:</label><input type="text" id="rep-region-input" class="w-full p-2 border rounded-lg" placeholder="نزوى - الداخلية"></div>
+            </div>
+            <div><label class="block font-bold mb-1">رقم الهاتف المعتمد:</label><input type="text" id="rep-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX"></div>
+            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
+                    <input type="checkbox" id="rep-has-target-toggle" onchange="toggleTargetInput(this.checked)" class="w-4 h-4 text-purple-600 rounded">
+                </div>
+                <div id="rep-target-box" class="hidden">
+                    <label class="block mb-1 text-[11px] text-gray-600">المستهدف الشهري (ر.ع):</label>
+                    <input type="number" id="rep-target-input" class="w-full p-1.5 border rounded bg-white" value="0">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeNewRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العضو</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="new-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة حساب عميل جديد</h3>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">اسم العميل (الشركة):</label><input type="text" id="cust-company-name" class="w-full p-2 border rounded-lg" placeholder="شركة التغذية المتكاملة"></div>
+                <div><label class="block font-bold mb-1">اسم العلامة التجارية:</label><input type="text" id="cust-brand-name" class="w-full p-2 border rounded-lg" placeholder="مطاعم الريف"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">المنطقة:</label><input type="text" id="cust-region" class="w-full p-2 border rounded-lg" value="مسقط"></div>
+                <div><label class="block font-bold mb-1">القطاع:</label><input type="text" id="cust-sector" class="w-full p-2 border rounded-lg" placeholder="مطاعم / فنادق"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">اسم المسؤول:</label><input type="text" id="cust-contact-person" class="w-full p-2 border rounded-lg" placeholder="علي"></div>
+                <div><label class="block font-bold mb-1">رقم التواصل:</label><input type="text" id="cust-phone" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX"></div>
+            </div>
+            <div><label class="block font-bold mb-1">عضو الفريق المتابع:</label><select id="cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">تعليمات وملاحظات العميل:</label><textarea id="cust-notes" rows="2" class="w-full p-2 border rounded-lg" placeholder="أوقات الاستلام..."></textarea></div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeNewCustomerModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewCustomer()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العميل</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينة جديدة</h3>
+            <div><label class="block font-bold mb-1">العميل المستلم:</label><select id="sample-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">عضو الفريق المسلّم:</label><select id="sample-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">المنتج المسلّم:</label><input type="text" id="sample-product-name" class="w-full p-2 border rounded-lg" placeholder="صدور دجاج متبلة"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">الكمية:</label><input type="number" id="sample-qty" class="w-full p-2 border rounded-lg" value="10"></div>
+                <div><label class="block font-bold mb-1">التاريخ:</label><input type="date" id="sample-date" class="w-full p-2 border rounded-lg" value="2026-09-05"></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العينة</button></div>
+        </div>
+    </div>
+
+    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية</h3>
+            <div><label class="block font-bold mb-1">العميل المستهدف:</label><select id="cal-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">عضو الفريق المكلّف:</label><select id="cal-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">نوع المهمة:</label><input type="text" id="cal-task-type" class="w-full p-2 border rounded-lg" placeholder="زيارة فحص جودة وتفاوض"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">الموعد:</label><input type="text" id="cal-scheduled-at" class="w-full p-2 border rounded-lg" value="2026-09-06 10:00"></div>
+                <div><label class="block font-bold mb-1">الموقع:</label><input type="text" id="cal-location" class="w-full p-2 border rounded-lg" placeholder="مقر العميل"></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تأكيد الجدولة</button></div>
+        </div>
+    </div>
+
+    <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي جديد</h3>
+            <div><label class="block font-bold mb-1">مسمى الهدف:</label><input type="text" id="tgt-title" class="w-full p-2 border rounded-lg" placeholder="توريد دواجن طازجة أسبوعي"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">العميل المستهدف:</label><select id="tgt-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+                <div><label class="block font-bold mb-1">عضو الفريق المكلّف:</label><select id="tgt-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            </div>
+            <div><label class="block font-bold mb-1">القيمة المتوقعة (ر.ع):</label><input type="number" id="tgt-value" class="w-full p-2 border rounded-lg" value="5000"></div>
+            <div><label class="block font-bold mb-1">ملاحظة البداية:</label><textarea id="tgt-note" rows="2" class="w-full p-2 border rounded-lg" placeholder="تم الاتصال بالعميل..."></textarea></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewTargetModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewTarget()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">بدء العداد وحفظ الهدف</button></div>
+        </div>
+    </div>
+
+    <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[470px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm text-amber-800 border-b pb-2">قيد مصاريف ميدانية وتشغيلية</h3>
+            <div><label class="block font-bold mb-1">عضو فريق المبيعات:</label><select id="exp-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">نوع وبند المصروف:</label><select id="exp-type-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]"></select></div>
+                <div><label class="block font-bold mb-1">قيمة المصروف (ر.ع):</label><input type="number" id="exp-amount" class="w-full p-2 border rounded-lg font-bold text-amber-900" value="25"></div>
+            </div>
+            <div><label class="block font-bold mb-1">ملاحظات وبيان المصروف:</label><input type="text" id="exp-notes" class="w-full p-2 border rounded-lg" placeholder="رحلة عمل لمتابعة العملاء"></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeExpenseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitExpense()" class="px-4 py-2 bg-amber-600 text-white font-bold rounded-lg">قيد المصروف</button></div>
+        </div>
+    </div>
+
+    <div id="target-note-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-5 w-[420px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديث ملاحظات الهدف</h3>
+            <input type="hidden" id="target-note-id">
+            <div><label class="block font-bold mb-1">الملاحظة الجديدة:</label><textarea id="target-new-note-text" rows="3" class="w-full p-2 border rounded-lg"></textarea></div>
+            <div class="flex justify-end gap-2"><button onclick="closeTargetNoteModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitTargetNote()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ الملاحظة</button></div>
+        </div>
+    </div>
+
+    <div id="close-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">إغلاق الهدف بنجاح وتحويله لأمر شراء (PO)</h3>
+            <input type="hidden" id="close-target-id">
+            <div><label class="block font-bold mb-1">رقم أمر الشراء (PO):</label><input type="text" id="close-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX"></div>
+            <div><label class="block font-bold mb-1">قيمة أمر الشراء (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0"></div>
+            <div><label class="block font-bold mb-1">رابط المستند المرفق:</label><input type="text" id="close-po-url" class="w-full p-2 border rounded-lg" placeholder="رابط درايف أو مرجع السند"></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeTargetCloseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitCloseTarget()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الإغلاق والترحيل</button></div>
+        </div>
+    </div>
+
+    <script>
+        const tabs = ['overview', 'targets', 'reps', 'customers', 'samples', 'calendar', 'agents', 'whatsapp-feed', 'whatsapp-settings'];
+        const titles = {
+            overview: 'لوحة التحكم العامة',
+            targets: 'الأهداف والفرص البيعية (Target Pipeline)',
+            reps: 'فريق المبيعات',
+            customers: 'دليل حسابات العملاء المعتمدة',
+            samples: 'سجل حركة العينات والتحويل التجاري',
+            calendar: 'تقويم العمليات والمسارات الميدانية',
+            agents: 'وكلاء المتابعة الذكية (AI Agents) 🤖',
+            'whatsapp-feed': 'رادار الرسائل والمحادثات',
+            'whatsapp-settings': 'إعدادات ونطاق الواتساب الميداني'
+        };
+
+        function switchTab(id) {
+            tabs.forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                const nav = document.getElementById(`nav-${t}`);
+                if (el) el.classList.add('hidden');
+                if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
+            });
+            document.getElementById(`tab-${id}`).classList.remove('hidden');
+            document.getElementById(`nav-${id}`).className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
+            document.getElementById('current-tab-title').innerText = titles[id];
+        }
+
+        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
+        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
+
+        async function previewReportOfficial() {
+            const payload = {
+                report_recipient: document.getElementById('report-recipient').value,
+                recommendation: document.getElementById('report-custom-recommendation').value
+            };
+            const res = await fetch('/api/reports/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const html = await res.text();
+            const w = window.open('', '_blank');
+            w.document.write(html);
+            w.document.close();
+            closeReportModal();
+        }
+
+        let waPollingTimer = null;
+
+        async function checkWhatsAppLiveStatus() {
+            try {
+                const res = await fetch('/api/whatsapp/status');
+                const data = await res.json();
+                const btn = document.getElementById('top-bar-wa-btn');
+                const dot = document.getElementById('top-bar-wa-dot');
+                const text = document.getElementById('top-bar-wa-text');
+                const connectedCard = document.getElementById('whatsapp-connected-card');
+                const qrWrapper = document.getElementById('whatsapp-qr-wrapper');
+                const phoneDisplay = document.getElementById('connected-phone-display');
+
+                if (data.connected) {
+                    btn.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-emerald-50 text-emerald-800 border-emerald-300";
+                    dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
+                    text.innerText = `واتساب: متصل (${data.phone || 'نشط'})`;
+
+                    if (connectedCard && qrWrapper) {
+                        connectedCard.classList.remove('hidden');
+                        qrWrapper.classList.add('hidden');
+                        phoneDisplay.innerText = data.phone || 'متصل';
+                    }
+                    return true;
+                } else {
+                    btn.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-amber-50 text-amber-800 border-amber-300";
+                    dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
+                    text.innerText = "واتساب: بانتظار المسح";
+
+                    if (connectedCard && qrWrapper) {
+                        connectedCard.classList.add('hidden');
+                        qrWrapper.classList.remove('hidden');
+                    }
+                    return false;
+                }
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function openWhatsAppModal() {
+            document.getElementById('whatsapp-modal').classList.remove('hidden');
+            const isConn = await checkWhatsAppLiveStatus();
+
+            if (!isConn) {
+                const img = document.getElementById('whatsapp-qr-image');
+                const loader = document.getElementById('whatsapp-qr-loader');
+                const loaderText = document.getElementById('whatsapp-loader-text');
+
+                loader.classList.remove('hidden');
+                loaderText.innerText = "جاري جلب رمز الجلسة الحقيقي من خوادم واتساب...";
+
+                try {
+                    const res = await fetch('/api/whatsapp/qr?t=' + new Date().getTime());
+                    const contentType = res.headers.get("content-type");
+
+                    if (res.status === 200 && contentType && contentType.includes("image")) {
+                        const blob = await res.blob();
+                        img.src = URL.createObjectURL(blob);
+                        loader.classList.add('hidden');
+                    }
+                } catch (e) {
+                    loaderText.innerText = "جاري إعداد محرك الاتصال... يرجى الانتظار ثوانٍ";
+                }
+            }
+
+            clearInterval(waPollingTimer);
+            waPollingTimer = setInterval(async () => {
+                const connected = await checkWhatsAppLiveStatus();
+                if (connected) {
+                    clearInterval(waPollingTimer);
+                }
+            }, 1500);
+        }
+
+        function closeWhatsAppModal() {
+            document.getElementById('whatsapp-modal').classList.add('hidden');
+            clearInterval(waPollingTimer);
+        }
+
+        function openNewAgentModal() { document.getElementById('new-agent-modal').classList.remove('hidden'); }
+        function closeNewAgentModal() { document.getElementById('new-agent-modal').classList.add('hidden'); }
+
+        async function submitNewAgent() {
+            const name = document.getElementById('agent-name-input').value.trim();
+            const role = document.getElementById('agent-role-select').value;
+            const sched = document.getElementById('agent-schedule-select').value;
+            const prompt = document.getElementById('agent-prompt-input').value.trim();
+            const testPhone = document.getElementById('agent-test-phone-input').value.trim();
+
+            if (!name || !prompt) {
+                alert("يرجى إدخال اسم الوكيل والبرومبت التوجيهي له");
+                return;
+            }
+
+            const res = await fetch('/api/agents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    role_type: role,
+                    trigger_schedule: sched,
+                    system_prompt: prompt,
+                    test_phone: testPhone
+                })
+            });
+
+            if (res.ok) {
+                closeNewAgentModal();
+                await loadAgentsData();
+                alert("تم إنشاء الوكيل الذكي بنجاح ✓");
+            } else {
+                alert("حدث خطأ أثناء حفظ الوكيل");
+            }
+        }
+
+        async function toggleAgentStatus(id, newStatus) {
+            await fetch(`/api/agents/${id}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: newStatus })
+            });
+            await loadAgentsData();
+        }
+
+        async function testAgentNow(id, agentName) {
+            if (!confirm(`هل تريد تشغيل محاكاة للوكيل "${agentName}" وإرسال الرسالة إلى رقم الاختبار المسجل به؟`)) return;
+
+            try {
+                const res = await fetch(`/api/agents/${id}/test`, { method: 'POST' });
+                const data = await res.json();
+
+                if (res.ok) {
+                    alert(`✅ تم إرسال رسالة الاختبار بنجاح إلى الرقم: ${data.to}\n\nنص الرسالة المرسلة:\n${data.message_preview}`);
+                } else {
+                    alert(`❌ تعذر الإرسال: ${data.detail || 'تأكد من توصيل جلسة الواتساب وصحة رقم الهاتف'}`);
+                }
+            } catch (e) {
+                alert("خطأ في الاتصال بالخادم لإجراء الاختبار");
+            }
+        }
+
+        async function loadAgentsData() {
+            try {
+                const res = await fetch('/api/agents');
+                const agents = await res.json();
+                const container = document.getElementById('agents-grid-container');
+
+                if (container) {
+                    container.innerHTML = agents.map(a => `
+                        <div class="p-4 rounded-xl border ${a.is_active ? 'brand-border bg-white shadow-xs' : 'border-gray-200 bg-gray-50 opacity-75'} space-y-3 flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <span class="font-bold text-sm text-gray-900">${a.name}</span>
+                                        <span class="text-[10px] text-purple-700 block mt-0.5 font-bold">${getRoleLabel(a.role_type)}</span>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'}">
+                                        ${a.is_active ? 'نشط ومفعّل ✓' : 'متوقف مؤقتاً'}
+                                    </span>
+                                </div>
+
+                                <div class="p-2 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-24 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
+                                    <strong>البرومبت:</strong> ${a.system_prompt}
+                                </div>
+
+                                <div class="text-[10px] text-gray-500 space-y-0.5">
+                                    <div>🕒 المشغّل: <span class="font-bold text-gray-700">${a.trigger_schedule}</span></div>
+                                    <div>📱 هاتف الاختبار: <span class="font-mono font-bold text-purple-900">${a.test_phone || 'غير محدد'}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="pt-2 border-t flex justify-between items-center gap-1 no-print">
+                                <button onclick="testAgentNow(${a.id}, '${a.name}')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10px] flex items-center gap-1 shadow-2xs">
+                                    <span>🧪</span> <span>اختبار وإرسال لهاتفي</span>
+                                </button>
+                                <button onclick="toggleAgentStatus(${a.id}, ${!a.is_active})" class="px-2.5 py-1.5 border ${a.is_active ? 'border-amber-400 text-amber-800 hover:bg-amber-50' : 'border-emerald-500 text-emerald-800 hover:bg-emerald-50'} font-bold rounded-lg text-[10px]">
+                                    ${a.is_active ? 'إيقاف مؤقت' : 'تفعيل'}
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {}
+        }
+
+        function getRoleLabel(role) {
+            const map = {
+                SAMPLES_CONVERSION: 'تحويل العينات لأوامر شراء',
+                CALENDAR_DISPATCH: 'التذكير الصباحي بالمهام والتقويم',
+                STAGNANT_TARGETS: 'إنعاش الفرص والأهداف الراكدة',
+                CUSTOM_ASSISTANT: 'مساعد ذكي مخصص'
+            };
+            return map[role] || role;
+        }
+
+        async function fetchDiscoveredGroups() {
+            const container = document.getElementById('discovered-groups-container');
+            const list = document.getElementById('discovered-groups-list');
+            container.classList.remove('hidden');
+            list.innerHTML = '<div class="text-xs text-gray-500 p-2">جاري قراءة المجموعات من جلسة الواتساب النشطة...</div>';
+
+            try {
+                const res = await fetch('/api/whatsapp/discovered-groups');
+                const groups = await res.json();
+
+                if (groups.length === 0) {
+                    list.innerHTML = '<div class="text-xs text-amber-700 p-2 bg-amber-50 rounded">لم يتم العثور على مجموعات في هذا الحساب، أو أن الجلسة غير متصلة حالياً.</div>';
+                    return;
+                }
+
+                list.innerHTML = groups.map(g => `
+                    <div class="flex justify-between items-center bg-white p-2.5 rounded-lg border text-xs shadow-2xs">
+                        <div>
+                            <span class="font-bold text-gray-800">${g.subject}</span>
+                            <span class="text-[10px] text-gray-400 block font-mono">${g.id} (${g.participants_count} عضو)</span>
+                        </div>
+                        <button onclick="useDiscoveredGroupId('${g.id}')" class="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[11px]">
+                            استخدام هذا المعرّف ↙
+                        </button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                list.innerHTML = '<div class="text-xs text-red-600 p-2">تعذر قراءة المجموعات حالياً.</div>';
+            }
+        }
+
+        function useDiscoveredGroupId(gid) {
+            document.getElementById('settings-wa-group-id').value = gid;
+            window.scrollTo({ top: 350, behavior: 'smooth' });
+        }
+
+        async function submitSettingsAssignGroup() {
+            const custId = parseInt(document.getElementById('settings-wa-customer-select').value);
+            const gid = document.getElementById('settings-wa-group-id').value.trim();
+
+            if (!gid) {
+                alert("يرجى تحديد أو لصق رمز معرّف المجموعة");
+                return;
+            }
+
+            const res = await fetch('/api/customers/group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: custId, whatsapp_group_id: gid })
+            });
+
+            if (res.ok) {
+                document.getElementById('settings-wa-group-id').value = '';
+                await loadAllData();
+                alert("تم ربط المجموعة بالعميل بنجاح وتفعيل رادار المراقبة لها ✓");
+            } else {
+                alert("حدث خطأ أثناء حفظ الربط");
+            }
+        }
+
+        async function unassignGroup(custId) {
+            if (!confirm("هل أنت متأكد من فك ربط هذه المجموعة وإيقاف مراقبتها؟")) return;
+            const res = await fetch('/api/customers/group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: custId, whatsapp_group_id: "" })
+            });
+            if (res.ok) {
+                await loadAllData();
+            }
+        }
+
+        function toggleTargetInput(checked) {
+            document.getElementById('rep-target-box').classList.toggle('hidden', !checked);
+        }
+
+        function openNewRepModal() { document.getElementById('new-rep-modal').classList.remove('hidden'); }
+        function closeNewRepModal() { document.getElementById('new-rep-modal').classList.add('hidden'); }
+
+        function openNewCustomerModal() { document.getElementById('new-customer-modal').classList.remove('hidden'); }
+        function closeNewCustomerModal() { document.getElementById('new-customer-modal').classList.add('hidden'); }
+
+        function openNewSampleModal() { document.getElementById('new-sample-modal').classList.remove('hidden'); }
+        function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
+
+        function openNewCalendarModal() { document.getElementById('new-calendar-modal').classList.remove('hidden'); }
+        function closeNewCalendarModal() { document.getElementById('new-calendar-modal').classList.add('hidden'); }
+
+        function openNewTargetModal() { document.getElementById('new-target-modal').classList.remove('hidden'); }
+        function closeNewTargetModal() { document.getElementById('new-target-modal').classList.add('hidden'); }
+
+        function openExpenseModal() { document.getElementById('expense-modal').classList.remove('hidden'); }
+        function closeExpenseModal() { document.getElementById('expense-modal').classList.add('hidden'); }
+
+        function openTargetNoteModal(id, currentNote) {
+            document.getElementById('target-note-id').value = id;
+            document.getElementById('target-new-note-text').value = currentNote || '';
+            document.getElementById('target-note-modal').classList.remove('hidden');
+        }
+        function closeTargetNoteModal() { document.getElementById('target-note-modal').classList.add('hidden'); }
+
+        function openTargetCloseModal(id) {
+            document.getElementById('close-target-id').value = id;
+            document.getElementById('close-target-modal').classList.remove('hidden');
+        }
+        function closeTargetCloseModal() { document.getElementById('close-target-modal').classList.add('hidden'); }
+
+        function logoutSession() {
+            sessionStorage.removeItem('fdc_auth_token');
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            document.getElementById('auth-otp-code').value = '';
+        }
+
+        function toggleSetupQR() {
+            const box = document.getElementById('qr-setup-box');
+            const qrImg = document.getElementById('qr-image');
+            box.classList.toggle('hidden');
+            if (!box.classList.contains('hidden')) {
+                qrImg.src = '/api/auth/2fa/qr?t=' + new Date().getTime();
+            }
+        }
+
+        async function submit2FAVerification() {
+            const code = document.getElementById('auth-otp-code').value.trim();
+            const errorEl = document.getElementById('auth-error-msg');
+            errorEl.classList.add('hidden');
+
+            if (code.length !== 6) {
+                errorEl.innerText = "يرجى إدخال 6 أرقام كاملة";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/2fa/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+
+                if (res.ok) {
+                    sessionStorage.setItem('fdc_auth_token', 'AUTHENTICATED');
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    check2FAStatus();
+                    loadAllData();
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    errorEl.innerText = data.detail || "رمز التحقق غير صحيح";
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorEl.innerText = "تعذر الاتصال بالخادم: " + err.message;
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        async function check2FAStatus() {
+            try {
+                const res = await fetch('/api/auth/2fa/status');
+                const data = await res.json();
+                if (data.is_enabled) {
+                    const btn = document.getElementById('qr-setup-btn');
+                    const box = document.getElementById('qr-setup-box');
+                    if (btn) btn.remove();
+                    if (box) box.remove();
+                }
+            } catch (e) {}
+        }
+
+        async function loadExpenseCategories() {
+            try {
+                const res = await fetch('/api/expense-categories');
+                const categories = await res.json();
+                const selectEl = document.getElementById('exp-type-select');
+                if (selectEl) {
+                    selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
+                }
+            } catch (e) {}
+        }
+
+        async function submitNewRep() {
+            const name = document.getElementById('rep-name-input').value.trim();
+            const code = document.getElementById('rep-code-input').value.trim();
+            const region = document.getElementById('rep-region-input').value.trim();
+            const phone = document.getElementById('rep-phone-input').value.trim();
+            const hasT = document.getElementById('rep-has-target-toggle').checked;
+            const targetInput = document.getElementById('rep-target-input');
+            const targetVal = (hasT && targetInput) ? (parseFloat(targetInput.value) || 0) : 0;
+
+            if (!name || !phone) {
+                alert("يرجى ملء الاسم الكامل ورقم الهاتف على الأقل");
+                return;
+            }
+
+            const payload = {
+                name: name,
+                employee_code: code || "SE-" + Math.floor(100 + Math.random() * 900),
+                region: region || "مسقط",
+                phone_number: phone,
+                has_target: hasT,
+                monthly_target: targetVal
+            };
+
+            try {
+                const res = await fetch('/api/reps', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeNewRepModal();
+                    await loadAllData();
+                    alert("تم حفظ عضو فريق المبيعات بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "حدث خطأ أثناء حفظ عضو الفريق");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لحفظ عضو الفريق");
+            }
+        }
+
+        async function submitNewCustomer() {
+            const company = document.getElementById('cust-company-name').value.trim();
+            const brand = document.getElementById('cust-brand-name').value.trim();
+            const region = document.getElementById('cust-region').value.trim();
+            const sector = document.getElementById('cust-sector').value.trim();
+            const person = document.getElementById('cust-contact-person').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const repSelect = document.getElementById('cust-rep-select');
+            const notes = document.getElementById('cust-notes').value.trim();
+
+            if (!company || !phone) {
+                alert("يرجى ملء اسم الشركة ورقم الهاتف");
+                return;
+            }
+
+            const payload = {
+                company_name: company,
+                brand_name: brand || "",
+                sector: sector || "عام",
+                region: region || "مسقط",
+                contact_person: person || "المسؤول",
+                phone: phone,
+                assigned_rep_id: (repSelect && repSelect.value) ? parseInt(repSelect.value) : null,
+                notes: notes || ""
+            };
+
+            try {
+                const res = await fetch('/api/customers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeNewCustomerModal();
+                    await loadAllData();
+                    alert("تمت إضافة العميل بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "حدث خطأ أثناء حفظ العميل");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لحفظ العميل");
+            }
+        }
+
+        async function submitNewSample() {
+            const custSelect = document.getElementById('sample-customer-select');
+            const repSelect = document.getElementById('sample-rep-select');
+            const product = document.getElementById('sample-product-name').value.trim();
+            const qty = parseInt(document.getElementById('sample-qty').value) || 1;
+            const date = document.getElementById('sample-date').value;
+
+            if (!product) {
+                alert("يرجى كتابة اسم المنتج المسلّم");
+                return;
+            }
+
+            const payload = {
+                customer_name: custSelect.value,
+                rep_name: repSelect.value,
+                product_name: product,
+                qty_free: qty,
+                delivery_date: date
+            };
+
+            const res = await fetch('/api/samples', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                closeNewSampleModal();
+                await loadAllData();
+                alert("تم حفظ تسليم العينة بنجاح ✓");
+            }
+        }
+
+        async function submitNewCalendarEvent() {
+            const custSelect = document.getElementById('cal-customer-select');
+            const repSelect = document.getElementById('cal-rep-select');
+            const task = document.getElementById('cal-task-type').value.trim();
+            const sched = document.getElementById('cal-scheduled-at').value.trim();
+            const loc = document.getElementById('cal-location').value.trim();
+
+            if (!task) {
+                alert("يرجى تحديد نوع المهمة");
+                return;
+            }
+
+            const payload = {
+                customer_name: custSelect.value,
+                rep_name: repSelect.value,
+                task_type: task,
+                scheduled_at: sched,
+                location: loc || "مقر العميل",
+                route_code: "R-01"
+            };
+
+            const res = await fetch('/api/calendar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                closeNewCalendarModal();
+                await loadAllData();
+                alert("تمت جدولة المهمة بنجاح ✓");
+            }
+        }
+
+        async function submitNewTarget() {
+            const payload = {
+                title: document.getElementById('tgt-title').value.trim(),
+                customer_id: parseInt(document.getElementById('tgt-customer-select').value),
+                rep_id: parseInt(document.getElementById('tgt-rep-select').value),
+                target_value: parseFloat(document.getElementById('tgt-value').value) || 0,
+                initial_note: document.getElementById('tgt-note').value.trim()
+            };
+            if (!payload.title) {
+                alert("يرجى كتابة عنوان الهدف");
+                return;
+            }
+            const res = await fetch('/api/targets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                closeNewTargetModal();
+                await loadAllData();
+                alert("تم إنشاء الهدف بنجاح ✓");
+            }
+        }
+
+        async function submitTargetNote() {
+            const id = document.getElementById('target-note-id').value;
+            const note = document.getElementById('target-new-note-text').value.trim();
+            const res = await fetch(`/api/targets/${id}/note`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note })
+            });
+            if (res.ok) {
+                closeTargetNoteModal();
+                await loadAllData();
+            }
+        }
+
+        async function submitCloseTarget() {
+            const id = document.getElementById('close-target-id').value;
+            const payload = {
+                po_number: document.getElementById('close-po-number').value.trim(),
+                po_value: parseFloat(document.getElementById('close-po-value').value) || 0,
+                po_attachment_url: document.getElementById('close-po-url').value.trim()
+            };
+            if (!payload.po_number || payload.po_value <= 0) {
+                alert("يرجى إدخال رقم أمر الشراء وقيمته المالية الصحيحة");
+                return;
+            }
+            const res = await fetch(`/api/targets/${id}/close`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                closeTargetCloseModal();
+                await loadAllData();
+                alert("تهانينا! تم إغلاق الهدف بنجاح وترحيل المبيعات ✓");
+            }
+        }
+
+        async function submitExpense() {
+            const payload = {
+                rep_id: parseInt(document.getElementById('exp-rep-select').value),
+                expense_type: document.getElementById('exp-type-select').value,
+                amount: parseFloat(document.getElementById('exp-amount').value) || 0,
+                notes: document.getElementById('exp-notes').value.trim()
+            };
+            if (payload.amount <= 0) {
+                alert("يرجى إدخال قيمة المصروف");
+                return;
+            }
+            const res = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                closeExpenseModal();
+                await loadAllData();
+                alert("تم قيد المصروف بنجاح ✓");
+            }
+        }
+
+        async function loadAllData() {
+            checkWhatsAppLiveStatus();
+            loadExpenseCategories();
+            loadAgentsData();
+
+            const repsRes = await fetch('/api/reps');
+            const reps = await repsRes.json();
+            
+            let totalSales = 0;
+            let totalExp = 0;
+
+            document.getElementById('overview-reps-tbody').innerHTML = reps.map(r => {
+                totalSales += (r.achieved_sales || 0);
+                totalExp += (r.total_expenses || 0);
+                return `
+                <tr>
+                    <td class="p-3 font-bold">${r.name}</td>
+                    <td class="p-3 text-gray-600">${r.region}</td>
+                    <td class="p-3 font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</td>
+                    <td class="p-3">${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع (' + (r.achievement_rate || 0).toFixed(1) + '%)' : '<span class="text-gray-400">قياس مفتوح</span>'}</td>
+                    <td class="p-3 font-semibold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span></td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('kpi-total-sales').innerText = `${totalSales.toLocaleString()} ر.ع`;
+            document.getElementById('kpi-total-expenses').innerText = `${totalExp.toLocaleString()} ر.ع`;
+
+            document.getElementById('reps-grid-cards').innerHTML = reps.map(r => `
+                <div class="p-4 rounded-xl border brand-border brand-tint space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                    </div>
+                    <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
+                    <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
+                    <div class="pt-2 border-t brand-border space-y-1 text-xs">
+                        <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</span></div>
+                        <div class="flex justify-between"><span>المستهدف:</span><span>${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع' : 'قياس نتائج مفتوح'}</span></div>
+                        <div class="flex justify-between"><span>إجمالي المصاريف:</span><span class="font-bold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</span></div>
+                    </div>
+                </div>
+            `).join('');
+
+            const repOptionsHTML = reps.map(r => `<option value="${r.id}">${r.name} (${r.region})</option>`).join('');
+            const repNamesOnlyHTML = reps.map(r => `<option value="${r.name}">${r.name} (${r.region})</option>`).join('');
+
+            document.getElementById('cust-rep-select').innerHTML = '<option value="">-- بدون تعيين حالي --</option>' + repOptionsHTML;
+            document.getElementById('tgt-rep-select').innerHTML = repOptionsHTML;
+            document.getElementById('exp-rep-select').innerHTML = repOptionsHTML;
+            document.getElementById('sample-rep-select').innerHTML = repNamesOnlyHTML;
+            document.getElementById('cal-rep-select').innerHTML = repNamesOnlyHTML;
+
+            document.getElementById('settings-reps-whitelist-list').innerHTML = reps.map(r => `
+                <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-xl flex justify-between items-center text-xs">
+                    <div>
+                        <div class="font-bold text-[#3A056A]">${r.name}</div>
+                        <div class="text-[10px] text-gray-500">${r.region}</div>
+                    </div>
+                    <span class="font-mono font-bold text-purple-900 bg-white px-2 py-1 rounded border">${r.phone_number}</span>
+                </div>
+            `).join('');
+
+            const custRes = await fetch('/api/customers');
+            const custs = await custRes.json();
+            
+            document.getElementById('customers-table-body').innerHTML = custs.map(c => `
+                <tr>
+                    <td class="p-3 font-bold">${c.company_name || '—'}</td>
+                    <td class="p-3 font-semibold text-purple-900">${c.brand_name || '—'}</td>
+                    <td class="p-3 text-gray-600">${c.region || 'مسقط'} | ${c.sector || 'عام'}</td>
+                    <td class="p-3"><div>${c.contact_person || '—'}</div><div class="font-mono text-gray-500 text-[10px]">${c.phone || '—'}</div></td>
+                    <td class="p-3 font-bold text-[#3A056A]">${c.assigned_rep_name || '—'}</td>
+                    <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id ? '✓ ' + c.whatsapp_group_id : '<span class="text-gray-400">غير مربوط</span>'}</td>
+                    <td class="p-3 text-[11px] text-gray-600 max-w-xs">${c.notes || 'لا توجد ملاحظات خاصة'}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status || 'نشط'}</span></td>
+                </tr>
+            `).join('');
+
+            const custOptionsHTML = custs.map(c => `<option value="${c.id}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
+            const custNamesOnlyHTML = custs.map(c => `<option value="${c.brand_name ? c.company_name + ' (' + c.brand_name + ')' : c.company_name}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
+
+            document.getElementById('tgt-customer-select').innerHTML = custOptionsHTML;
+            document.getElementById('sample-customer-select').innerHTML = custNamesOnlyHTML;
+            document.getElementById('cal-customer-select').innerHTML = custNamesOnlyHTML;
+            document.getElementById('settings-wa-customer-select').innerHTML = custOptionsHTML;
+
+            const monitoredCusts = custs.filter(c => c.whatsapp_group_id);
+            document.getElementById('settings-monitored-groups-tbody').innerHTML = monitoredCusts.length > 0 ? monitoredCusts.map(c => `
+                <tr>
+                    <td class="p-2.5 font-bold">${c.company_name}</td>
+                    <td class="p-2.5 font-semibold text-purple-900">${c.brand_name || '—'}</td>
+                    <td class="p-2.5 font-mono text-purple-800">${c.whatsapp_group_id}</td>
+                    <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">مراقبة حصرية نشطة ✓</span></td>
+                    <td class="p-2.5 no-print"><button onclick="unassignGroup(${c.id})" class="text-red-600 hover:text-red-800 underline text-[11px]">فك الربط</button></td>
+                </tr>
+            `).join('') : '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد مجموعات مربوطة حالياً. استخدم الأداة أعلاه لربط المجموعات بنقرة واحدة.</td></tr>';
+
+            const tgtRes = await fetch('/api/targets');
+            const targets = await tgtRes.json();
+            
+            const activeTargets = targets.filter(t => t.status === 'IN_PROGRESS');
+            document.getElementById('kpi-active-targets').innerText = activeTargets.length;
+
+            document.getElementById('targets-cards-container').innerHTML = targets.map(t => `
+                <div class="p-4 rounded-xl border ${t.status === 'CLOSED' ? 'border-emerald-300 bg-emerald-50/40' : 'brand-border bg-white'} shadow-xs space-y-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="font-bold text-sm text-gray-900">${t.title}</span>
+                            <div class="text-xs text-[#3A056A] font-semibold mt-0.5">🏢 العميل: ${t.customer_name}</div>
+                            <div class="text-xs text-gray-500">👤 عضو الفريق المتابع: <strong>${t.rep_name}</strong></div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded text-[10px] font-bold ${t.status === 'CLOSED' ? 'bg-emerald-200 text-emerald-900' : 'bg-purple-100 text-[#3A056A]'}">
+                            ${t.status === 'CLOSED' ? 'مغلق بأمر شراء ✓' : 'فرصة جارية ⏳'}
+                        </span>
+                    </div>
+
+                    <div class="p-2.5 bg-gray-50 rounded-lg flex justify-between items-center text-xs">
+                        <span class="text-gray-500">العداد الحي منذ بدء أول خطوة:</span>
+                        <span class="font-mono font-bold text-purple-900">${t.duration_text}</span>
+                    </div>
+
+                    <div class="p-2.5 rounded-lg border border-dashed brand-border bg-purple-50/50 space-y-1">
+                        <div class="flex justify-between text-[10px] text-gray-500">
+                            <span class="font-bold text-[#3A056A]">آخر ملاحظة من الفريق:</span>
+                            <span>${t.last_note_at_str}</span>
+                        </div>
+                        <p class="text-xs text-gray-800">${t.last_note || 'لا توجد ملاحظات مسجلة بعد'}</p>
+                    </div>
+
+                    ${t.status === 'CLOSED' ? `
+                    <div class="p-2 bg-emerald-100/60 rounded-lg text-xs space-y-0.5 border border-emerald-300">
+                        <div class="flex justify-between font-bold text-emerald-900">
+                            <span>رقم أمر الشراء (PO): ${t.po_number}</span>
+                            <span>القيمة: ${(t.po_value || 0).toLocaleString()} ر.ع</span>
+                        </div>
+                        ${t.po_attachment_url ? `<a href="${t.po_attachment_url}" target="_blank" class="text-[10px] text-blue-700 underline block mt-1">عرض المستند المرفق 🔗</a>` : ''}
+                    </div>
+                    ` : `
+                    <div class="flex justify-between items-center pt-2 border-t border-gray-100 no-print">
+                        <button onclick="openTargetNoteModal(${t.id}, '${escape(t.last_note || '')}')" class="px-3 py-1.5 border brand-border text-[#3A056A] font-bold rounded-lg text-[11px] hover:bg-purple-50">
+                            + تحديث الملاحظة
+                        </button>
+                        <button onclick="openTargetCloseModal(${t.id})" class="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-lg text-[11px] shadow-xs hover:bg-emerald-700">
+                            إغلاق بأمر شراء (PO) ✓
+                        </button>
+                    </div>
+                    `}
+                </div>
+            `).join('');
+
+            const sRes = await fetch('/api/samples');
+            const samples = await sRes.json();
+            document.getElementById('samples-table-body').innerHTML = samples.map(s => `
+                <tr>
+                    <td class="p-3 font-bold">${s.customer_name}</td>
+                    <td class="p-3 text-[#3A056A]">${s.rep_name}</td>
+                    <td class="p-3">${s.product_name}</td>
+                    <td class="p-3">${s.qty_free} وحدة</td>
+                    <td class="p-3 text-gray-500">${s.delivery_date}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">${s.status}</span></td>
+                    <td class="p-3 font-mono">${s.converted_po_id || '—'}</td>
+                </tr>
+            `).join('');
+
+            const cRes = await fetch('/api/calendar');
+            const cal = await cRes.json();
+            document.getElementById('calendar-events-list').innerHTML = cal.map(e => `
+                <div class="p-3.5 rounded-xl border brand-border brand-tint flex justify-between items-center text-xs">
+                    <div>
+                        <div class="font-bold text-gray-800">${e.task_type}</div>
+                        <div class="text-gray-500 mt-0.5">العميل: ${e.customer_name} | عضو الفريق: ${e.rep_name} | الموعد: ${e.scheduled_at}</div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded text-xs font-bold bg-amber-100 text-amber-800">${e.execution_status}</span>
+                </div>
+            `).join('');
+
+            const wRes = await fetch('/api/whatsapp/logs');
+            const wLogs = await wRes.json();
+            document.getElementById('whatsapp-feed-list').innerHTML = wLogs.map(l => `
+                <div class="p-3 rounded-xl border brand-border bg-white space-y-1">
+                    <div class="flex justify-between items-center text-[10px] text-gray-400">
+                        <span class="font-bold brand-primary-text">${l.sender_name}</span>
+                        <span>${l.created_at}</span>
+                    </div>
+                    <p class="text-gray-800 text-xs">${l.message_body}</p>
+                </div>
+            `).join('');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            check2FAStatus();
+            if (sessionStorage.getItem('fdc_auth_token') === 'AUTHENTICATED') {
+                document.getElementById('auth-overlay').classList.add('hidden');
+                loadAllData();
+            }
+        });
+    </script>
 </body>
 </html>
-"""
-    return HTMLResponse(content=html)
-
-@app.get("/", response_class=HTMLResponse)
-def serve_dashboard():
-    dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
-    if os.path.exists(dashboard_path):
-        with open(dashboard_path, "r", encoding="utf-8") as f:
-            return f.read()
-    return "<h1>dashboard.html not found</h1>"
-
-if __name__ == "__main__":
-    import uvicorn
-    raw_port = os.getenv("PORT", "8000")
-    try:
-        clean_port = int(raw_port)
-    except (ValueError, TypeError):
-        clean_port = 8000
-    uvicorn.run("main:app", host="0.0.0.0", port=clean_port)
