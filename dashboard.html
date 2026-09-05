@@ -79,13 +79,17 @@
                     <span>📅</span> <span>تقويم العمليات والمسارات</span>
                 </button>
 
-                <div class="pt-3 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">خدمات الواتساب والميدان</div>
+                <div class="pt-3 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">خدمات الذكاء والواتساب</div>
+
+                <!-- قسم وكلاء المتابعة الذكية الجديد -->
+                <button onclick="switchTab('agents')" id="nav-agents" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-purple-900/60 text-purple-100 hover:bg-purple-800 text-right border border-purple-400/30">
+                    <span>🤖</span> <span>وكلاء المتابعة الذكية (AI Agents)</span>
+                </button>
 
                 <button onclick="switchTab('whatsapp-feed')" id="nav-whatsapp-feed" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>📡</span> <span>رادار الرسائل والمحادثات</span>
                 </button>
 
-                <!-- قسم مستقل خاص بضبط وإدارة نطاق الواتساب في القائمة الجانبية -->
                 <button onclick="switchTab('whatsapp-settings')" id="nav-whatsapp-settings" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>⚙️</span> <span>إعدادات ونطاق الواتساب</span>
                 </button>
@@ -115,7 +119,6 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <!-- زر حالة الواتساب السريع والربط عبر QR -->
                 <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border" id="top-bar-wa-btn">
                     <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" id="top-bar-wa-dot"></span>
                     <span id="top-bar-wa-text">واتساب: فحص الاتصال...</span>
@@ -266,7 +269,23 @@
                 </div>
             </div>
 
-            <!-- تبويب 7: رادار رسائل الواتساب -->
+            <!-- تبويب 7: قسم وكلاء المتابعة الذكية (AI Agents) -->
+            <div id="tab-agents" class="hidden space-y-6">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">منظومة وكلاء الذكاء الاصطناعي للمتابعة الميدانية (AI Agents) 🤖</h3>
+                            <div class="text-xs text-gray-500">وكلاء متخصصون لمتابعة العينات، الأهداف، والمهام عبر إرسال رسائل WhatsApp مخصصة وتجربتها على هاتفك أولاً.</div>
+                        </div>
+                        <button onclick="openNewAgentModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة وكيل ذكي جديد</button>
+                    </div>
+
+                    <!-- شبكة بطاقات الوكلاء -->
+                    <div id="agents-grid-container" class="grid grid-cols-3 gap-4"></div>
+                </div>
+            </div>
+
+            <!-- تبويب 8: رادار الرسائل -->
             <div id="tab-whatsapp-feed" class="hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4">
@@ -280,10 +299,9 @@
                 </div>
             </div>
 
-            <!-- تبويب 8: قسم مستقل في القائمة لإعدادات ونطاق الواتساب الميداني مع أداة الاستكشاف المدمجة -->
+            <!-- تبويب 9: إعدادات ونطاق الواتساب الميداني -->
             <div id="tab-whatsapp-settings" class="hidden space-y-6">
                 
-                <!-- بطاقة شرح النظام ونطاق المراقبة -->
                 <div class="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-2 text-xs">
                     <div class="flex items-center gap-2">
                         <span class="text-base">🛡️</span>
@@ -294,12 +312,12 @@
                     </p>
                 </div>
 
-                <!-- أداة استكشاف واستخراج المجموعات المدمجة تلقائياً -->
+                <!-- أداة استكشاف المجموعات المدمجة -->
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
                     <div class="flex justify-between items-center">
                         <div>
                             <h4 class="font-bold text-sm brand-primary-text">أداة استخراج المجموعات المدمجة تلقائياً 🔍</h4>
-                            <div class="text-xs text-gray-500">تقوم هذه الأداة بفحص تطبيق الواتساب المتصل وجلب كافة المجموعات المشترك بها لاستخراج المعرف وربطه مباشرة بنقرة زر واحدة.</div>
+                            <div class="text-xs text-gray-500">تقوم بفحص حساب الواتساب المتصل وجلب المجموعات المشترك بها لاستخراج المعرف وربطه مباشرة بنقرة زر واحدة.</div>
                         </div>
                         <button onclick="fetchDiscoveredGroups()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5">
                             <span>🔄</span> <span>فحص وجلب مجموعات الواتساب</span>
@@ -312,7 +330,7 @@
                     </div>
                 </div>
 
-                <!-- نموذج الربط اليدوي للمجموعات -->
+                <!-- نموذج الربط -->
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
                     <h4 class="font-bold text-sm brand-primary-text">ربط مجموعة واتساب بحساب عميل</h4>
                     <div class="grid grid-cols-3 gap-3 text-xs">
@@ -330,7 +348,7 @@
                     </div>
                 </div>
 
-                <!-- جدول المجموعات المراقبة حالياً مع إمكانية فك الربط -->
+                <!-- جدول المجموعات المراقبة -->
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
                     <h4 class="font-bold text-sm brand-primary-text">المجموعات المعتمدة الخاضعة للمراقبة حالياً</h4>
                     <table class="w-full text-right text-xs border">
@@ -347,7 +365,7 @@
                     </table>
                 </div>
 
-                <!-- أرقام أعضاء فريق المبيعات المعتمدة للتفاعل -->
+                <!-- أرقام أعضاء الفريق -->
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
                     <h4 class="font-bold text-sm brand-primary-text">أرقام أعضاء فريق المبيعات المصرح لهم بالميدان</h4>
                     <div id="settings-reps-whitelist-list" class="grid grid-cols-3 gap-3"></div>
@@ -358,7 +376,54 @@
         </div>
     </main>
 
-    <!-- نافذة QR الواتساب الخفيفة والمستقلة -->
+    <!-- مودال: إضافة وكيل ذكي جديد -->
+    <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-3 text-xs">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm brand-primary-text">إضافة وكيل ذكاء اصطناعي جديد (AI Agent)</h3>
+                <span class="text-[10px] text-gray-500">مساعد ميداني ذكي</span>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">اسم الوكيل:</label>
+                <input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: وكيل استرجاع العينات">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">نوع التخصص والمهام:</label>
+                    <select id="agent-role-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
+                        <option value="SAMPLES_CONVERSION">متابعة العينات وتحويلها لأوامر شراء</option>
+                        <option value="CALENDAR_DISPATCH">التذكير الصباحي بالزيارات والتقويم</option>
+                        <option value="STAGNANT_TARGETS">إنعاش الفرص والأهداف الراكدة</option>
+                        <option value="CUSTOM_ASSISTANT">مساعد ذكي مخصص</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">توقيت التشغيل والمشغّل:</label>
+                    <select id="agent-schedule-select" class="w-full p-2 border rounded-lg bg-white">
+                        <option value="DAILY_10AM">يومياً الساعة 10:00 صباحاً</option>
+                        <option value="DAILY_08AM">يومياً الساعة 08:30 صباحاً</option>
+                        <option value="WEEKLY_SUNDAY">أسبوعياً (كل يوم أحد)</option>
+                        <option value="MANUAL">تشغيل يدوي عند الطلب فقط</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">توجيهات البرومبت والتعليمات المخصصة للوكيل (System Prompt):</label>
+                <textarea id="agent-prompt-input" rows="3" class="w-full p-2 border rounded-lg" placeholder="أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق..."></textarea>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">رقم الهاتف المعتمد لاستقبال رسائل الاختبار (Test Phone):</label>
+                <input type="text" id="agent-test-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX">
+                <span class="text-[10px] text-gray-500">عند الضغط على 'اختبار الوكيل'، سترسل الرسالة التجريبية إلى هذا الرقم للتأكد منها قبل إرسالها لأعضاء الفريق.</span>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="closeNewAgentModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ الوكيل الذكي</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة QR الواتساب الخفيفة -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[420px] space-y-4 text-xs text-center">
             <div class="flex justify-between items-center border-b pb-2">
@@ -366,7 +431,6 @@
                 <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">مشفر وآمن ✓</span>
             </div>
 
-            <!-- بطاقة عند الاتصال الناجح -->
             <div id="whatsapp-connected-card" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
                 <div class="w-12 h-12 bg-emerald-500 text-white text-2xl flex items-center justify-center rounded-full mx-auto">✓</div>
                 <div class="font-bold text-emerald-900 text-sm">الجلسة متصلة وتعمل بنجاح!</div>
@@ -374,7 +438,6 @@
                 <p class="text-[10px] text-gray-500 mt-1">لإدارة المجموعات وتحديد نطاق المراقبة، توجه إلى قسم "إعدادات ونطاق الواتساب" من القائمة الجانبية.</p>
             </div>
 
-            <!-- بطاقة عند انتظار المسح عبر الـ QR -->
             <div id="whatsapp-qr-wrapper" class="space-y-3">
                 <div class="font-bold text-gray-700">امسح الرمز لربط الهاتف بالنظام:</div>
                 <div class="relative w-48 h-48 mx-auto flex items-center justify-center bg-white border rounded-lg shadow-sm">
@@ -393,7 +456,7 @@
         </div>
     </div>
 
-    <!-- باقي المودالات (إضافة عضو، إضافة عميل، تسليم عينة، جدولة مهمة، هدف، قيد مصاريف) -->
+    <!-- باقي النوافذ الميدانية (عضو، عميل، عينة، تقويم، هدف، مصاريف) -->
     <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
@@ -520,7 +583,7 @@
     </div>
 
     <script>
-        const tabs = ['overview', 'targets', 'reps', 'customers', 'samples', 'calendar', 'whatsapp-feed', 'whatsapp-settings'];
+        const tabs = ['overview', 'targets', 'reps', 'customers', 'samples', 'calendar', 'agents', 'whatsapp-feed', 'whatsapp-settings'];
         const titles = {
             overview: 'لوحة التحكم العامة',
             targets: 'الأهداف والفرص البيعية (Target Pipeline)',
@@ -528,6 +591,7 @@
             customers: 'دليل حسابات العملاء المعتمدة',
             samples: 'سجل حركة العينات والتحويل التجاري',
             calendar: 'تقويم العمليات والمسارات الميدانية',
+            agents: 'وكلاء المتابعة الذكية (AI Agents) 🤖',
             'whatsapp-feed': 'رادار الرسائل والمحادثات',
             'whatsapp-settings': 'إعدادات ونطاق الواتساب الميداني'
         };
@@ -624,7 +688,124 @@
             clearInterval(waPollingTimer);
         }
 
-        // أداة استكشاف المجموعات المدمجة تلقائياً
+        // ----------------- دوال وكلاء الذكاء الاصطناعي (AI Agents) -----------------
+        function openNewAgentModal() { document.getElementById('new-agent-modal').classList.remove('hidden'); }
+        function closeNewAgentModal() { document.getElementById('new-agent-modal').classList.add('hidden'); }
+
+        async function submitNewAgent() {
+            const name = document.getElementById('agent-name-input').value.trim();
+            const role = document.getElementById('agent-role-select').value;
+            const sched = document.getElementById('agent-schedule-select').value;
+            const prompt = document.getElementById('agent-prompt-input').value.trim();
+            const testPhone = document.getElementById('agent-test-phone-input').value.trim();
+
+            if (!name || !prompt) {
+                alert("يرجى إدخال اسم الوكيل والبرومبت التوجيهي له");
+                return;
+            }
+
+            const res = await fetch('/api/agents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    role_type: role,
+                    trigger_schedule: sched,
+                    system_prompt: prompt,
+                    test_phone: testPhone
+                })
+            });
+
+            if (res.ok) {
+                closeNewAgentModal();
+                await loadAgentsData();
+                alert("تم إنشاء الوكيل الذكي بنجاح ✓");
+            } else {
+                alert("حدث خطأ أثناء حفظ الوكيل");
+            }
+        }
+
+        async function toggleAgentStatus(id, newStatus) {
+            await fetch(`/api/agents/${id}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: newStatus })
+            });
+            await loadAgentsData();
+        }
+
+        async function testAgentNow(id, agentName) {
+            if (!confirm(`هل تريد تشغيل محاكاة للوكيل "${agentName}" وإرسال الرسالة إلى رقم الاختبار المسجل به؟`)) return;
+
+            try {
+                const res = await fetch(`/api/agents/${id}/test`, { method: 'POST' });
+                const data = await res.json();
+
+                if (res.ok) {
+                    alert(`✅ تم إرسال رسالة الاختبار بنجاح إلى الرقم: ${data.to}\n\nنص الرسالة المرسلة:\n${data.message_preview}`);
+                } else {
+                    alert(`❌ تعذر الإرسال: ${data.detail || 'تأكد من توصيل جلسة الواتساب وصحة رقم الهاتف'}`);
+                }
+            } catch (e) {
+                alert("خطأ في الاتصال بالخادم لإجراء الاختبار");
+            }
+        }
+
+        async function loadAgentsData() {
+            try {
+                const res = await fetch('/api/agents');
+                const agents = await res.json();
+                const container = document.getElementById('agents-grid-container');
+
+                if (container) {
+                    container.innerHTML = agents.map(a => `
+                        <div class="p-4 rounded-xl border ${a.is_active ? 'brand-border bg-white shadow-xs' : 'border-gray-200 bg-gray-50 opacity-75'} space-y-3 flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <span class="font-bold text-sm text-gray-900">${a.name}</span>
+                                        <span class="text-[10px] text-purple-700 block mt-0.5 font-bold">${getRoleLabel(a.role_type)}</span>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'}">
+                                        ${a.is_active ? 'نشط ومفعّل ✓' : 'متوقف مؤقتاً'}
+                                    </span>
+                                </div>
+
+                                <div class="p-2 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-24 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
+                                    <strong>البرومبت:</strong> ${a.system_prompt}
+                                </div>
+
+                                <div class="text-[10px] text-gray-500 space-y-0.5">
+                                    <div>🕒 المشغّل: <span class="font-bold text-gray-700">${a.trigger_schedule}</span></div>
+                                    <div>📱 هاتف الاختبار: <span class="font-mono font-bold text-purple-900">${a.test_phone || 'غير محدد'}</span></div>
+                                </div>
+                            </div>
+
+                            <div class="pt-2 border-t flex justify-between items-center gap-1">
+                                <button onclick="testAgentNow(${a.id}, '${a.name}')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10px] flex items-center gap-1 shadow-2xs">
+                                    <span>🧪</span> <span>اختبار وإرسال لهاتفي</span>
+                                </button>
+                                <button onclick="toggleAgentStatus(${a.id}, ${!a.is_active})" class="px-2.5 py-1.5 border ${a.is_active ? 'border-amber-400 text-amber-800 hover:bg-amber-50' : 'border-emerald-500 text-emerald-800 hover:bg-emerald-50'} font-bold rounded-lg text-[10px]">
+                                    ${a.is_active ? 'إيقاف مؤقت' : 'تفعيل'}
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {}
+        }
+
+        function getRoleLabel(role) {
+            const map = {
+                SAMPLES_CONVERSION: 'تحويل العينات لأوامر شراء',
+                CALENDAR_DISPATCH: 'التذكير الصباحي بالمهام والتقويم',
+                STAGNANT_TARGETS: 'إنعاش الفرص والأهداف الراكدة',
+                CUSTOM_ASSISTANT: 'مساعد ذكي مخصص'
+            };
+            return map[role] || role;
+        }
+
+        // أداة استكشاف المجموعات
         async function fetchDiscoveredGroups() {
             const container = document.getElementById('discovered-groups-container');
             const list = document.getElementById('discovered-groups-list');
@@ -1045,6 +1226,7 @@
         async function loadAllData() {
             checkWhatsAppLiveStatus();
             loadExpenseCategories();
+            loadAgentsData();
 
             // 1. جلب فريق المبيعات
             const repsRes = await fetch('/api/reps');
@@ -1131,7 +1313,7 @@
             document.getElementById('cal-customer-select').innerHTML = custNamesOnlyHTML;
             document.getElementById('settings-wa-customer-select').innerHTML = custOptionsHTML;
 
-            // تعبئة جدول المجموعات المراقبة في قسم إعدادات الواتساب
+            // جدول المجموعات المراقبة في قسم إعدادات الواتساب
             const monitoredCusts = custs.filter(c => c.whatsapp_group_id);
             document.getElementById('settings-monitored-groups-tbody').innerHTML = monitoredCusts.length > 0 ? monitoredCusts.map(c => `
                 <tr>
