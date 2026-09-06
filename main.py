@@ -286,7 +286,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="10.2.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="10.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -496,7 +496,8 @@ def preview_sales_report(payload: ReportPreviewPayload):
             "cost_to_sales_ratio": cost_ratio,
             "reps_performance": reps_perf,
             "strategic_summary": payload.recommendation or "أظهر الفريق التزاماً متميزاً في تغطية المسارات وزيادة معدل تحويل العينات لأوامر شراء.",
-            "generated_at": datetime.now().strftime("%Y-%m-%d")
+            "generated_at": datetime.now().strftime("%Y-%m-%d"),
+            "logo": "/logo.png?v=2"
         }
         return render_report_html("02_executive_sales_report.html", context)
     finally:
@@ -1076,11 +1077,15 @@ async def get_whatsapp_qr():
                     return Response(
                         content=base64.b64decode(clean_b64),
                         media_type="image/png",
-                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+                        headers={
+                            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                            "Pragma": "no-cache",
+                            "Expires": "0"
+                        }
                     )
     except Exception as e:
         logger.warning(f"Waiting for Baileys: {e}")
-    raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب المشفر...")
+    raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب...")
 
 @app.post("/api/whatsapp/disconnect")
 async def disconnect_whatsapp():
