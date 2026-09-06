@@ -266,7 +266,7 @@ def render_report_html(template_name: str, context_data: dict) -> str:
     payload = {
         **context_data,
         "css": CSS_BASE,
-        "logo": context_data.get("logo", "/logo.png?v=2"),
+        "logo": context_data.get("logo", "/logo.png?t=20260907"),
         "report_recipient": context_data.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام"),
         "generated_at": context_data.get("generated_at", "2026-09-07")
     }
