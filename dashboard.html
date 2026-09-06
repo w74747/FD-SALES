@@ -50,15 +50,12 @@
     <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
-                <div class="flex items-center justify-center p-2 bg-white rounded-xl border border-gray-100 shadow-sm w-64">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 70" class="w-full h-auto">
-                        <g transform="translate(5, 5)">
-                            <path d="M 30 10 C 18 10 10 18 10 30 C 10 42 18 50 30 50 C 38 50 45 44 48 37 L 40 37 C 38 41 34 43 30 43 C 23 43 18 37 18 30 C 18 23 23 17 30 17 C 35 17 39 20 41 24 L 49 24 C 46 16 38 10 30 10 Z" fill="#3A056A"/>
-                            <circle cx="30" cy="30" r="4.5" fill="#7E22CE"/>
-                        </g>
-                        <text x="75" y="32" font-family="'Cairo', 'Segoe UI', Tahoma, sans-serif" font-size="19" font-weight="900" fill="#3A056A">شركة تنمية الغذاء</text>
-                        <text x="76" y="49" font-family="'Cairo', 'Segoe UI', Tahoma, sans-serif" font-size="9.5" font-weight="700" fill="#7E22CE" letter-spacing="1.5">FOOD DEVELOPMENT CO.</text>
-                    </svg>
+                <div class="flex items-center justify-center gap-3 p-3 bg-white rounded-2xl border border-purple-100 shadow-sm w-full">
+                    <img src="/logo.png" alt="Logo" class="h-12 w-auto object-contain block" onerror="this.style.display='none'">
+                    <div class="text-right">
+                        <div class="text-xl font-black text-[#3A056A] leading-tight">شركة تنمية الغذاء</div>
+                        <div class="text-[10px] font-bold text-purple-700 tracking-wider uppercase">FOOD DEVELOPMENT COMPANY</div>
+                    </div>
                 </div>
             </div>
             <h2 class="text-base font-bold text-gray-800">التحقق الأمني الثنائي (2FA)</h2>
@@ -85,15 +82,12 @@
     <aside class="w-72 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
-                <div class="flex items-center justify-center w-full h-full p-1 bg-white rounded-xl shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 70" class="max-w-full max-h-full w-auto h-auto">
-                        <g transform="translate(5, 5)">
-                            <path d="M 30 10 C 18 10 10 18 10 30 C 10 42 18 50 30 50 C 38 50 45 44 48 37 L 40 37 C 38 41 34 43 30 43 C 23 43 18 37 18 30 C 18 23 23 17 30 17 C 35 17 39 20 41 24 L 49 24 C 46 16 38 10 30 10 Z" fill="#3A056A"/>
-                            <circle cx="30" cy="30" r="4.5" fill="#7E22CE"/>
-                        </g>
-                        <text x="75" y="32" font-family="'Cairo', 'Segoe UI', Tahoma, sans-serif" font-size="19" font-weight="900" fill="#3A056A">شركة تنمية الغذاء</text>
-                        <text x="76" y="49" font-family="'Cairo', 'Segoe UI', Tahoma, sans-serif" font-size="9.5" font-weight="700" fill="#7E22CE" letter-spacing="1.5">FOOD DEVELOPMENT CO.</text>
-                    </svg>
+                <div class="flex items-center justify-center gap-2.5 w-full h-full px-2 bg-white rounded-xl shadow-sm">
+                    <img src="/logo.png" alt="Logo" class="h-10 w-auto object-contain block" onerror="this.style.display='none'">
+                    <div class="text-right">
+                        <div class="text-sm font-black text-[#3A056A] leading-tight">شركة تنمية الغذاء</div>
+                        <div class="text-[8.5px] font-bold text-purple-700 tracking-wider uppercase">Food Development Co.</div>
+                    </div>
                 </div>
             </div>
 
@@ -101,51 +95,51 @@
                 <div class="text-[10px] font-bold text-[#C194FB] mb-2 px-2 uppercase tracking-wider">نظام العمليات والفرص</div>
                 
                 <button onclick="switchTab('overview')" id="nav-overview" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white transition text-right">
-                    <span>📊</span> <span>لوحة التحكم العامة</span>
+                    <span>لوحة التحكم العامة</span>
                 </button>
 
                 <button onclick="switchTab('targets')" id="nav-targets" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>🎯</span> <span>الأهداف والفرص البيعية</span>
+                    <span>الأهداف والفرص البيعية</span>
                 </button>
 
                 <button onclick="switchTab('reps')" id="nav-reps" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>👥</span> <span>فريق المبيعات</span>
+                    <span>فريق المبيعات</span>
                 </button>
 
                 <button onclick="switchTab('customers')" id="nav-customers" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>🏢</span> <span>دليل حسابات العملاء</span>
+                    <span>دليل حسابات العملاء</span>
                 </button>
 
                 <button onclick="switchTab('samples')" id="nav-samples" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>🧪</span> <span>سجل حركة العينات (PO)</span>
+                    <span>سجل حركة العينات (PO)</span>
                 </button>
 
                 <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>📅</span> <span>تقويم العمليات والمسارات</span>
+                    <span>تقويم العمليات والمسارات</span>
                 </button>
 
                 <div class="pt-3 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">خدمات الذكاء والواتساب</div>
 
                 <button onclick="switchTab('agents')" id="nav-agents" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-purple-900/60 text-purple-100 hover:bg-purple-800 text-right border border-purple-400/30">
-                    <span>🤖</span> <span>وكلاء المتابعة الذكية (AI Agents)</span>
+                    <span>وكلاء المتابعة الذكية (AI Agents)</span>
                 </button>
 
                 <button onclick="switchTab('whatsapp-feed')" id="nav-whatsapp-feed" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>📡</span> <span>رادار الرسائل والمحادثات</span>
+                    <span>رادار الرسائل والمحادثات</span>
                 </button>
 
                 <button onclick="switchTab('whatsapp-settings')" id="nav-whatsapp-settings" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>⚙️</span> <span>إعدادات ونطاق الواتساب</span>
+                    <span>إعدادات ونطاق الواتساب</span>
                 </button>
 
                 <div class="pt-4 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">الإدارة والتقارير التنفيذية</div>
 
                 <button onclick="openExpenseModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-amber-600/90 text-white hover:bg-amber-600 text-right">
-                    <span>💰</span> <span>قيد مصاريف ميدانية</span>
+                    <span>قيد مصاريف ميدانية</span>
                 </button>
 
                 <button onclick="openReportModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-[#C194FB]/20 text-purple-100 border border-[#C194FB]/40 hover:bg-[#C194FB]/30 text-right mt-1.5">
-                    <span>📄</span> <span>مركز التقارير الرسمية (A4)</span>
+                    <span>مركز التقارير الرسمية (A4)</span>
                 </button>
             </div>
 
@@ -172,7 +166,7 @@
                 </button>
 
                 <button onclick="openReportModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 flex items-center gap-2">
-                    <span>🖨️</span> <span>إصدار تقرير رسمي</span>
+                    <span>إصدار تقرير رسمي</span>
                 </button>
 
                 <button onclick="logoutSession()" title="تسجيل الخروج" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 transition">
@@ -256,7 +250,7 @@
                         <div class="flex gap-2">
                             <button onclick="openNewCustomerModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة عميل جديد</button>
                             <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50 flex items-center gap-1.5">
-                                <span>🖨️</span> <span>طباعة دليل العملاء (A4)</span>
+                                <span>طباعة دليل العملاء (A4)</span>
                             </button>
                         </div>
                     </div>
@@ -288,7 +282,7 @@
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ تسليم عينة جديدة</button>
-                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">🖨️ طباعة السجل</button>
+                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">طباعة السجل</button>
                         </div>
                     </div>
                     <table class="w-full text-right text-xs">
@@ -317,7 +311,7 @@
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openNewCalendarModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ جدولة مهمة جديدة</button>
-                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">🖨️ طباعة التقويم</button>
+                            <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">طباعة التقويم</button>
                         </div>
                     </div>
                     <div class="space-y-3" id="calendar-events-list"></div>
@@ -356,7 +350,7 @@
                             <h3 class="font-bold text-sm brand-primary-text">رادار الرسائل والمحادثات الملتقطة</h3>
                             <div class="text-xs text-gray-500">المحادثات الواردة حصراً من مجموعات العملاء المعتمدة أو أعضاء فريق المبيعات</div>
                         </div>
-                        <button onclick="switchTab('whatsapp-settings')" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">⚙️ ضبط النطاق والمجموعات</button>
+                        <button onclick="switchTab('whatsapp-settings')" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">ضبط النطاق والمجموعات</button>
                     </div>
                     <div class="space-y-2.5 text-xs" id="whatsapp-feed-list"></div>
                 </div>
@@ -380,7 +374,7 @@
                             <div class="text-xs text-gray-500">تقوم بفحص حساب الواتساب المتصل وجلب المجموعات المشترك بها لاستخراج المعرف وربطه مباشرة بنقرة زر واحدة.</div>
                         </div>
                         <button onclick="fetchDiscoveredGroups()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5">
-                            <span>🔄</span> <span>فحص وجلب مجموعات الواتساب</span>
+                            <span>فحص وجلب مجموعات الواتساب</span>
                         </button>
                     </div>
                     
@@ -446,7 +440,7 @@
             </div>
             <div class="flex justify-between items-center pt-3 border-t">
                 <button onclick="previewReportOfficial()" class="px-5 py-2.5 brand-primary-bg text-white font-bold rounded-lg shadow hover:opacity-95 flex items-center gap-2">
-                    <span>🖨️</span> <span>معاينة وطباعة التقرير المعتمد (A4)</span>
+                    <span>معاينة وطباعة التقرير المعتمد (A4)</span>
                 </button>
                 <button onclick="closeReportModal()" class="px-4 py-2 border rounded-lg">إغلاق</button>
             </div>
@@ -492,7 +486,7 @@
             </div>
             <div>
                 <label class="block font-bold mb-1">اسم الوكيل:</label>
-                <input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: وكيل استرجاع العينات">
+                <input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: متابعة العينات">
             </div>
             <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -525,17 +519,28 @@
         </div>
     </div>
 
+    <!-- نافذة ربط الواتساب مع خيار الفصل اليدوي وتوضيح الاستمرارية -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[420px] space-y-4 text-xs text-center">
+        <div class="bg-white rounded-2xl p-6 w-[440px] space-y-4 text-xs text-center">
             <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">ربط جهاز الواتساب</h3>
+                <h3 class="font-bold text-sm brand-primary-text">ربط جهاز الواتساب بالمنظومة</h3>
                 <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">مشفر وآمن ✓</span>
             </div>
 
-            <div id="whatsapp-connected-card" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+            <div id="whatsapp-connected-card" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3">
                 <div class="w-12 h-12 bg-emerald-500 text-white text-2xl flex items-center justify-center rounded-full mx-auto">✓</div>
                 <div class="font-bold text-emerald-900 text-sm">الجلسة متصلة وتعمل بنجاح!</div>
                 <div class="text-xs text-emerald-700">رقم الهاتف المقترن: <span id="connected-phone-display" class="font-mono font-bold"></span></div>
+                
+                <div class="p-2.5 bg-white border border-emerald-200 rounded-lg text-[11px] text-gray-600 leading-relaxed text-right">
+                    <strong>تنبيه الاستمرارية:</strong> يعمل محرك الواتساب كخدمة مستقلة ومستمرة في الخلفية لمراقبة المجموعات وإرسال تنبيهات الوكلاء حتى في حال قمت بتسجيل الخروج من لوحة التحكم.
+                </div>
+
+                <div class="pt-2">
+                    <button onclick="disconnectWhatsAppSession()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 font-bold rounded-lg transition text-xs flex items-center justify-center gap-1.5 mx-auto">
+                        <span>فصل ارتباط الواتساب (تسجيل خروج الرقم)</span>
+                    </button>
+                </div>
             </div>
 
             <div id="whatsapp-qr-wrapper" class="space-y-3">
@@ -837,6 +842,23 @@
         function closeWhatsAppModal() {
             document.getElementById('whatsapp-modal').classList.add('hidden');
             clearInterval(waPollingTimer);
+        }
+
+        async function disconnectWhatsAppSession() {
+            if (!confirm("هل أنت متأكد من رغبتك في فصل ارتباط هذا الرقم عن النظام؟\nسيتوقف الواتساب عن إرسال الرسائل حتى يتم مسح الرمز الجديد.")) return;
+
+            try {
+                const res = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+                if (res.ok) {
+                    alert("تم فصل ارتباط الحساب بنجاح. سيتم الآن توليد رمز QR جديد.");
+                    await checkWhatsAppLiveStatus();
+                    openWhatsAppModal();
+                } else {
+                    alert("حدث خطأ أثناء محاولة فصل الحساب");
+                }
+            } catch(e) {
+                alert("تعذر الاتصال بالخادم لفصل الحساب");
+            }
         }
 
         function openNewAgentModal() { document.getElementById('new-agent-modal').classList.remove('hidden'); }
