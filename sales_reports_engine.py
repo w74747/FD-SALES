@@ -263,11 +263,12 @@ jinja_env = Environment(loader=DictLoader(REPORT_TEMPLATES), autoescape=True)
 
 def render_report_html(template_name: str, context_data: dict) -> str:
     template = jinja_env.get_template(template_name)
+    from logo_data import LOGO_BASE64
     payload = {
         **context_data,
         "css": CSS_BASE,
-        "logo": context_data.get("logo", "/logo.png"),
+        "logo": context_data.get("logo") or LOGO_BASE64,
         "report_recipient": context_data.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام"),
-        "generated_at": context_data.get("generated_at", "2026-09-06")
+        "generated_at": context_data.get("generated_at", "2026-09-07")
     }
     return template.render(**payload)
