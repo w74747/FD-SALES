@@ -51,7 +51,7 @@
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
                 <div class="bg-white p-2 rounded-xl border border-gray-100 shadow-sm inline-block">
-                    <img src="/logo.png" 
+                    <img src="/logo.png?t=20260907" 
                          alt="شعار شركة تنمية الغذاء" 
                          class="max-h-16 w-auto max-w-full object-contain block">
                 </div>
@@ -81,7 +81,7 @@
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
                 <div class="w-full h-full bg-white rounded-xl p-2 flex items-center justify-center shadow-sm">
-                    <img src="/logo.png" 
+                    <img src="/logo.png?t=20260907" 
                          alt="شركة تنمية الغذاء" 
                          class="max-w-full max-h-full w-auto h-auto object-contain block" />
                 </div>
@@ -602,7 +602,7 @@
             <div><label class="block font-bold mb-1">المنتج المسلّم:</label><input type="text" id="sample-product-name" class="w-full p-2 border rounded-lg" placeholder="صدور دجاج متبلة"></div>
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="block font-bold mb-1">الكمية:</label><input type="number" id="sample-qty" class="w-full p-2 border rounded-lg" value="10"></div>
-                <div><label class="block font-bold mb-1">التاريخ:</label><input type="date" id="sample-date" class="w-full p-2 border rounded-lg" value="2026-09-06"></div>
+                <div><label class="block font-bold mb-1">التاريخ:</label><input type="date" id="sample-date" class="w-full p-2 border rounded-lg" value="2026-09-07"></div>
             </div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العينة</button></div>
         </div>
@@ -615,7 +615,7 @@
             <div><label class="block font-bold mb-1">عضو الفريق المكلّف:</label><select id="cal-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
             <div><label class="block font-bold mb-1">نوع المهمة:</label><input type="text" id="cal-task-type" class="w-full p-2 border rounded-lg" placeholder="زيارة فحص جودة وتفاوض"></div>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">الموعد:</label><input type="text" id="cal-scheduled-at" class="w-full p-2 border rounded-lg" value="2026-09-07 10:00"></div>
+                <div><label class="block font-bold mb-1">الموعد:</label><input type="text" id="cal-scheduled-at" class="w-full p-2 border rounded-lg" value="2026-09-08 10:00"></div>
                 <div><label class="block font-bold mb-1">الموقع:</label><input type="text" id="cal-location" class="w-full p-2 border rounded-lg" placeholder="مقر العميل"></div>
             </div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تأكيد الجدولة</button></div>
@@ -1241,28 +1241,43 @@
             const qty = parseInt(document.getElementById('sample-qty').value) || 1;
             const date = document.getElementById('sample-date').value;
 
+            const custName = custSelect.options[custSelect.selectedIndex] ? custSelect.options[custSelect.selectedIndex].text : custSelect.value;
+            const repName = repSelect.options[repSelect.selectedIndex] ? repSelect.options[repSelect.selectedIndex].text : repSelect.value;
+
             if (!product) {
                 alert("يرجى كتابة اسم المنتج المسلّم");
                 return;
             }
+            if (!date) {
+                alert("يرجى تحديد تاريخ التسليم");
+                return;
+            }
 
             const payload = {
-                customer_name: custSelect.value,
-                rep_name: repSelect.value,
+                customer_name: custName,
+                rep_name: repName,
                 product_name: product,
                 qty_free: qty,
                 delivery_date: date
             };
 
-            const res = await fetch('/api/samples', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) {
-                closeNewSampleModal();
-                await loadAllData();
-                alert("تم حفظ تسليم العينة بنجاح ✓");
+            try {
+                const res = await fetch('/api/samples', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeNewSampleModal();
+                    document.getElementById('sample-product-name').value = '';
+                    await loadAllData();
+                    alert("تم حفظ تسليم العينة بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "حدث خطأ أثناء حفظ العينة");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لحفظ العينة");
             }
         }
 
@@ -1273,29 +1288,44 @@
             const sched = document.getElementById('cal-scheduled-at').value.trim();
             const loc = document.getElementById('cal-location').value.trim();
 
+            const custName = custSelect.options[custSelect.selectedIndex] ? custSelect.options[custSelect.selectedIndex].text : custSelect.value;
+            const repName = repSelect.options[repSelect.selectedIndex] ? repSelect.options[repSelect.selectedIndex].text : repSelect.value;
+
             if (!task) {
                 alert("يرجى تحديد نوع المهمة");
                 return;
             }
+            if (!sched) {
+                alert("يرجى إدخال الموعد المجدول");
+                return;
+            }
 
             const payload = {
-                customer_name: custSelect.value,
-                rep_name: repSelect.value,
+                customer_name: custName,
+                rep_name: repName,
                 task_type: task,
                 scheduled_at: sched,
                 location: loc || "مقر العميل",
                 route_code: "R-01"
             };
 
-            const res = await fetch('/api/calendar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) {
-                closeNewCalendarModal();
-                await loadAllData();
-                alert("تمت جدولة المهمة بنجاح ✓");
+            try {
+                const res = await fetch('/api/calendar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeNewCalendarModal();
+                    document.getElementById('cal-task-type').value = '';
+                    await loadAllData();
+                    alert("تمت جدولة المهمة بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "حدث خطأ أثناء جدولة المهمة");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لجدولة المهمة");
             }
         }
 
@@ -1473,7 +1503,7 @@
 
             document.getElementById('tgt-customer-select').innerHTML = custOptionsHTML;
             document.getElementById('sample-customer-select').innerHTML = custNamesOnlyHTML;
-            document.getElementById('cal-customer-select').innerHTML = custOptionsHTML;
+            document.getElementById('cal-customer-select').innerHTML = custNamesOnlyHTML;
             document.getElementById('settings-wa-customer-select').innerHTML = custOptionsHTML;
 
             const monitoredCusts = custs.filter(c => c.whatsapp_group_id);
