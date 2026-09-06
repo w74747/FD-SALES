@@ -317,7 +317,7 @@
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
                         <div>
-                            <h3 class="font-bold text-sm brand-primary-text">منظومة وكلاء الذكاء الاصطناعي للمتابعة الميدانية (AI Agents) 🤖</h3>
+                            <h3 class="font-bold text-sm brand-primary-text">منظومة وكلاء الذكاء الاصطناعي للمتابعة الميدانية (AI Agents)</h3>
                             <div class="text-xs text-gray-500">وكلاء متخصصون لمتابعة العينات، الأهداف، والمهام عبر إرسال رسائل WhatsApp مخصصة وتجربتها على رقمك الموحد أولاً.</div>
                         </div>
                         <button onclick="openNewAgentModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة وكيل ذكي جديد</button>
@@ -365,7 +365,7 @@
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3 no-print">
                     <div class="flex justify-between items-center">
                         <div>
-                            <h4 class="font-bold text-sm brand-primary-text">أداة استخراج المجموعات المدمجة تلقائياً 🔍</h4>
+                            <h4 class="font-bold text-sm brand-primary-text">أداة استخراج المجموعات المدمجة تلقائياً</h4>
                             <div class="text-xs text-gray-500">تقوم بفحص حساب الواتساب المتصل وجلب المجموعات المشترك بها لاستخراج المعرف وربطه مباشرة بنقرة زر واحدة.</div>
                         </div>
                         <button onclick="fetchDiscoveredGroups()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5">
@@ -684,7 +684,7 @@
             customers: 'دليل حسابات العملاء المعتمدة',
             samples: 'سجل حركة العينات والتحويل التجاري',
             calendar: 'تقويم العمليات والمسارات الميدانية',
-            agents: 'وكلاء المتابعة الذكية (AI Agents) 🤖',
+            agents: 'وكلاء المتابعة الذكية (AI Agents)',
             'whatsapp-feed': 'رادار الرسائل والمحادثات',
             'whatsapp-settings': 'إعدادات ونطاق الواتساب الميداني'
         };
@@ -836,10 +836,17 @@
             }
         }
 
-        function openEditAgentModal(id, name, prompt, sched) {
+        function openEditAgentModal(id, name, promptBase64, sched) {
             document.getElementById('edit-agent-id').value = id;
             document.getElementById('edit-agent-name').value = name;
-            document.getElementById('edit-agent-prompt').value = prompt;
+            
+            try {
+                const decodedPrompt = decodeURIComponent(escape(atob(promptBase64)));
+                document.getElementById('edit-agent-prompt').value = decodedPrompt;
+            } catch(e) {
+                document.getElementById('edit-agent-prompt').value = promptBase64;
+            }
+            
             document.getElementById('edit-agent-schedule').value = sched;
             document.getElementById('edit-agent-modal').classList.remove('hidden');
         }
@@ -909,7 +916,9 @@
                 const container = document.getElementById('agents-grid-container');
 
                 if (container) {
-                    container.innerHTML = agents.map(a => `
+                    container.innerHTML = agents.map(a => {
+                        const safePromptB64 = btoa(unescape(encodeURIComponent(a.system_prompt || '')));
+                        return `
                         <div class="p-4 rounded-xl border ${a.is_active ? 'brand-border bg-white shadow-xs' : 'border-gray-200 bg-gray-50 opacity-75'} space-y-3 flex flex-col justify-between">
                             <div class="space-y-2">
                                 <div class="flex justify-between items-start">
@@ -936,14 +945,14 @@
                                     <span>🧪</span> <span>إرسال تجربة لهاتفي</span>
                                 </button>
                                 <div class="flex gap-1">
-                                    <button onclick="openEditAgentModal(${a.id}, '${a.name}', '${escape(a.system_prompt)}', '${a.trigger_schedule}')" class="px-2 py-1 border border-purple-300 text-[#3A056A] font-bold rounded text-[10px]">✏️ تعديل</button>
+                                    <button onclick="openEditAgentModal(${a.id}, '${a.name}', '${safePromptB64}', '${a.trigger_schedule}')" class="px-2 py-1 border border-purple-300 text-[#3A056A] font-bold rounded text-[10px]">✏️ تعديل</button>
                                     <button onclick="toggleAgentStatus(${a.id}, ${!a.is_active})" class="px-2 py-1 border ${a.is_active ? 'border-amber-400 text-amber-800' : 'border-emerald-500 text-emerald-800'} font-bold rounded text-[10px]">
                                         ${a.is_active ? 'إيقاف' : 'تفعيل'}
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    `).join('');
+                    `}).join('');
                 }
             } catch (e) {}
         }
