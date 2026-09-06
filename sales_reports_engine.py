@@ -1,13 +1,10 @@
 """
 sales_reports_engine.py
 محرك التقارير التنفيذية والرسمية لشركة تنمية الغذاء (Food Development Company)
-يعتمد Jinja2 لتوليد مستندات HTML متوافقة تماماً مع معيار الطباعة الرسمي A4 بالريال العماني.
+يعتمد Jinja2 لتوليد مستندات رسمية متوافقة تماماً مع معيار الطباعة A4 بالريال العماني دون استخدام رموز تعبيرية.
 """
 
-import os
 from jinja2 import Environment, DictLoader
-
-COMPANY_LOGO_SRC = "/logo.png"
 
 CSS_BASE = """
 @page {
@@ -202,7 +199,7 @@ REPORT_TEMPLATES = {
     </head>
     <body>
         <div class="print-btn-bar">
-            <button onclick="window.print()" class="print-btn">🖨️ طباعة المستند الرسمي (A4)</button>
+            <button onclick="window.print()" class="print-btn">طباعة المستند الرسمي (A4)</button>
         </div>
 
         <div class="report-header">
@@ -210,7 +207,7 @@ REPORT_TEMPLATES = {
                 <h1>التقرير التنفيذي الشامل لإدارة المبيعات والعمليات</h1>
                 <div class="report-meta">نطاق التقرير: الإدارة العامة وفروع التوزيع الميدانية | شركة تنمية الغذاء</div>
             </div>
-            <img src="{{ logo }}" alt="Food Development Company Logo" style="max-height: 52px; max-width: 220px; object-fit: contain;">
+            <img src="{{ logo }}" alt="شعار شركة تنمية الغذاء" style="max-height: 52px; max-width: 220px; object-fit: contain;">
         </div>
 
         <div class="recipient-banner">
@@ -220,7 +217,7 @@ REPORT_TEMPLATES = {
         </div>
 
         <div style="font-weight: bold; color: var(--brand-primary); margin-bottom: 8px; font-size: 10pt;">
-            📊 كشف إنجازات فريق المبيعات التنفيذي الميداني
+            كشف إنجازات فريق المبيعات التنفيذي الميداني
         </div>
         <table class="data-table">
             <thead>
@@ -254,7 +251,7 @@ REPORT_TEMPLATES = {
         </table>
 
         <div class="ai-box">
-            <div class="ai-box-title">👔 التوصية الإدارية والتحليل الميداني المعتمد:</div>
+            <div class="ai-box-title">التوصية الإدارية والتحليل الميداني المعتمد:</div>
             <div>{{ strategic_summary }}</div>
         </div>
     </body>
@@ -269,7 +266,7 @@ def render_report_html(template_name: str, context_data: dict) -> str:
     payload = {
         **context_data,
         "css": CSS_BASE,
-        "logo": COMPANY_LOGO_SRC,
+        "logo": context_data.get("logo", "/logo.png"),
         "report_recipient": context_data.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام"),
         "generated_at": context_data.get("generated_at", "2026-09-06")
     }
