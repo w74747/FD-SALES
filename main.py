@@ -26,7 +26,7 @@ import pyotp
 import qrcode
 import httpx
 
-from logo_data import LOGO_BASE64
+from logo_data import LOGO_SVG, LOGO_BASE64
 from sales_reports_engine import render_report_html
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -287,7 +287,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="9.8.5", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="9.9.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -299,14 +299,12 @@ app.add_middleware(
 
 @app.get("/logo.png")
 def get_logo():
-    """تقديم صورة الشعار المعتمدة بجودة وثبات عاليين"""
+    """تقديم شعار شركة تنمية الغذاء بصيغة SVG متجهة حقيقية خفيفة وعالية الدقة"""
     try:
-        if LOGO_BASE64:
-            clean_b64 = LOGO_BASE64.split(",")[-1].strip()
-            image_bytes = base64.b64decode(clean_b64)
+        if LOGO_SVG:
             return Response(
-                content=image_bytes,
-                media_type="image/jpeg",
+                content=LOGO_SVG.strip(),
+                media_type="image/svg+xml",
                 headers={
                     "Cache-Control": "public, max-age=86400",
                     "Access-Control-Allow-Origin": "*"
