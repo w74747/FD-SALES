@@ -286,7 +286,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="9.9.5", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="10.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -298,7 +298,7 @@ app.add_middleware(
 
 @app.get("/logo.png")
 def get_logo():
-    """خدمة ملف الشعار الحقيقي مباشرة من القرص مع حظر التخزين المؤقت"""
+    """خدمة ملف الشعار الحقيقي مباشرة من القرص وتجاوز الكاش تماماً"""
     base_dir = os.path.dirname(__file__)
     for filename in ["logo.png", "logo.jpg", "logo.jpeg"]:
         file_path = os.path.join(base_dir, filename)
@@ -496,7 +496,7 @@ def preview_sales_report(payload: ReportPreviewPayload):
             "reps_performance": reps_perf,
             "strategic_summary": payload.recommendation or "أظهر الفريق التزاماً متميزاً في تغطية المسارات وزيادة معدل تحويل العينات لأوامر شراء.",
             "generated_at": datetime.now().strftime("%Y-%m-%d"),
-            "logo": "/logo.png?v=2"
+            "logo": "/logo.png?t=20260907"
         }
         return render_report_html("02_executive_sales_report.html", context)
     finally:
