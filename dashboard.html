@@ -50,14 +50,14 @@
     <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
-                <div class="flex items-center justify-center p-2 bg-white rounded-xl border border-gray-100 shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 90" class="h-16 w-auto max-w-full">
-                        <g transform="translate(10, 10)">
-                            <path d="M 35 12 C 22.3 12 12 22.3 12 35 C 12 47.7 22.3 58 35 58 C 45.2 58 53.7 51.3 56.7 42 L 47 42 C 44.5 46.2 39.8 49 35 49 C 27.3 49 21 42.7 21 35 C 21 27.3 27.3 21 35 21 C 40.5 21 45.2 24.2 47.3 29 L 57 29 C 54.2 19 45.4 12 35 12 Z" fill="#3A056A"/>
-                            <circle cx="35" cy="35" r="5" fill="#7E22CE"/>
+                <div class="flex items-center justify-center p-2 bg-white rounded-xl border border-gray-100 shadow-sm w-64">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 70" class="w-full h-auto">
+                        <g transform="translate(5, 5)">
+                            <path d="M 30 10 C 18 10 10 18 10 30 C 10 42 18 50 30 50 C 38 50 45 44 48 37 L 40 37 C 38 41 34 43 30 43 C 23 43 18 37 18 30 C 18 23 23 17 30 17 C 35 17 39 20 41 24 L 49 24 C 46 16 38 10 30 10 Z" fill="#3A056A"/>
+                            <circle cx="30" cy="30" r="4.5" fill="#7E22CE"/>
                         </g>
-                        <text x="85" y="44" font-family="'Cairo', sans-serif" font-size="24" font-weight="900" fill="#3A056A">شركة تنمية الغذاء</text>
-                        <text x="87" y="64" font-family="'Cairo', sans-serif" font-size="11" font-weight="700" fill="#7E22CE" letter-spacing="2">FOOD DEVELOPMENT COMPANY</text>
+                        <text x="75" y="32" font-family="'Cairo', 'Segoe UI', Tahoma, sans-serif" font-size="19" font-weight="900" fill="#3A056A">شركة تنمية الغذاء</text>
+                        <text x="76" y="49" font-family="'Cairo', 'Segoe UI', Tahoma, sans-serif" font-size="9.5" font-weight="700" fill="#7E22CE" letter-spacing="1.5">FOOD DEVELOPMENT CO.</text>
                     </svg>
                 </div>
             </div>
@@ -86,13 +86,13 @@
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
                 <div class="flex items-center justify-center w-full h-full p-1 bg-white rounded-xl shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 90" class="max-w-full max-h-full w-auto h-auto">
-                        <g transform="translate(10, 10)">
-                            <path d="M 35 12 C 22.3 12 12 22.3 12 35 C 12 47.7 22.3 58 35 58 C 45.2 58 53.7 51.3 56.7 42 L 47 42 C 44.5 46.2 39.8 49 35 49 C 27.3 49 21 42.7 21 35 C 21 27.3 27.3 21 35 21 C 40.5 21 45.2 24.2 47.3 29 L 57 29 C 54.2 19 45.4 12 35 12 Z" fill="#3A056A"/>
-                            <circle cx="35" cy="35" r="5" fill="#7E22CE"/>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 70" class="max-w-full max-h-full w-auto h-auto">
+                        <g transform="translate(5, 5)">
+                            <path d="M 30 10 C 18 10 10 18 10 30 C 10 42 18 50 30 50 C 38 50 45 44 48 37 L 40 37 C 38 41 34 43 30 43 C 23 43 18 37 18 30 C 18 23 23 17 30 17 C 35 17 39 20 41 24 L 49 24 C 46 16 38 10 30 10 Z" fill="#3A056A"/>
+                            <circle cx="30" cy="30" r="4.5" fill="#7E22CE"/>
                         </g>
-                        <text x="85" y="44" font-family="'Cairo', sans-serif" font-size="24" font-weight="900" fill="#3A056A">شركة تنمية الغذاء</text>
-                        <text x="87" y="64" font-family="'Cairo', sans-serif" font-size="11" font-weight="700" fill="#7E22CE" letter-spacing="2">FOOD DEVELOPMENT COMPANY</text>
+                        <text x="75" y="32" font-family="'Cairo', 'Segoe UI', Tahoma, sans-serif" font-size="19" font-weight="900" fill="#3A056A">شركة تنمية الغذاء</text>
+                        <text x="76" y="49" font-family="'Cairo', 'Segoe UI', Tahoma, sans-serif" font-size="9.5" font-weight="700" fill="#7E22CE" letter-spacing="1.5">FOOD DEVELOPMENT CO.</text>
                     </svg>
                 </div>
             </div>
@@ -271,6 +271,7 @@
                                 <th class="p-3">مجموعة الواتساب المراقبة</th>
                                 <th class="p-3">تعليمات وملاحظات العميل</th>
                                 <th class="p-3">الحالة</th>
+                                <th class="p-3 no-print">إجراءات</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y brand-border" id="customers-table-body"></tbody>
@@ -580,6 +581,7 @@
         </div>
     </div>
 
+    <!-- نافذة إضافة عميل جديد -->
     <div id="new-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة حساب عميل جديد</h3>
@@ -600,6 +602,32 @@
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeNewCustomerModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitNewCustomer()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العميل</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تعديل العميل المضافة -->
+    <div id="edit-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات حساب العميل</h3>
+            <input type="hidden" id="edit-cust-id">
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">اسم العميل (الشركة):</label><input type="text" id="edit-cust-company-name" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">اسم العلامة التجارية:</label><input type="text" id="edit-cust-brand-name" class="w-full p-2 border rounded-lg"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">المنطقة:</label><input type="text" id="edit-cust-region" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">القطاع:</label><input type="text" id="edit-cust-sector" class="w-full p-2 border rounded-lg"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">اسم المسؤول:</label><input type="text" id="edit-cust-contact-person" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">رقم التواصل:</label><input type="text" id="edit-cust-phone" class="w-full p-2 border rounded-lg font-mono"></div>
+            </div>
+            <div><label class="block font-bold mb-1">عضو الفريق المتابع:</label><select id="edit-cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">تعليمات وملاحظات العميل:</label><textarea id="edit-cust-notes" rows="2" class="w-full p-2 border rounded-lg"></textarea></div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeEditCustomerModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitUpdateCustomer()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
             </div>
         </div>
     </div>
@@ -1059,6 +1087,80 @@
         function openNewCustomerModal() { document.getElementById('new-customer-modal').classList.remove('hidden'); }
         function closeNewCustomerModal() { document.getElementById('new-customer-modal').classList.add('hidden'); }
 
+        function openEditCustomerModal(id, comp, brand, sect, reg, pers, ph, repId, notes) {
+            document.getElementById('edit-cust-id').value = id;
+            document.getElementById('edit-cust-company-name').value = comp || '';
+            document.getElementById('edit-cust-brand-name').value = brand || '';
+            document.getElementById('edit-cust-sector').value = sect || '';
+            document.getElementById('edit-cust-region').value = reg || '';
+            document.getElementById('edit-cust-contact-person').value = pers || '';
+            document.getElementById('edit-cust-phone').value = ph || '';
+            document.getElementById('edit-cust-rep-select').value = repId || '';
+            document.getElementById('edit-cust-notes').value = notes || '';
+            document.getElementById('edit-customer-modal').classList.remove('hidden');
+        }
+        function closeEditCustomerModal() { document.getElementById('edit-customer-modal').classList.add('hidden'); }
+
+        async function submitUpdateCustomer() {
+            const id = document.getElementById('edit-cust-id').value;
+            const comp = document.getElementById('edit-cust-company-name').value.trim();
+            const brand = document.getElementById('edit-cust-brand-name').value.trim();
+            const sect = document.getElementById('edit-cust-sector').value.trim();
+            const reg = document.getElementById('edit-cust-region').value.trim();
+            const pers = document.getElementById('edit-cust-contact-person').value.trim();
+            const ph = document.getElementById('edit-cust-phone').value.trim();
+            const repSelect = document.getElementById('edit-cust-rep-select');
+            const notes = document.getElementById('edit-cust-notes').value.trim();
+
+            if (!comp || !ph) {
+                alert("يرجى ملء اسم الشركة ورقم الهاتف");
+                return;
+            }
+
+            const payload = {
+                company_name: comp,
+                brand_name: brand,
+                sector: sect,
+                region: reg,
+                contact_person: pers,
+                phone: ph,
+                assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null,
+                notes: notes
+            };
+
+            try {
+                const res = await fetch(`/api/customers/${id}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeEditCustomerModal();
+                    await loadAllData();
+                    alert("تم تحديث بيانات العميل بنجاح ✓");
+                } else {
+                    alert("فشل تحديث بيانات العميل");
+                }
+            } catch(e) {
+                alert("خطأ في الاتصال بالخادم");
+            }
+        }
+
+        async function deleteCustomer(id, compName) {
+            if (!confirm(`هل أنت متأكد من حذف العميل "${compName}" نهائياً من النظام؟`)) return;
+            try {
+                const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    await loadAllData();
+                    alert("تم حذف العميل بنجاح ✓");
+                } else {
+                    alert("تعذر حذف العميل لوجود أهداف أو سجلات مرتبطة به");
+                }
+            } catch(e) {
+                alert("خطأ في الاتصال بالخادم");
+            }
+        }
+
         function openNewSampleModal() { document.getElementById('new-sample-modal').classList.remove('hidden'); }
         function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
 
@@ -1251,8 +1353,8 @@
             const qty = parseInt(document.getElementById('sample-qty').value) || 1;
             const date = document.getElementById('sample-date').value;
 
-            const custName = custSelect.options[custSelect.selectedIndex] ? custSelect.options[custSelect.selectedIndex].text : custSelect.value;
-            const repName = repSelect.options[repSelect.selectedIndex] ? repSelect.options[repSelect.selectedIndex].text : repSelect.value;
+            const custName = custSelect.value;
+            const repName = repSelect.value;
 
             if (!product) {
                 alert("يرجى كتابة اسم المنتج المسلّم");
@@ -1298,8 +1400,8 @@
             const sched = document.getElementById('cal-scheduled-at').value.trim();
             const loc = document.getElementById('cal-location').value.trim();
 
-            const custName = custSelect.options[custSelect.selectedIndex] ? custSelect.options[custSelect.selectedIndex].text : custSelect.value;
-            const repName = repSelect.options[repSelect.selectedIndex] ? repSelect.options[repSelect.selectedIndex].text : repSelect.value;
+            const custName = custSelect.value;
+            const repName = repSelect.value;
 
             if (!task) {
                 alert("يرجى تحديد نوع المهمة");
@@ -1477,6 +1579,7 @@
             const repNamesOnlyHTML = reps.map(r => `<option value="${r.name}">${r.name} (${r.region})</option>`).join('');
 
             document.getElementById('cust-rep-select').innerHTML = '<option value="">-- بدون تعيين حالي --</option>' + repOptionsHTML;
+            document.getElementById('edit-cust-rep-select').innerHTML = '<option value="">-- بدون تعيين حالي --</option>' + repOptionsHTML;
             document.getElementById('tgt-rep-select').innerHTML = repOptionsHTML;
             document.getElementById('exp-rep-select').innerHTML = repOptionsHTML;
             document.getElementById('sample-rep-select').innerHTML = repNamesOnlyHTML;
@@ -1505,11 +1608,18 @@
                     <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id ? '✓ ' + c.whatsapp_group_id : '<span class="text-gray-400">غير مربوط</span>'}</td>
                     <td class="p-3 text-[11px] text-gray-600 max-w-xs">${c.notes || 'لا توجد ملاحظات خاصة'}</td>
                     <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status || 'نشط'}</span></td>
+                    <td class="p-3 no-print">
+                        <div class="flex gap-1.5">
+                            <button onclick="openEditCustomerModal(${c.id}, '${escape(c.company_name)}', '${escape(c.brand_name)}', '${escape(c.sector)}', '${escape(c.region)}', '${escape(c.contact_person)}', '${escape(c.phone)}', ${c.assigned_rep_id || 'null'}, '${escape(c.notes)}')" class="text-blue-600 hover:text-blue-800 font-bold">تعديل</button>
+                            <span class="text-gray-300">|</span>
+                            <button onclick="deleteCustomer(${c.id}, '${c.company_name}')" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                        </div>
+                    </td>
                 </tr>
             `).join('');
 
             const custOptionsHTML = custs.map(c => `<option value="${c.id}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
-            const custNamesOnlyHTML = custs.map(c => `<option value="${c.brand_name ? c.company_name + ' (' + c.brand_name + ')' : c.company_name}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
+            const custNamesOnlyHTML = custs.map(c => `<option value="${c.company_name}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
 
             document.getElementById('tgt-customer-select').innerHTML = custOptionsHTML;
             document.getElementById('sample-customer-select').innerHTML = custNamesOnlyHTML;
