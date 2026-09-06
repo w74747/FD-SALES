@@ -219,6 +219,7 @@ def init_database():
     finally:
         conn.close()
 
+    # ترقية وتأكيد وجود كافة الأعمدة المطلوبة للجداول
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS has_target BOOLEAN DEFAULT FALSE;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS monthly_target NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS achieved_sales NUMERIC(12, 2) DEFAULT 0.00;")
@@ -227,6 +228,26 @@ def init_database():
     run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS region VARCHAR(100) DEFAULT 'مسقط';")
     run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';")
     run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150) DEFAULT '';")
+
+    # ترقية جدول العينات لضمان وجود الأعمدة النصية
+    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS customer_name VARCHAR(200) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS rep_name VARCHAR(150) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS product_name VARCHAR(200) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS qty_free INT DEFAULT 1;")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS delivery_date DATE DEFAULT CURRENT_DATE;")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'PENDING';")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS converted_po_id VARCHAR(100) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS po_value NUMERIC(12, 2) DEFAULT 0.00;")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'يدوي';")
+
+    # ترقية جدول التقويم لضمان وجود الأعمدة
+    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS customer_name VARCHAR(200) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS rep_name VARCHAR(150) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS task_type VARCHAR(150) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS scheduled_at VARCHAR(50) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS location VARCHAR(255) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS route_code VARCHAR(50) DEFAULT 'R-01';")
+    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS execution_status VARCHAR(20) DEFAULT 'PENDING';")
 
     run_isolated_ddl("""
     INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
@@ -286,7 +307,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="10.3.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="10.4.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -371,6 +392,14 @@ def verify_2fa(payload: Verify2FAPayload):
         conn.close()
 
 class NewRepPayload(BaseModel):
+    name: str
+    employee_code: str
+    phone_number: str
+    region: str
+    has_target: Optional[bool] = False
+    monthly_target: Optional[float] = 0.0
+
+class UpdateRepPayload(BaseModel):
     name: str
     employee_code: str
     phone_number: str
@@ -503,6 +532,7 @@ def preview_sales_report(payload: ReportPreviewPayload):
     finally:
         conn.close()
 
+# ----------------- مسارات وكلاء الذكاء الاصطناعي -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -583,7 +613,7 @@ async def test_agent_global(payload: dict):
 
             cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC LIMIT 1;")
             sample = cur.fetchone()
-            sample_info = f"العميل: {sample['customer_name']} | المنتج: {sample['product_name']}" if sample else "العميل: مطاعم الريف | المنتج: صدور دجاج 4B"
+            sample_info = f"العميل: {sample['customer_name']} | المنتج: {sample['product_name']}" if (sample and sample.get('customer_name')) else "العميل: مطاعم الريف | المنتج: صدور دجاج 4B"
 
             clean_title = agent["name"].replace("وكيل ", "").replace("وكيل", "").strip()
 
@@ -631,6 +661,7 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
+# ----------------- مسارات بنود المصاريف -----------------
 @app.get("/api/expense-categories")
 def get_expense_categories():
     conn = get_db_connection()
@@ -676,6 +707,7 @@ def delete_expense_category(cat_id: int):
     finally:
         conn.close()
 
+# ----------------- مسارات فريق المبيعات والعمليات -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -726,6 +758,54 @@ def add_rep(payload: NewRepPayload):
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=400, detail=f"فشل الحفظ: {str(e)}")
+    finally:
+        conn.close()
+
+@app.post("/api/reps/{rep_id}/update")
+def update_rep(rep_id: int, payload: UpdateRepPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            target = payload.monthly_target if payload.has_target else 0.0
+            cur.execute("""
+            UPDATE sales_executives 
+            SET name = %s, employee_code = %s, phone_number = %s, region = %s, 
+                has_target = %s, monthly_target = %s 
+            WHERE id = %s;
+            """, (
+                payload.name.strip(),
+                payload.employee_code.strip(),
+                payload.phone_number.strip(),
+                payload.region.strip(),
+                payload.has_target,
+                target,
+                rep_id
+            ))
+            cur.execute("UPDATE customer_accounts SET assigned_rep_name = %s WHERE assigned_rep_id = %s;", (payload.name.strip(), rep_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل تحديث بيانات المندوب: {str(e)}")
+    finally:
+        conn.close()
+
+@app.delete("/api/reps/{rep_id}")
+def delete_rep(rep_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE customer_accounts SET assigned_rep_id = NULL, assigned_rep_name = '—' WHERE assigned_rep_id = %s;", (rep_id,))
+            cur.execute("DELETE FROM sales_executives WHERE id = %s;", (rep_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"تعذر حذف المندوب: {str(e)}")
     finally:
         conn.close()
 
@@ -870,7 +950,7 @@ def get_samples():
             cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC;")
             rows = cur.fetchall()
             for r in rows:
-                r["delivery_date"] = str(r["delivery_date"])
+                r["delivery_date"] = str(r.get("delivery_date") or "")
                 r["po_value"] = float(r.get("po_value") or 0)
                 r["converted_po_id"] = r.get("converted_po_id") or "—"
             return rows
