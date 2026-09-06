@@ -51,7 +51,7 @@
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
                 <div class="flex items-center justify-center gap-3 p-3 bg-white rounded-2xl border border-purple-100 shadow-sm w-full">
-                    <img src="/logo.png" alt="Logo" class="h-12 w-auto object-contain block" onerror="this.style.display='none'">
+                    <img src="/logo.png?t=20260907" alt="Logo" class="h-12 w-auto object-contain block" onerror="this.style.display='none'">
                     <div class="text-right">
                         <div class="text-xl font-black text-[#3A056A] leading-tight">شركة تنمية الغذاء</div>
                         <div class="text-[10px] font-bold text-purple-700 tracking-wider uppercase">FOOD DEVELOPMENT COMPANY</div>
@@ -83,7 +83,7 @@
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
                 <div class="flex items-center justify-center gap-2.5 w-full h-full px-2 bg-white rounded-xl shadow-sm">
-                    <img src="/logo.png" alt="Logo" class="h-10 w-auto object-contain block" onerror="this.style.display='none'">
+                    <img src="/logo.png?t=20260907" alt="Logo" class="h-10 w-auto object-contain block" onerror="this.style.display='none'">
                     <div class="text-right">
                         <div class="text-sm font-black text-[#3A056A] leading-tight">شركة تنمية الغذاء</div>
                         <div class="text-[8.5px] font-bold text-purple-700 tracking-wider uppercase">Food Development Co.</div>
@@ -519,7 +519,7 @@
         </div>
     </div>
 
-    <!-- نافذة ربط الواتساب مع خيار الفصل اليدوي وتوضيح الاستمرارية -->
+    <!-- نافذة ربط الواتساب مع التحديث التلقائي للـ QR وزر الفصل اليدوي -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[440px] space-y-4 text-xs text-center">
             <div class="flex justify-between items-center border-b pb-2">
@@ -552,6 +552,7 @@
                         <span id="whatsapp-loader-text">جاري الاتصال بمحرك الواتساب...</span>
                     </div>
                 </div>
+                <div class="text-[10px] text-gray-400">يتم تجديد الرمز تلقائياً قبل انتهاء صلاحيته</div>
             </div>
 
             <div class="flex justify-end pt-2 border-t">
@@ -611,7 +612,7 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل العميل المضافة -->
+    <!-- نافذة تعديل العميل -->
     <div id="edit-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات حساب العميل</h3>
@@ -765,6 +766,7 @@
         }
 
         let waPollingTimer = null;
+        let waQRRefreshTimer = null;
 
         async function checkWhatsAppLiveStatus() {
             try {
@@ -804,30 +806,48 @@
             }
         }
 
+        async function refreshQRCode() {
+            const img = document.getElementById('whatsapp-qr-image');
+            const loader = document.getElementById('whatsapp-qr-loader');
+            const loaderText = document.getElementById('whatsapp-loader-text');
+            
+            try {
+                const res = await fetch('/api/whatsapp/qr?t=' + new Date().getTime());
+                const contentType = res.headers.get("content-type");
+
+                if (res.status === 200 && contentType && contentType.includes("image")) {
+                    const blob = await res.blob();
+                    img.src = URL.createObjectURL(blob);
+                    if (loader) loader.classList.add('hidden');
+                } else if (res.status === 200) {
+                    const data = await res.json();
+                    if (data.connected) {
+                        checkWhatsAppLiveStatus();
+                    }
+                }
+            } catch (e) {
+                if (loaderText) loaderText.innerText = "جاري الاتصال بمحرك الواتساب...";
+            }
+        }
+
         async function openWhatsAppModal() {
             document.getElementById('whatsapp-modal').classList.remove('hidden');
             const isConn = await checkWhatsAppLiveStatus();
 
             if (!isConn) {
-                const img = document.getElementById('whatsapp-qr-image');
                 const loader = document.getElementById('whatsapp-qr-loader');
-                const loaderText = document.getElementById('whatsapp-loader-text');
+                if (loader) loader.classList.remove('hidden');
+                await refreshQRCode();
 
-                loader.classList.remove('hidden');
-                loaderText.innerText = "جاري جلب رمز الجلسة الحقيقي من خوادم واتساب...";
-
-                try {
-                    const res = await fetch('/api/whatsapp/qr?t=' + new Date().getTime());
-                    const contentType = res.headers.get("content-type");
-
-                    if (res.status === 200 && contentType && contentType.includes("image")) {
-                        const blob = await res.blob();
-                        img.src = URL.createObjectURL(blob);
-                        loader.classList.add('hidden');
+                clearInterval(waQRRefreshTimer);
+                waQRRefreshTimer = setInterval(async () => {
+                    const connected = await checkWhatsAppLiveStatus();
+                    if (!connected) {
+                        await refreshQRCode();
+                    } else {
+                        clearInterval(waQRRefreshTimer);
                     }
-                } catch (e) {
-                    loaderText.innerText = "جاري إعداد محرك الاتصال... يرجى الانتظار ثوانٍ";
-                }
+                }, 5000);
             }
 
             clearInterval(waPollingTimer);
@@ -835,6 +855,7 @@
                 const connected = await checkWhatsAppLiveStatus();
                 if (connected) {
                     clearInterval(waPollingTimer);
+                    clearInterval(waQRRefreshTimer);
                 }
             }, 1500);
         }
@@ -842,6 +863,7 @@
         function closeWhatsAppModal() {
             document.getElementById('whatsapp-modal').classList.add('hidden');
             clearInterval(waPollingTimer);
+            clearInterval(waQRRefreshTimer);
         }
 
         async function disconnectWhatsAppSession() {
