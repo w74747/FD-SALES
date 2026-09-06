@@ -18,7 +18,7 @@ from typing import Optional, List
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -26,7 +26,6 @@ import pyotp
 import qrcode
 import httpx
 
-from logo_data import LOGO_SVG, LOGO_BASE64
 from sales_reports_engine import render_report_html
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -233,7 +232,7 @@ def init_database():
     INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
     VALUES 
     (
-        'وكيل متابعة العينات واسترجاع الـ PO',
+        'متابعة العينات واسترجاع الـ PO',
         'SAMPLES_CONVERSION',
         'أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق لمتابعة العينات المسلمة التي لم يُصدر لها أمر شراء حتى الآن، واطلب منه بلباقة موافاتك بقرار الشيف أو مدير المشتريات وإرسال رقم أمر الشراء PO عند اعتماده.',
         'DAILY_10AM',
@@ -241,7 +240,7 @@ def init_database():
         TRUE
     ),
     (
-        'وكيل التذكير الصباحي بالمسارات',
+        'التذكير الصباحي بالمسارات',
         'CALENDAR_DISPATCH',
         'أنت منسق جدول العمليات في شركة تنمية الغذاء. قم بصياغة رسالة صباحية مشجعة وموجزة تذكر فيها عضو الفريق بالزيارات الميدانية المجدولة له اليوم، وأسماء العملاء والمواقع المستهدفة.',
         'DAILY_08AM',
@@ -249,7 +248,7 @@ def init_database():
         TRUE
     ),
     (
-        'وكيل إنعاش الأهداف والفرص الراكدة',
+        'إنعاش الأهداف والفرص الراكدة',
         'STAGNANT_TARGETS',
         'أنت مستشار الصفقات في شركة تنمية الغذاء. اكتب رسالة تحفيزية لعضو الفريق بخصوص الفرص البيعية التي مر عليها أكثر من 3 أيام دون أي تحديث، واقترح عليه إجراء مكالمة هاتفية أو طلب عينة دعم للإغلاق.',
         'WEEKLY_SUNDAY',
@@ -287,7 +286,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="9.9.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="9.9.5", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -299,20 +298,22 @@ app.add_middleware(
 
 @app.get("/logo.png")
 def get_logo():
-    """تقديم شعار شركة تنمية الغذاء بصيغة SVG متجهة حقيقية خفيفة وعالية الدقة"""
-    try:
-        if LOGO_SVG:
-            return Response(
-                content=LOGO_SVG.strip(),
-                media_type="image/svg+xml",
+    """خدمة ملف الشعار الحقيقي مباشرة من القرص مع حظر التخزين المؤقت"""
+    base_dir = os.path.dirname(__file__)
+    for filename in ["logo.png", "logo.jpg", "logo.jpeg"]:
+        file_path = os.path.join(base_dir, filename)
+        if os.path.exists(file_path):
+            media_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+            return FileResponse(
+                file_path,
+                media_type=media_type,
                 headers={
-                    "Cache-Control": "public, max-age=86400",
-                    "Access-Control-Allow-Origin": "*"
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
                 }
             )
-    except Exception as e:
-        logger.error(f"Error loading logo: {e}")
-    raise HTTPException(status_code=404, detail="Logo not found")
+    raise HTTPException(status_code=404, detail="Logo file not found on disk")
 
 class Verify2FAPayload(BaseModel):
     code: str
@@ -495,7 +496,7 @@ def preview_sales_report(payload: ReportPreviewPayload):
             "reps_performance": reps_perf,
             "strategic_summary": payload.recommendation or "أظهر الفريق التزاماً متميزاً في تغطية المسارات وزيادة معدل تحويل العينات لأوامر شراء.",
             "generated_at": datetime.now().strftime("%Y-%m-%d"),
-            "logo": LOGO_BASE64
+            "logo": "/logo.png?v=2"
         }
         return render_report_html("02_executive_sales_report.html", context)
     finally:
@@ -581,21 +582,37 @@ async def test_agent_global(payload: dict):
 
             cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC LIMIT 1;")
             sample = cur.fetchone()
-            sample_info = f"العميل: {sample['customer_name']}، المنتج: {sample['product_name']}" if sample else "العميل: مطاعم الريف، المنتج: صدور دجاج 4B"
+            sample_info = f"العميل: {sample['customer_name']} | المنتج: {sample['product_name']}" if sample else "العميل: مطاعم الريف | المنتج: صدور دجاج 4B"
+
+            clean_title = agent["name"].replace("وكيل ", "").replace("وكيل", "").strip()
 
             if agent["role_type"] == "SAMPLES_CONVERSION":
                 message_text = (
-                    f"متابعة تجريبية من: {agent['name']}\n"
-                    f"━━━━━━━━━━━━━━━━━━\n"
-                    f"أهلاً بك، يرجى موافاتنا بنتيجة تجربة العينات الميدانية لدى:\n"
+                    f"*{clean_title}*\n"
+                    f"━━━━━━━━━\n"
+                    f"مرحبا، يرجى موافاتنا بنتيجة تجربة العينات الميدانية لدى:\n"
                     f"{sample_info}\n\n"
                     f"عند الاعتماد نرجو تسجيل رقم أمر الشراء (PO) في النظام."
                 )
+            elif agent["role_type"] == "CALENDAR_DISPATCH":
+                message_text = (
+                    f"*{clean_title}*\n"
+                    f"━━━━━━━━━\n"
+                    f"مرحبا، تذكير بالزيارات الميدانية المجدولة في جدول العمليات اليوم.\n\n"
+                    f"شركة تنمية الغذاء | FDC Sales CRM"
+                )
+            elif agent["role_type"] == "STAGNANT_TARGETS":
+                message_text = (
+                    f"*{clean_title}*\n"
+                    f"━━━━━━━━━\n"
+                    f"مرحبا، يرجى متابعة الفرص البيعية غير المحدثة لإغلاق الصفقات وإصدار أوامر الشراء.\n\n"
+                    f"شركة تنمية الغذاء | FDC Sales CRM"
+                )
             else:
                 message_text = (
-                    f"رسالة تجريبية من: {agent['name']}\n"
-                    f"━━━━━━━━━━━━━━━━━━\n"
-                    f"التوجيه النشط:\n«{agent['system_prompt']}»\n\n"
+                    f"*{clean_title}*\n"
+                    f"━━━━━━━━━\n"
+                    f"مرحبا،\n«{agent['system_prompt']}»\n\n"
                     f"شركة تنمية الغذاء | FDC Sales CRM"
                 )
 
