@@ -26,10 +26,8 @@ import pyotp
 import qrcode
 import httpx
 
-try:
-    from logo_data import LOGO_BASE64
-except ImportError:
-    LOGO_BASE64 = ""
+from logo_data import LOGO_BASE64
+from sales_reports_engine import render_report_html
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
@@ -289,7 +287,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="9.7.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="9.8.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -301,15 +299,14 @@ app.add_middleware(
 
 @app.get("/logo.png")
 def get_logo():
-    """إرسال صورة الشعار مباشرة وتجاوز مشاكل التخزين المؤقت"""
+    """تقديم صورة الشعار الرسمية عالية الجودة كـ JPEG حقيقي وسريع"""
     try:
-        from logo_data import LOGO_BASE64
         if LOGO_BASE64:
             clean_b64 = LOGO_BASE64.split(",")[-1].strip()
             image_bytes = base64.b64decode(clean_b64)
             return Response(
                 content=image_bytes,
-                media_type="image/png",
+                media_type="image/jpeg",
                 headers={
                     "Cache-Control": "public, max-age=86400",
                     "Access-Control-Allow-Origin": "*"
@@ -461,6 +458,52 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_phone: str
     sender_name: str
     message_text: str
+
+class ReportPreviewPayload(BaseModel):
+    report_recipient: Optional[str] = "سعادة رئيس مجلس الإدارة / المدير العام"
+    recommendation: Optional[str] = ""
+
+# ----------------- مسار التقارير التنفيذية -----------------
+@app.post("/api/reports/preview", response_class=HTMLResponse)
+def preview_sales_report(payload: ReportPreviewPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sales_executives ORDER BY id ASC;")
+            reps = cur.fetchall()
+
+        total_sales = sum(float(r.get("achieved_sales") or 0) for r in reps)
+        total_exp = sum(float(r.get("total_expenses") or 0) for r in reps)
+        cost_ratio = round((total_exp / total_sales * 100), 1) if total_sales > 0 else 0.0
+
+        reps_perf = []
+        for r in reps:
+            target = float(r.get("monthly_target") or 0)
+            sales = float(r.get("achieved_sales") or 0)
+            rate = (sales / target * 100) if (r.get("has_target") and target > 0) else 0.0
+            reps_perf.append({
+                "name": r["name"],
+                "region": r["region"],
+                "monthly_target": target,
+                "achieved_sales": sales,
+                "achievement_rate": rate,
+                "total_expenses": float(r.get("total_expenses") or 0),
+                "efficiency": "عالي الكفاءة" if rate >= 100 else ("مقبول" if rate >= 70 else "يحتاج متابعة")
+            })
+
+        context = {
+            "report_recipient": payload.report_recipient,
+            "total_revenue": total_sales,
+            "cost_to_sales_ratio": cost_ratio,
+            "reps_performance": reps_perf,
+            "strategic_summary": payload.recommendation or "أظهر الفريق التزاماً متميزاً في تغطية المسارات وزيادة معدل تحويل العينات لأوامر شراء.",
+            "generated_at": datetime.now().strftime("%Y-%m-%d")
+        }
+        return render_report_html("02_executive_sales_report.html", context)
+    finally:
+        conn.close()
 
 # ----------------- مسارات وكلاء الذكاء الاصطناعي -----------------
 @app.get("/api/agents")
@@ -980,11 +1023,15 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
+        clean_phone = msg.sender_phone.replace("+", "").strip()
         with conn.cursor() as cur:
             cur.execute("SELECT id, company_name FROM customer_accounts WHERE whatsapp_group_id = %s;", (msg.chat_id,))
             customer = cur.fetchone()
 
-            cur.execute("SELECT id, name FROM sales_executives WHERE phone_number = %s;", (msg.sender_phone,))
+            cur.execute(
+                "SELECT id, name FROM sales_executives WHERE REPLACE(phone_number, '+', '') = %s;", 
+                (clean_phone,)
+            )
             rep = cur.fetchone()
 
             if not customer and not rep:
