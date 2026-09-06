@@ -287,7 +287,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="9.8.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="9.8.5", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -299,7 +299,7 @@ app.add_middleware(
 
 @app.get("/logo.png")
 def get_logo():
-    """تقديم صورة الشعار الرسمية عالية الجودة كـ JPEG حقيقي وسريع"""
+    """تقديم صورة الشعار المعتمدة بجودة وثبات عاليين"""
     try:
         if LOGO_BASE64:
             clean_b64 = LOGO_BASE64.split(",")[-1].strip()
@@ -334,7 +334,6 @@ def get_2fa_status():
 
 @app.get("/api/auth/2fa/qr")
 def get_2fa_qr():
-    """إرجاع QR التوثيق دائماً دون حظر 403 لمنع تعليق واجهة المستخدم"""
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
@@ -381,7 +380,6 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- نماذج البيانات -----------------
 class NewRepPayload(BaseModel):
     name: str
     employee_code: str
@@ -463,7 +461,6 @@ class ReportPreviewPayload(BaseModel):
     report_recipient: Optional[str] = "سعادة رئيس مجلس الإدارة / المدير العام"
     recommendation: Optional[str] = ""
 
-# ----------------- مسار التقارير التنفيذية -----------------
 @app.post("/api/reports/preview", response_class=HTMLResponse)
 def preview_sales_report(payload: ReportPreviewPayload):
     conn = get_db_connection()
@@ -499,13 +496,13 @@ def preview_sales_report(payload: ReportPreviewPayload):
             "cost_to_sales_ratio": cost_ratio,
             "reps_performance": reps_perf,
             "strategic_summary": payload.recommendation or "أظهر الفريق التزاماً متميزاً في تغطية المسارات وزيادة معدل تحويل العينات لأوامر شراء.",
-            "generated_at": datetime.now().strftime("%Y-%m-%d")
+            "generated_at": datetime.now().strftime("%Y-%m-%d"),
+            "logo": LOGO_BASE64
         }
         return render_report_html("02_executive_sales_report.html", context)
     finally:
         conn.close()
 
-# ----------------- مسارات وكلاء الذكاء الاصطناعي -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -590,15 +587,15 @@ async def test_agent_global(payload: dict):
 
             if agent["role_type"] == "SAMPLES_CONVERSION":
                 message_text = (
-                    f"🤖 *متابعة تجريبية من: {agent['name']}*\n"
+                    f"متابعة تجريبية من: {agent['name']}\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"أهلاً بك، يرجى موافاتنا بنتيجة تجربة العينات الميدانية لدى:\n"
-                    f"📍 {sample_info}\n\n"
+                    f"{sample_info}\n\n"
                     f"عند الاعتماد نرجو تسجيل رقم أمر الشراء (PO) في النظام."
                 )
             else:
                 message_text = (
-                    f"🤖 *رسالة تجريبية من: {agent['name']}*\n"
+                    f"رسالة تجريبية من: {agent['name']}\n"
                     f"━━━━━━━━━━━━━━━━━━\n"
                     f"التوجيه النشط:\n«{agent['system_prompt']}»\n\n"
                     f"شركة تنمية الغذاء | FDC Sales CRM"
@@ -618,7 +615,6 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسارات بنود المصاريف -----------------
 @app.get("/api/expense-categories")
 def get_expense_categories():
     conn = get_db_connection()
@@ -664,7 +660,6 @@ def delete_expense_category(cat_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات فريق المبيعات والعمليات -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
