@@ -23,6 +23,10 @@ async function startWhatsApp() {
   try {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
+    if (sock) {
+      try { sock.ev.removeAllListeners(); } catch (e) {}
+    }
+
     sock = makeWASocket({
       auth: state,
       logger: pino({ level: 'silent' }),
@@ -41,10 +45,13 @@ async function startWhatsApp() {
       }
 
       if (connection === 'close') {
-        const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+        const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
         isConnected = false;
         latestQR = null;
         connectedUser = null;
+        console.log(`[Baileys Connection Closed] كود الحالة: ${statusCode}، إعادة الاتصال: ${shouldReconnect}`);
+        
         if (shouldReconnect) {
           setTimeout(startWhatsApp, 3000);
         }
@@ -68,21 +75,23 @@ async function startWhatsApp() {
 
         if (!text) return;
 
+        const cleanSender = senderPhone.replace(/^\+/, '');
+
         await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
           chat_id: chatId,
-          sender_phone: `+${senderPhone}`,
+          sender_phone: `+${cleanSender}`,
           sender_name: senderName,
           message_text: text
-        });
+        }, { timeout: 4000 });
       } catch (e) {}
     });
 
   } catch (err) {
+    console.error('[Baileys Launch Error]:', err);
     setTimeout(startWhatsApp, 5000);
   }
 }
 
-// مسار فحص الحالة
 app.get('/qr-status', (req, res) => {
   res.json({
     connected: isConnected,
@@ -91,11 +100,8 @@ app.get('/qr-status', (req, res) => {
   });
 });
 
-// أداة استخراج المجموعات
 app.get('/groups', async (req, res) => {
-  if (!isConnected || !sock) {
-    return res.json([]);
-  }
+  if (!isConnected || !sock) return res.json([]);
   try {
     const groups = await sock.groupFetchAllParticipating();
     const result = Object.values(groups).map(g => ({
@@ -109,7 +115,6 @@ app.get('/groups', async (req, res) => {
   }
 });
 
-// مسار إرسال الرسائل الصادرة للوكلاء الأذكياء واختبارات النظام
 app.post('/send-message', async (req, res) => {
   if (!isConnected || !sock) {
     return res.status(503).json({ error: 'جلسة الواتساب غير متصلة حالياً' });
@@ -121,21 +126,37 @@ app.post('/send-message', async (req, res) => {
   }
 
   try {
-    let cleanTarget = phone_or_group.replace(/[^0-9@a-z\._-]/gi, '');
-    let jid = '';
-
-    if (cleanTarget.endsWith('@g.us')) {
-      jid = cleanTarget;
-    } else {
-      if (cleanTarget.startsWith('+')) cleanTarget = cleanTarget.substring(1);
-      jid = `${cleanTarget}@s.whatsapp.net`;
-    }
+    let cleanTarget = phone_or_group.replace(/[^0-9@a-z._-]/gi, '');
+    let jid = cleanTarget.endsWith('@g.us') ? cleanTarget : `${cleanTarget.replace(/^\+/, '')}@s.whatsapp.net`;
 
     await sock.sendMessage(jid, { text: message });
-    console.log(`[Baileys Sent] تم إرسال رسالة بنجاح إلى ${jid}`);
     return res.json({ status: 'SENT', to: jid });
   } catch (e) {
-    console.error('[Baileys Send Error]:', e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// مسار فصل الارتباط اليدوي وحذف الجلسة
+app.post('/disconnect', async (req, res) => {
+  try {
+    console.log('[Baileys] جاري فصل ارتباط الحساب بناءً على طلب المستخدم...');
+    isConnected = false;
+    connectedUser = null;
+    latestQR = null;
+
+    if (sock) {
+      try { await sock.logout(); } catch (e) {}
+      try { sock.end(); } catch (e) {}
+    }
+
+    if (fs.existsSync(AUTH_DIR)) {
+      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    }
+
+    setTimeout(startWhatsApp, 2000);
+    return res.json({ status: 'DISCONNECTED', message: 'تم إنهاء الجلسة بنجاح' });
+  } catch (e) {
     return res.status(500).json({ error: e.message });
   }
 });
