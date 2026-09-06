@@ -207,7 +207,14 @@ REPORT_TEMPLATES = {
                 <h1>التقرير التنفيذي الشامل لإدارة المبيعات والعمليات</h1>
                 <div class="report-meta">نطاق التقرير: الإدارة العامة وفروع التوزيع الميدانية | شركة تنمية الغذاء</div>
             </div>
-            <img src="{{ logo }}" alt="شعار شركة تنمية الغذاء" style="max-height: 52px; max-width: 220px; object-fit: contain;">
+            
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <img src="/logo.png" alt="شركة تنمية الغذاء" style="max-height: 52px; width: auto; display: block;" onerror="this.style.display='none'">
+                <div style="text-align: right;">
+                    <div style="font-size: 16pt; font-weight: 900; color: #3A056A; line-height: 1.1;">شركة تنمية الغذاء</div>
+                    <div style="font-size: 8pt; font-weight: 700; color: #7E22CE; letter-spacing: 1px;">FOOD DEVELOPMENT COMPANY</div>
+                </div>
+            </div>
         </div>
 
         <div class="recipient-banner">
@@ -266,7 +273,6 @@ def render_report_html(template_name: str, context_data: dict) -> str:
     payload = {
         **context_data,
         "css": CSS_BASE,
-        "logo": context_data.get("logo", "/logo.png?t=20260907"),
         "report_recipient": context_data.get("report_recipient", "سعادة رئيس مجلس الإدارة / المدير العام"),
         "generated_at": context_data.get("generated_at", "2026-09-07")
     }
