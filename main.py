@@ -18,7 +18,7 @@ from typing import Optional, List
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -228,6 +228,43 @@ def init_database():
     run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';")
     run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150) DEFAULT '';")
 
+    run_isolated_ddl("""
+    INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
+    VALUES 
+    (
+        'متابعة العينات واسترجاع الـ PO',
+        'SAMPLES_CONVERSION',
+        'أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق لمتابعة العينات المسلمة التي لم يُصدر لها أمر شراء حتى الآن، واطلب منه بلباقة موافاتك بقرار الشيف أو مدير المشتريات وإرسال رقم أمر الشراء PO عند اعتماده.',
+        'DAILY_10AM',
+        '+96898996963',
+        TRUE
+    ),
+    (
+        'التذكير الصباحي بالمسارات',
+        'CALENDAR_DISPATCH',
+        'أنت منسق جدول العمليات في شركة تنمية الغذاء. قم بصياغة رسالة صباحية مشجعة وموجزة تذكر فيها عضو الفريق بالزيارات الميدانية المجدولة له اليوم، وأسماء العملاء والمواقع المستهدفة.',
+        'DAILY_08AM',
+        '+96898996963',
+        TRUE
+    ),
+    (
+        'إنعاش الأهداف والفرص الراكدة',
+        'STAGNANT_TARGETS',
+        'أنت مستشار الصفقات في شركة تنمية الغذاء. اكتب رسالة تحفيزية لعضو الفريق بخصوص الفرص البيعية التي مر عليها أكثر من 3 أيام دون أي تحديث، واقترح عليه إجراء مكالمة هاتفية أو طلب عينة دعم للإغلاق.',
+        'WEEKLY_SUNDAY',
+        '+96898996963',
+        TRUE
+    )
+    ON CONFLICT DO NOTHING;
+    """)
+
+    run_isolated_ddl("""
+    INSERT INTO expense_categories (category_name) VALUES 
+    ('وقود سيارة'), ('إيجار سيارة / نقل'), ('علاوة يومية (انتداب مدينة أخرى)'),
+    ('ضيافة واجتماعات عملاء'), ('شحن ونثريات عينات'), ('صيانة وإصلاحات طارئة')
+    ON CONFLICT DO NOTHING;
+    """)
+
 def start_whatsapp_service():
     global whatsapp_process
     if os.path.exists("whatsapp_service.js"):
@@ -249,7 +286,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="10.1.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="10.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -258,6 +295,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/logo.png")
+def get_logo():
+    base_dir = os.path.dirname(__file__)
+    for filename in ["logo.jpg", "logo.png", "logo.jpeg"]:
+        file_path = os.path.join(base_dir, filename)
+        if os.path.exists(file_path):
+            media_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+            return FileResponse(file_path, media_type=media_type)
+    raise HTTPException(status_code=404, detail="Logo file not found on disk")
 
 class Verify2FAPayload(BaseModel):
     code: str
@@ -455,7 +502,6 @@ def preview_sales_report(payload: ReportPreviewPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات وكلاء الذكاء الاصطناعي -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -584,7 +630,6 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسارات بنود المصاريف -----------------
 @app.get("/api/expense-categories")
 def get_expense_categories():
     conn = get_db_connection()
@@ -630,7 +675,6 @@ def delete_expense_category(cat_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات فريق المبيعات والعمليات -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -1037,6 +1081,17 @@ async def get_whatsapp_qr():
     except Exception as e:
         logger.warning(f"Waiting for Baileys: {e}")
     raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب المشفر...")
+
+@app.post("/api/whatsapp/disconnect")
+async def disconnect_whatsapp():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post("http://127.0.0.1:3001/disconnect", timeout=8.0)
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        logger.error(f"Error disconnecting whatsapp: {e}")
+    raise HTTPException(status_code=500, detail="تعذر إنهاء جلسة الواتساب حالياً")
 
 @app.get("/api/whatsapp/logs")
 def get_whatsapp_logs():
