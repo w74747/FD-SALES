@@ -220,14 +220,12 @@ def init_database():
     finally:
         conn.close()
 
-    # ترقية الجداول القديمة وإسقاط قيود NOT NULL المسببة للخطأ
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(10) DEFAULT 'AR';")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS has_target BOOLEAN DEFAULT FALSE;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS monthly_target NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS achieved_sales NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS total_expenses NUMERIC(12, 2) DEFAULT 0.00;")
     
-    # حل قيد NOT NULL في جدول العينات والتقويم
     run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN customer_id DROP NOT NULL;")
     run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN rep_id DROP NOT NULL;")
     run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS customer_name VARCHAR(200) DEFAULT '';")
@@ -261,7 +259,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="10.5.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="10.6.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -393,6 +391,13 @@ class NewSamplePayload(BaseModel):
     product_name: str
     qty_free: int
     delivery_date: str
+
+class ConvertSamplePayload(BaseModel):
+    po_number: str
+    po_value: float
+
+class UpdateStatusPayload(BaseModel):
+    status: str
 
 class NewCalendarEventPayload(BaseModel):
     customer_name: str
@@ -566,7 +571,6 @@ async def test_agent_global(payload: dict):
             if not agent:
                 raise HTTPException(status_code=404, detail="الوكيل غير موجود")
 
-            # التحقق من اللغة المفضلة للمندوب صاحب الرقم إن وجد
             clean_search_phone = test_target.replace("+", "").strip()
             cur.execute("SELECT preferred_language FROM sales_executives WHERE REPLACE(phone_number, '+', '') = %s;", (clean_search_phone,))
             rep_lang_row = cur.fetchone()
@@ -578,7 +582,6 @@ async def test_agent_global(payload: dict):
             clean_title = agent["name"].replace("وكيل ", "").replace("وكيل", "").strip()
 
             if pref_lang == "EN":
-                # الصياغة باللغة الإنجليزية بدون خطوط
                 sample_info_en = f"Client: {sample['customer_name']} | Product: {sample['product_name']}" if (sample and sample.get('customer_name')) else "Client: Al Reef Restaurants | Product: Chicken Breast 4B"
                 if agent["role_type"] == "SAMPLES_CONVERSION":
                     message_text = (
@@ -606,7 +609,6 @@ async def test_agent_global(payload: dict):
                         f"Food Development Company | FDC Sales CRM"
                     )
             else:
-                # الصياغة باللغة العربية الرسمية بدون خطوط
                 sample_info_ar = f"العميل: {sample['customer_name']} | المنتج: {sample['product_name']}" if (sample and sample.get('customer_name')) else "العميل: مطاعم الريف | المنتج: صدور دجاج 4B"
                 if agent["role_type"] == "SAMPLES_CONVERSION":
                     message_text = (
@@ -927,6 +929,7 @@ def update_customer_group(payload: UpdateCustomerGroupPayload):
     finally:
         conn.close()
 
+# ----------------- مسارات العينات والتحويل -----------------
 @app.get("/api/samples")
 def get_samples():
     conn = get_db_connection()
@@ -951,7 +954,6 @@ def add_sample(payload: NewSamplePayload):
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
-            # إيجاد customer_id و rep_id إن تواجدا
             cur.execute("SELECT id FROM customer_accounts WHERE company_name = %s LIMIT 1;", (payload.customer_name,))
             c_row = cur.fetchone()
             c_id = c_row["id"] if c_row else None
@@ -974,6 +976,52 @@ def add_sample(payload: NewSamplePayload):
     finally:
         conn.close()
 
+@app.post("/api/samples/{sample_id}/convert")
+def convert_sample_to_po(sample_id: int, payload: ConvertSamplePayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT rep_id, rep_name FROM sample_deliveries WHERE id = %s;", (sample_id,))
+            s_row = cur.fetchone()
+            if not s_row:
+                raise HTTPException(status_code=404, detail="العينة غير موجودة")
+
+            cur.execute("""
+            UPDATE sample_deliveries 
+            SET status = 'CONVERTED', converted_po_id = %s, po_value = %s 
+            WHERE id = %s;
+            """, (payload.po_number.strip(), payload.po_value, sample_id))
+
+            # إضافة قيمة أمر الشراء إلى المبيعات المحققة للمندوب
+            if s_row.get("rep_id"):
+                cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s WHERE id = %s;", (payload.po_value, s_row["rep_id"]))
+            elif s_row.get("rep_name"):
+                cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s WHERE name = %s;", (payload.po_value, s_row["rep_name"]))
+
+            conn.commit()
+            return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل تحويل العينة: {str(e)}")
+    finally:
+        conn.close()
+
+@app.post("/api/samples/{sample_id}/status")
+def update_sample_status(sample_id: int, payload: UpdateStatusPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE sample_deliveries SET status = %s WHERE id = %s;", (payload.status.strip(), sample_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+# ----------------- مسارات التقويم والمسارات -----------------
 @app.get("/api/calendar")
 def get_calendar():
     conn = get_db_connection()
@@ -1012,6 +1060,19 @@ def add_calendar_event(payload: NewCalendarEventPayload):
         conn.rollback()
         logger.error(f"Error saving calendar event: {e}")
         raise HTTPException(status_code=400, detail=f"فشل جدولة المهمة: {str(e)}")
+    finally:
+        conn.close()
+
+@app.post("/api/calendar/{event_id}/status")
+def update_calendar_event_status(event_id: int, payload: UpdateStatusPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE calendar_events SET execution_status = %s WHERE id = %s;", (payload.status.strip(), event_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
     finally:
         conn.close()
 
