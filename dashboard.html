@@ -277,7 +277,6 @@
                 </div>
             </div>
 
-            <!-- تبويب العينات مع الفلترة المتقدمة ودورة الحياة -->
             <div id="tab-samples" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
@@ -291,7 +290,6 @@
                         </div>
                     </div>
 
-                    <!-- شريط أدوات الفلترة الفورية للأصناف والتواريخ -->
                     <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-xl grid grid-cols-4 gap-3 text-xs no-print">
                         <div>
                             <label class="block font-bold mb-1 text-gray-700">بحث بالصنف / المنتج:</label>
@@ -330,7 +328,6 @@
                 </div>
             </div>
 
-            <!-- تبويب التقويم والمسارات الميدانية مع التعديل والملاحظات -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -382,7 +379,6 @@
                 </div>
             </div>
 
-            <!-- تبويب سجل المصاريف الميدانية -->
             <div id="tab-expenses-log" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -515,7 +511,7 @@
         </div>
     </div>
 
-    <!-- نافذة إضافة تسليم عينة جديدة (مع تحديد موعد التذكير وقبول اسم عميل غير مسجل) -->
+    <!-- نافذة إضافة تسليم عينة جديدة -->
     <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينة جديدة (إشعار واتساب تلقائي للموظف)</h3>
@@ -561,7 +557,7 @@
         </div>
     </div>
 
-    <!-- نافذة جدولة مهمة جديدة مع موعد التذكير والإشعار التلقائي -->
+    <!-- نافذة جدولة مهمة جديدة -->
     <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية (إشعار واتساب تلقائي للموظف)</h3>
@@ -587,7 +583,7 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل المهمة المجدولة وتعيين شخص آخر أو تغيير الموعد مع الملاحظة -->
+    <!-- نافذة تعديل المهمة المجدولة -->
     <div id="edit-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل المهمة المجدولة (إعادة تعيين / تغيير الموعد)</h3>
@@ -698,7 +694,7 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل عضو فريق مبيعات -->
+    <!-- نافذة تعديل عضو فريق المبيعات -->
     <div id="edit-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
@@ -899,9 +895,11 @@
                 if (el) el.classList.add('hidden');
                 if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
             });
-            document.getElementById(`tab-${id}`).classList.remove('hidden');
-            document.getElementById(`nav-${id}`).className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
-            document.getElementById('current-tab-title').innerText = titles[id];
+            const activeTab = document.getElementById(`tab-${id}`);
+            const activeNav = document.getElementById(`nav-${id}`);
+            if (activeTab) activeTab.classList.remove('hidden');
+            if (activeNav) activeNav.className = "w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
+            document.getElementById('current-tab-title').innerText = titles[id] || '';
         }
 
         function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
@@ -1016,7 +1014,7 @@
                     clearInterval(waPollingTimer);
                     clearInterval(waQRRefreshTimer);
                 }
-            }, 1500);
+            }, 2000);
         }
 
         function closeWhatsAppModal() {
@@ -1452,6 +1450,51 @@
         }
         function closeEditCustomerModal() { document.getElementById('edit-customer-modal').classList.add('hidden'); }
 
+        async function submitNewCustomer() {
+            const company = document.getElementById('cust-company-name').value.trim();
+            const brand = document.getElementById('cust-brand-name').value.trim();
+            const region = document.getElementById('cust-region').value.trim();
+            const sector = document.getElementById('cust-sector').value.trim();
+            const person = document.getElementById('cust-contact-person').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const repSelect = document.getElementById('cust-rep-select');
+            const notes = document.getElementById('cust-notes').value.trim();
+
+            if (!company || !phone) {
+                alert("يرجى ملء اسم الشركة ورقم الهاتف");
+                return;
+            }
+
+            const payload = {
+                company_name: company,
+                brand_name: brand || "",
+                sector: sector || "عام",
+                region: region || "مسقط",
+                contact_person: person || "المسؤول",
+                phone: phone,
+                assigned_rep_id: (repSelect && repSelect.value) ? parseInt(repSelect.value) : null,
+                notes: notes || ""
+            };
+
+            try {
+                const res = await fetch('/api/customers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeNewCustomerModal();
+                    await loadAllData();
+                    alert("تمت إضافة العميل بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "حدث خطأ أثناء حفظ العميل");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لحفظ العميل");
+            }
+        }
+
         async function submitUpdateCustomer() {
             const id = document.getElementById('edit-cust-id').value;
             const comp = document.getElementById('edit-cust-company-name').value.trim();
@@ -1666,10 +1709,10 @@
         }
 
         function applySamplesFilter() {
-            const productTerm = document.getElementById('filter-sample-product').value.trim().toLowerCase();
-            const customerTerm = document.getElementById('filter-sample-customer').value.trim().toLowerCase();
-            const fromDate = document.getElementById('filter-sample-from-date').value;
-            const toDate = document.getElementById('filter-sample-to-date').value;
+            const productTerm = (document.getElementById('filter-sample-product')?.value || '').trim().toLowerCase();
+            const customerTerm = (document.getElementById('filter-sample-customer')?.value || '').trim().toLowerCase();
+            const fromDate = document.getElementById('filter-sample-from-date')?.value || '';
+            const toDate = document.getElementById('filter-sample-to-date')?.value || '';
 
             const filtered = allSamplesCache.filter(s => {
                 const matchProduct = !productTerm || (s.product_name && s.product_name.toLowerCase().includes(productTerm));
@@ -2029,244 +2072,312 @@
             } catch (e) {}
         }
 
+        // دالة مركزية ومحصنة بالكامل لتحميل كافة البيانات وتحديث الجداول دون انقطاع
         async function loadAllData() {
             loadSavedTestPhone();
             checkWhatsAppLiveStatus();
             loadExpenseCategories();
             loadAgentsData();
 
-            const repsRes = await fetch('/api/reps');
-            const reps = await repsRes.json();
-            
-            let totalSales = 0;
-            let totalExp = 0;
+            // 1. جلب وتحديث المندوبين
+            try {
+                const repsRes = await fetch('/api/reps');
+                const reps = await repsRes.json();
+                let totalSales = 0;
+                let totalExp = 0;
 
-            document.getElementById('overview-reps-tbody').innerHTML = reps.map(r => {
-                totalSales += (r.achieved_sales || 0);
-                totalExp += (r.total_expenses || 0);
-                return `
-                <tr>
-                    <td class="p-3 font-bold">${r.name}</td>
-                    <td class="p-3 text-gray-600">${r.region}</td>
-                    <td class="p-3 font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</td>
-                    <td class="p-3">${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع (' + (r.achievement_rate || 0).toFixed(1) + '%)' : '<span class="text-gray-400">قياس مفتوح</span>'}</td>
-                    <td class="p-3 font-semibold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span></td>
-                </tr>`;
-            }).join('');
+                const overviewTbody = document.getElementById('overview-reps-tbody');
+                if (overviewTbody) {
+                    overviewTbody.innerHTML = reps.map(r => {
+                        totalSales += (r.achieved_sales || 0);
+                        totalExp += (r.total_expenses || 0);
+                        return `
+                        <tr>
+                            <td class="p-3 font-bold">${r.name}</td>
+                            <td class="p-3 text-gray-600">${r.region}</td>
+                            <td class="p-3 font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</td>
+                            <td class="p-3">${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع (' + (r.achievement_rate || 0).toFixed(1) + '%)' : '<span class="text-gray-400">قياس مفتوح</span>'}</td>
+                            <td class="p-3 font-semibold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span></td>
+                        </tr>`;
+                    }).join('');
+                }
 
-            document.getElementById('kpi-total-sales').innerText = `${totalSales.toLocaleString()} ر.ع`;
-            document.getElementById('kpi-total-expenses').innerText = `${totalExp.toLocaleString()} ر.ع`;
+                document.getElementById('kpi-total-sales').innerText = `${totalSales.toLocaleString()} ر.ع`;
+                document.getElementById('kpi-total-expenses').innerText = `${totalExp.toLocaleString()} ر.ع`;
 
-            document.getElementById('reps-grid-cards').innerHTML = reps.map(r => `
-                <div class="p-4 rounded-xl border brand-border brand-tint space-y-2 flex flex-col justify-between">
-                    <div class="space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
-                            <div class="flex items-center gap-1.5">
-                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-100 text-[#3A056A]">${r.preferred_language === 'EN' ? 'EN' : 'AR'}</span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                const repsGrid = document.getElementById('reps-grid-cards');
+                if (repsGrid) {
+                    repsGrid.innerHTML = reps.map(r => `
+                        <div class="p-4 rounded-xl border brand-border brand-tint space-y-2 flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-100 text-[#3A056A]">${r.preferred_language === 'EN' ? 'EN' : 'AR'}</span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
+                                <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
+                                <div class="pt-2 border-t brand-border space-y-1 text-xs">
+                                    <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</span></div>
+                                    <div class="flex justify-between"><span>المستهدف:</span><span>${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع' : 'قياس نتائج مفتوح'}</span></div>
+                                    <div class="flex justify-between"><span>إجمالي المصاريف:</span><span class="font-bold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</span></div>
+                                </div>
+                            </div>
+                            <div class="pt-2 border-t border-purple-200/60 flex justify-end gap-2 text-xs no-print">
+                                <button onclick="openEditRepModal(${r.id}, '${escape(r.name)}', '${escape(r.employee_code)}', '${escape(r.region)}', '${r.phone_number}', ${r.has_target}, ${r.monthly_target || 0}, '${r.preferred_language || 'AR'}')" class="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded">تعديل</button>
+                                <button onclick="deleteRep(${r.id}, '${r.name}')" class="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded">حذف</button>
                             </div>
                         </div>
-                        <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
-                        <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
-                        <div class="pt-2 border-t brand-border space-y-1 text-xs">
-                            <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</span></div>
-                            <div class="flex justify-between"><span>المستهدف:</span><span>${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع' : 'قياس نتائج مفتوح'}</span></div>
-                            <div class="flex justify-between"><span>إجمالي المصاريف:</span><span class="font-bold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</span></div>
+                    `).join('');
+                }
+
+                const repOptionsHTML = reps.map(r => `<option value="${r.id}">${r.name} (${r.region})</option>`).join('');
+                const repNamesOnlyHTML = reps.map(r => `<option value="${r.name}">${r.name} (${r.region})</option>`).join('');
+
+                const selIds = ['cust-rep-select', 'edit-cust-rep-select', 'tgt-rep-select', 'exp-rep-select', 'edit-exp-rep-select'];
+                selIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = (id.includes('cust-rep') ? '<option value="">-- بدون تعيين حالي --</option>' : '') + repOptionsHTML;
+                });
+
+                const nameSelIds = ['sample-rep-select', 'cal-rep-select', 'edit-cal-rep-select'];
+                nameSelIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = repNamesOnlyHTML;
+                });
+
+                const repsWhitelist = document.getElementById('settings-reps-whitelist-list');
+                if (repsWhitelist) {
+                    repsWhitelist.innerHTML = reps.map(r => `
+                        <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-xl flex justify-between items-center text-xs">
+                            <div>
+                                <div class="font-bold text-[#3A056A]">${r.name}</div>
+                                <div class="text-[10px] text-gray-500">${r.region}</div>
+                            </div>
+                            <span class="font-mono font-bold text-purple-900 bg-white px-2 py-1 rounded border">${r.phone_number}</span>
                         </div>
-                    </div>
-                    <div class="pt-2 border-t border-purple-200/60 flex justify-end gap-2 text-xs no-print">
-                        <button onclick="openEditRepModal(${r.id}, '${escape(r.name)}', '${escape(r.employee_code)}', '${escape(r.region)}', '${r.phone_number}', ${r.has_target}, ${r.monthly_target || 0}, '${r.preferred_language || 'AR'}')" class="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded">تعديل</button>
-                        <button onclick="deleteRep(${r.id}, '${r.name}')" class="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded">حذف</button>
-                    </div>
-                </div>
-            `).join('');
+                    `).join('');
+                }
+            } catch(e) {
+                console.error("Error loading reps:", e);
+            }
 
-            const repOptionsHTML = reps.map(r => `<option value="${r.id}">${r.name} (${r.region})</option>`).join('');
-            const repNamesOnlyHTML = reps.map(r => `<option value="${r.name}">${r.name} (${r.region})</option>`).join('');
-
-            document.getElementById('cust-rep-select').innerHTML = '<option value="">-- بدون تعيين حالي --</option>' + repOptionsHTML;
-            document.getElementById('edit-cust-rep-select').innerHTML = '<option value="">-- بدون تعيين حالي --</option>' + repOptionsHTML;
-            document.getElementById('tgt-rep-select').innerHTML = repOptionsHTML;
-            document.getElementById('exp-rep-select').innerHTML = repOptionsHTML;
-            document.getElementById('edit-exp-rep-select').innerHTML = repOptionsHTML;
-            document.getElementById('sample-rep-select').innerHTML = repNamesOnlyHTML;
-            document.getElementById('cal-rep-select').innerHTML = repNamesOnlyHTML;
-            document.getElementById('edit-cal-rep-select').innerHTML = repNamesOnlyHTML;
-
-            document.getElementById('settings-reps-whitelist-list').innerHTML = reps.map(r => `
-                <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-xl flex justify-between items-center text-xs">
-                    <div>
-                        <div class="font-bold text-[#3A056A]">${r.name}</div>
-                        <div class="text-[10px] text-gray-500">${r.region}</div>
-                    </div>
-                    <span class="font-mono font-bold text-purple-900 bg-white px-2 py-1 rounded border">${r.phone_number}</span>
-                </div>
-            `).join('');
-
-            const custRes = await fetch('/api/customers');
-            const custs = await custRes.json();
-            
-            document.getElementById('customers-table-body').innerHTML = custs.map(c => `
-                <tr>
-                    <td class="p-3 font-bold">${c.company_name || '—'}</td>
-                    <td class="p-3 font-semibold text-purple-900">${c.brand_name || '—'}</td>
-                    <td class="p-3 text-gray-600">${c.region || 'مسقط'} | ${c.sector || 'عام'}</td>
-                    <td class="p-3"><div>${c.contact_person || '—'}</div><div class="font-mono text-gray-500 text-[10px]">${c.phone || '—'}</div></td>
-                    <td class="p-3 font-bold text-[#3A056A]">${c.assigned_rep_name || '—'}</td>
-                    <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id ? '✓ ' + c.whatsapp_group_id : '<span class="text-gray-400">غير مربوط</span>'}</td>
-                    <td class="p-3 text-[11px] text-gray-600 max-w-xs">${c.notes || 'لا توجد ملاحظات خاصة'}</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status || 'نشط'}</span></td>
-                    <td class="p-3 no-print">
-                        <div class="flex gap-1.5">
-                            <button onclick="openEditCustomerModal(${c.id}, '${escape(c.company_name)}', '${escape(c.brand_name)}', '${escape(c.sector)}', '${escape(c.region)}', '${escape(c.contact_person)}', '${escape(c.phone)}', ${c.assigned_rep_id || 'null'}, '${escape(c.notes)}')" class="text-blue-600 hover:text-blue-800 font-bold">تعديل</button>
-                            <span class="text-gray-300">|</span>
-                            <button onclick="deleteCustomer(${c.id}, '${c.company_name}')" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-
-            const custOptionsHTML = custs.map(c => `<option value="${c.id}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
-            const custDatalistHTML = custs.map(c => `<option value="${c.company_name}">${c.brand_name ? c.brand_name : c.region}</option>`).join('');
-
-            document.getElementById('tgt-customer-select').innerHTML = custOptionsHTML;
-            document.getElementById('settings-wa-customer-select').innerHTML = custOptionsHTML;
-            document.getElementById('sample-customers-datalist').innerHTML = custDatalistHTML;
-            document.getElementById('cal-customers-datalist').innerHTML = custDatalistHTML;
-
-            const monitoredCusts = custs.filter(c => c.whatsapp_group_id);
-            document.getElementById('settings-monitored-groups-tbody').innerHTML = monitoredCusts.length > 0 ? monitoredCusts.map(c => `
-                <tr>
-                    <td class="p-2.5 font-bold">${c.company_name}</td>
-                    <td class="p-2.5 font-semibold text-purple-900">${c.brand_name || '—'}</td>
-                    <td class="p-2.5 font-mono text-purple-800">${c.whatsapp_group_id}</td>
-                    <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">مراقبة حصرية نشطة ✓</span></td>
-                    <td class="p-2.5 no-print"><button onclick="unassignGroup(${c.id})" class="text-red-600 hover:text-red-800 underline text-[11px]">فك الربط</button></td>
-                </tr>
-            `).join('') : '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد مجموعات مربوطة حالياً. استخدم الأداة أعلاه لربط المجموعات بنقرة واحدة.</td></tr>';
-
-            const tgtRes = await fetch('/api/targets');
-            const targets = await tgtRes.json();
-            
-            const activeTargets = targets.filter(t => t.status === 'IN_PROGRESS');
-            document.getElementById('kpi-active-targets').innerText = activeTargets.length;
-
-            document.getElementById('targets-cards-container').innerHTML = targets.map(t => `
-                <div class="p-4 rounded-xl border ${t.status === 'CLOSED' ? 'border-emerald-300 bg-emerald-50/40' : 'brand-border bg-white'} shadow-xs space-y-3">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <span class="font-bold text-sm text-gray-900">${t.title}</span>
-                            <div class="text-xs text-[#3A056A] font-semibold mt-0.5">🏢 العميل: ${t.customer_name}</div>
-                            <div class="text-xs text-gray-500">👤 عضو الفريق المتابع: <strong>${t.rep_name}</strong></div>
-                        </div>
-                        <span class="px-2.5 py-1 rounded text-[10px] font-bold ${t.status === 'CLOSED' ? 'bg-emerald-200 text-emerald-900' : 'bg-purple-100 text-[#3A056A]'}">
-                            ${t.status === 'CLOSED' ? 'مغلق بأمر شراء ✓' : 'فرصة جارية ⏳'}
-                        </span>
-                    </div>
-
-                    <div class="p-2.5 bg-gray-50 rounded-lg flex justify-between items-center text-xs">
-                        <span class="text-gray-500">العداد الحي منذ بدء أول خطوة:</span>
-                        <span class="font-mono font-bold text-purple-900">${t.duration_text}</span>
-                    </div>
-
-                    <div class="p-2.5 rounded-lg border border-dashed brand-border bg-purple-50/50 space-y-1">
-                        <div class="flex justify-between text-[10px] text-gray-500">
-                            <span class="font-bold text-[#3A056A]">آخر ملاحظة من الفريق:</span>
-                            <span>${t.last_note_at_str}</span>
-                        </div>
-                        <p class="text-xs text-gray-800">${t.last_note || 'لا توجد ملاحظات مسجلة بعد'}</p>
-                    </div>
-
-                    ${t.status === 'CLOSED' ? `
-                    <div class="p-2 bg-emerald-100/60 rounded-lg text-xs space-y-0.5 border border-emerald-300">
-                        <div class="flex justify-between font-bold text-emerald-900">
-                            <span>رقم أمر الشراء (PO): ${t.po_number}</span>
-                            <span>القيمة: ${(t.po_value || 0).toLocaleString()} ر.ع</span>
-                        </div>
-                        ${t.po_attachment_url ? `<a href="${t.po_attachment_url}" target="_blank" class="text-[10px] text-blue-700 underline block mt-1">عرض المستند المرفق 🔗</a>` : ''}
-                    </div>
-                    ` : `
-                    <div class="flex justify-between items-center pt-2 border-t border-gray-100 no-print">
-                        <button onclick="openTargetNoteModal(${t.id})" class="px-3 py-1.5 border brand-border text-[#3A056A] font-bold rounded-lg text-[11px] hover:bg-purple-50">
-                            + تحديث الملاحظة
-                        </button>
-                        <button onclick="openTargetCloseModal(${t.id})" class="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-lg text-[11px] shadow-xs hover:bg-emerald-700">
-                            إغلاق بأمر شراء (PO) ✓
-                        </button>
-                    </div>
-                    `}
-                </div>
-            `).join('');
-
-            // جلب العينات وتفعيل جدول الجرد مع الفلترة
-            const sRes = await fetch('/api/samples');
-            allSamplesCache = await sRes.json();
-            applySamplesFilter();
-
-            // جلب التقويم مع زر التعديل وإظهار الملاحظات
-            const cRes = await fetch('/api/calendar');
-            const cal = await cRes.json();
-            document.getElementById('calendar-events-list').innerHTML = cal.map(e => {
-                const isCompleted = e.execution_status === 'COMPLETED';
-                const isCancelled = e.execution_status === 'CANCELLED';
+            // 2. جلب وتحديث العملاء ومجموعات الواتساب
+            try {
+                const custRes = await fetch('/api/customers');
+                const custs = await custRes.json();
                 
-                return `
-                <div class="p-3.5 rounded-xl border ${isCompleted ? 'border-emerald-300 bg-emerald-50/40' : (isCancelled ? 'border-gray-200 bg-gray-50 opacity-60' : 'brand-border brand-tint')} flex justify-between items-center text-xs">
-                    <div>
-                        <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
-                        <div class="text-gray-600 mt-0.5">
-                            العميل: <strong>${e.customer_name}</strong> | عضو الفريق: <strong>${e.rep_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span> | الموقع: ${e.location}
-                        </div>
-                        ${e.reminder_at ? `<div class="text-[10px] text-purple-700 font-mono mt-0.5">توقيت التذكير المجدول: ${e.reminder_at}</div>` : ''}
-                        ${e.change_notes ? `<div class="text-[11px] text-amber-800 bg-amber-50 p-1 rounded mt-1 border border-amber-200"><strong>ملاحظة التعديل:</strong> ${e.change_notes}</div>` : ''}
-                    </div>
-                    <div class="flex items-center gap-1.5 no-print">
-                        <span class="px-2.5 py-1 rounded text-xs font-bold ${isCompleted ? 'bg-emerald-100 text-emerald-800' : (isCancelled ? 'bg-gray-200 text-gray-700' : 'bg-amber-100 text-amber-800')}">
-                            ${isCompleted ? 'مكتملة ومُنفذة ✓' : (isCancelled ? 'ملغاة' : 'مجدولة (PENDING)')}
-                        </span>
-                        ${(!isCompleted && !isCancelled) ? `
-                        <button onclick="openEditCalendarModal(${e.id}, '${escape(e.customer_name)}', '${escape(e.rep_name)}', '${escape(e.task_type)}', '${e.scheduled_at}', '${e.reminder_at || ''}', '${escape(e.location)}', '${escape(e.change_notes || '')}')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[11px]">تعديل</button>
-                        <button onclick="updateCalendarStatus(${e.id}, 'COMPLETED')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px]">إتمام المهمة ✓</button>
-                        <button onclick="updateCalendarStatus(${e.id}, 'CANCELLED')" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-[11px]">إلغاء</button>
-                        ` : ''}
-                    </div>
-                </div>`;
-            }).join('');
+                const custTableBody = document.getElementById('customers-table-body');
+                if (custTableBody) {
+                    custTableBody.innerHTML = custs.map(c => `
+                        <tr>
+                            <td class="p-3 font-bold">${c.company_name || '—'}</td>
+                            <td class="p-3 font-semibold text-purple-900">${c.brand_name || '—'}</td>
+                            <td class="p-3 text-gray-600">${c.region || 'مسقط'} | ${c.sector || 'عام'}</td>
+                            <td class="p-3"><div>${c.contact_person || '—'}</div><div class="font-mono text-gray-500 text-[10px]">${c.phone || '—'}</div></td>
+                            <td class="p-3 font-bold text-[#3A056A]">${c.assigned_rep_name || '—'}</td>
+                            <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id ? '✓ ' + c.whatsapp_group_id : '<span class="text-gray-400">غير مربوط</span>'}</td>
+                            <td class="p-3 text-[11px] text-gray-600 max-w-xs">${c.notes || 'لا توجد ملاحظات خاصة'}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status || 'نشط'}</span></td>
+                            <td class="p-3 no-print">
+                                <div class="flex gap-1.5">
+                                    <button onclick="openEditCustomerModal(${c.id}, '${escape(c.company_name || '')}', '${escape(c.brand_name || '')}', '${escape(c.sector || '')}', '${escape(c.region || '')}', '${escape(c.contact_person || '')}', '${escape(c.phone || '')}', ${c.assigned_rep_id || 'null'}, '${escape(c.notes || '')}')" class="text-blue-600 hover:text-blue-800 font-bold">تعديل</button>
+                                    <span class="text-gray-300">|</span>
+                                    <button onclick="deleteCustomer(${c.id}, '${c.company_name}')" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
 
-            // جلب وعرض سجل المصاريف التفصيلي
-            const expRes = await fetch('/api/expenses');
-            const expenses = await expRes.json();
-            document.getElementById('expenses-log-table-body').innerHTML = expenses.length > 0 ? expenses.map(x => `
-                <tr>
-                    <td class="p-3 font-mono font-bold text-gray-500">#EXP-${x.id}</td>
-                    <td class="p-3 font-bold text-[#3A056A]">${x.rep_name}</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-purple-50 text-purple-900 font-bold border border-purple-200">${x.expense_type}</span></td>
-                    <td class="p-3 font-black text-amber-800">${x.amount.toLocaleString()} ر.ع</td>
-                    <td class="p-3 text-gray-600">${x.notes || '—'}</td>
-                    <td class="p-3 text-gray-400 font-mono text-[11px]">${x.created_at_str}</td>
-                    <td class="p-3 no-print">
-                        <div class="flex gap-2">
-                            <button onclick="openEditExpenseModal(${x.id}, ${x.rep_id}, '${x.expense_type}', ${x.amount}, '${escape(x.notes || '')}')" class="text-blue-600 hover:text-blue-800 font-bold">تعديل</button>
-                            <span class="text-gray-300">|</span>
-                            <button onclick="deleteExpense(${x.id})" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('') : '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا توجد سندات مصاريف مسجلة حتى الآن</td></tr>';
+                const custOptionsHTML = custs.map(c => `<option value="${c.id}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
+                const custDatalistHTML = custs.map(c => `<option value="${c.company_name}">${c.brand_name ? c.brand_name : c.region}</option>`).join('');
 
-            const wRes = await fetch('/api/whatsapp/logs');
-            const wLogs = await wRes.json();
-            document.getElementById('whatsapp-feed-list').innerHTML = wLogs.map(l => `
-                <div class="p-3 rounded-xl border brand-border bg-white space-y-1">
-                    <div class="flex justify-between items-center text-[10px] text-gray-400">
-                        <span class="font-bold brand-primary-text">${l.sender_name}</span>
-                        <span>${l.created_at}</span>
-                    </div>
-                    <p class="text-gray-800 text-xs">${l.message_body}</p>
-                </div>
-            `).join('');
+                const tgtCustSelect = document.getElementById('tgt-customer-select');
+                if (tgtCustSelect) tgtCustSelect.innerHTML = custOptionsHTML;
+
+                const setWaSelect = document.getElementById('settings-wa-customer-select');
+                if (setWaSelect) setWaSelect.innerHTML = custOptionsHTML;
+
+                const sampleDList = document.getElementById('sample-customers-datalist');
+                if (sampleDList) sampleDList.innerHTML = custDatalistHTML;
+
+                const calDList = document.getElementById('cal-customers-datalist');
+                if (calDList) calDList.innerHTML = custDatalistHTML;
+
+                const monitoredCusts = custs.filter(c => c.whatsapp_group_id);
+                const monTbody = document.getElementById('settings-monitored-groups-tbody');
+                if (monTbody) {
+                    monTbody.innerHTML = monitoredCusts.length > 0 ? monitoredCusts.map(c => `
+                        <tr>
+                            <td class="p-2.5 font-bold">${c.company_name}</td>
+                            <td class="p-2.5 font-semibold text-purple-900">${c.brand_name || '—'}</td>
+                            <td class="p-2.5 font-mono text-purple-800">${c.whatsapp_group_id}</td>
+                            <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">مراقبة حصرية نشطة ✓</span></td>
+                            <td class="p-2.5 no-print"><button onclick="unassignGroup(${c.id})" class="text-red-600 hover:text-red-800 underline text-[11px]">فك الربط</button></td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد مجموعات مربوطة حالياً. استخدم الأداة أعلاه لربط المجموعات بنقرة واحدة.</td></tr>';
+                }
+            } catch(e) {
+                console.error("Error loading customers:", e);
+            }
+
+            // 3. جلب وتحديث سجل المصاريف المفصل
+            try {
+                const expRes = await fetch('/api/expenses');
+                const expenses = await expRes.json();
+                const expTbody = document.getElementById('expenses-log-table-body');
+                if (expTbody) {
+                    expTbody.innerHTML = expenses.length > 0 ? expenses.map(x => `
+                        <tr>
+                            <td class="p-3 font-mono font-bold text-gray-500">#EXP-${x.id}</td>
+                            <td class="p-3 font-bold text-[#3A056A]">${x.rep_name}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded bg-purple-50 text-purple-900 font-bold border border-purple-200">${x.expense_type}</span></td>
+                            <td class="p-3 font-black text-amber-800">${x.amount.toLocaleString()} ر.ع</td>
+                            <td class="p-3 text-gray-600">${x.notes || '—'}</td>
+                            <td class="p-3 text-gray-400 font-mono text-[11px]">${x.created_at_str}</td>
+                            <td class="p-3 no-print">
+                                <div class="flex gap-2">
+                                    <button onclick="openEditExpenseModal(${x.id}, ${x.rep_id}, '${x.expense_type}', ${x.amount}, '${escape(x.notes || '')}')" class="text-blue-600 hover:text-blue-800 font-bold">تعديل</button>
+                                    <span class="text-gray-300">|</span>
+                                    <button onclick="deleteExpense(${x.id})" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا توجد سندات مصاريف مسجلة حتى الآن</td></tr>';
+                }
+            } catch(e) {
+                console.error("Error loading expenses:", e);
+            }
+
+            // 4. جلب وتحديث الأهداف والفرص
+            try {
+                const tgtRes = await fetch('/api/targets');
+                const targets = await tgtRes.json();
+                const activeTargets = targets.filter(t => t.status === 'IN_PROGRESS');
+                document.getElementById('kpi-active-targets').innerText = activeTargets.length;
+
+                const tgtContainer = document.getElementById('targets-cards-container');
+                if (tgtContainer) {
+                    tgtContainer.innerHTML = targets.map(t => `
+                        <div class="p-4 rounded-xl border ${t.status === 'CLOSED' ? 'border-emerald-300 bg-emerald-50/40' : 'brand-border bg-white'} shadow-xs space-y-3">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="font-bold text-sm text-gray-900">${t.title}</span>
+                                    <div class="text-xs text-[#3A056A] font-semibold mt-0.5">🏢 العميل: ${t.customer_name}</div>
+                                    <div class="text-xs text-gray-500">👤 عضو الفريق المتابع: <strong>${t.rep_name}</strong></div>
+                                </div>
+                                <span class="px-2.5 py-1 rounded text-[10px] font-bold ${t.status === 'CLOSED' ? 'bg-emerald-200 text-emerald-900' : 'bg-purple-100 text-[#3A056A]'}">
+                                    ${t.status === 'CLOSED' ? 'مغلق بأمر شراء ✓' : 'فرصة جارية ⏳'}
+                                </span>
+                            </div>
+
+                            <div class="p-2.5 bg-gray-50 rounded-lg flex justify-between items-center text-xs">
+                                <span class="text-gray-500">العداد الحي منذ بدء أول خطوة:</span>
+                                <span class="font-mono font-bold text-purple-900">${t.duration_text}</span>
+                            </div>
+
+                            <div class="p-2.5 rounded-lg border border-dashed brand-border bg-purple-50/50 space-y-1">
+                                <div class="flex justify-between text-[10px] text-gray-500">
+                                    <span class="font-bold text-[#3A056A]">آخر ملاحظة من الفريق:</span>
+                                    <span>${t.last_note_at_str}</span>
+                                </div>
+                                <p class="text-xs text-gray-800">${t.last_note || 'لا توجد ملاحظات مسجلة بعد'}</p>
+                            </div>
+
+                            ${t.status === 'CLOSED' ? `
+                            <div class="p-2 bg-emerald-100/60 rounded-lg text-xs space-y-0.5 border border-emerald-300">
+                                <div class="flex justify-between font-bold text-emerald-900">
+                                    <span>رقم أمر الشراء (PO): ${t.po_number}</span>
+                                    <span>القيمة: ${(t.po_value || 0).toLocaleString()} ر.ع</span>
+                                </div>
+                                ${t.po_attachment_url ? `<a href="${t.po_attachment_url}" target="_blank" class="text-[10px] text-blue-700 underline block mt-1">عرض المستند المرفق 🔗</a>` : ''}
+                            </div>
+                            ` : `
+                            <div class="flex justify-between items-center pt-2 border-t border-gray-100 no-print">
+                                <button onclick="openTargetNoteModal(${t.id})" class="px-3 py-1.5 border brand-border text-[#3A056A] font-bold rounded-lg text-[11px] hover:bg-purple-50">
+                                    + تحديث الملاحظة
+                                </button>
+                                <button onclick="openTargetCloseModal(${t.id})" class="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-lg text-[11px] shadow-xs hover:bg-emerald-700">
+                                    إغلاق بأمر شراء (PO) ✓
+                                </button>
+                            </div>
+                            `}
+                        </div>
+                    `).join('');
+                }
+            } catch(e) {
+                console.error("Error loading targets:", e);
+            }
+
+            // 5. جلب وتحديث العينات
+            try {
+                const sRes = await fetch('/api/samples');
+                allSamplesCache = await sRes.json();
+                applySamplesFilter();
+            } catch(e) {
+                console.error("Error loading samples:", e);
+            }
+
+            // 6. جلب وتحديث التقويم
+            try {
+                const cRes = await fetch('/api/calendar');
+                const cal = await cRes.json();
+                const calList = document.getElementById('calendar-events-list');
+                if (calList) {
+                    calList.innerHTML = cal.map(e => {
+                        const isCompleted = e.execution_status === 'COMPLETED';
+                        const isCancelled = e.execution_status === 'CANCELLED';
+                        
+                        return `
+                        <div class="p-3.5 rounded-xl border ${isCompleted ? 'border-emerald-300 bg-emerald-50/40' : (isCancelled ? 'border-gray-200 bg-gray-50 opacity-60' : 'brand-border brand-tint')} flex justify-between items-center text-xs">
+                            <div>
+                                <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
+                                <div class="text-gray-600 mt-0.5">
+                                    العميل: <strong>${e.customer_name}</strong> | عضو الفريق: <strong>${e.rep_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span> | الموقع: ${e.location}
+                                </div>
+                                ${e.reminder_at ? `<div class="text-[10px] text-purple-700 font-mono mt-0.5">توقيت التذكير المجدول: ${e.reminder_at}</div>` : ''}
+                                ${e.change_notes ? `<div class="text-[11px] text-amber-800 bg-amber-50 p-1 rounded mt-1 border border-amber-200"><strong>ملاحظة التعديل:</strong> ${e.change_notes}</div>` : ''}
+                            </div>
+                            <div class="flex items-center gap-1.5 no-print">
+                                <span class="px-2.5 py-1 rounded text-xs font-bold ${isCompleted ? 'bg-emerald-100 text-emerald-800' : (isCancelled ? 'bg-gray-200 text-gray-700' : 'bg-amber-100 text-amber-800')}">
+                                    ${isCompleted ? 'مكتملة ومُنفذة ✓' : (isCancelled ? 'ملغاة' : 'مجدولة (PENDING)')}
+                                </span>
+                                ${(!isCompleted && !isCancelled) ? `
+                                <button onclick="openEditCalendarModal(${e.id}, '${escape(e.customer_name || '')}', '${escape(e.rep_name || '')}', '${escape(e.task_type || '')}', '${e.scheduled_at || ''}', '${e.reminder_at || ''}', '${escape(e.location || '')}', '${escape(e.change_notes || '')}')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[11px]">تعديل</button>
+                                <button onclick="updateCalendarStatus(${e.id}, 'COMPLETED')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px]">إتمام المهمة ✓</button>
+                                <button onclick="updateCalendarStatus(${e.id}, 'CANCELLED')" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-[11px]">إلغاء</button>
+                                ` : ''}
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            } catch(e) {
+                console.error("Error loading calendar:", e);
+            }
+
+            // 7. جلب سجل الواتساب
+            try {
+                const wRes = await fetch('/api/whatsapp/logs');
+                const wLogs = await wRes.json();
+                const feedList = document.getElementById('whatsapp-feed-list');
+                if (feedList) {
+                    feedList.innerHTML = wLogs.map(l => `
+                        <div class="p-3 rounded-xl border brand-border bg-white space-y-1">
+                            <div class="flex justify-between items-center text-[10px] text-gray-400">
+                                <span class="font-bold brand-primary-text">${l.sender_name}</span>
+                                <span>${l.created_at}</span>
+                            </div>
+                            <p class="text-gray-800 text-xs">${l.message_body}</p>
+                        </div>
+                    `).join('');
+                }
+            } catch(e) {
+                console.error("Error loading whatsapp logs:", e);
+            }
         }
 
         window.addEventListener('DOMContentLoaded', () => {
