@@ -1709,6 +1709,79 @@
             }
         }
 
+        function logoutSession() {
+            localStorage.removeItem('fdc_auth_token');
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            document.getElementById('auth-otp-code').value = '';
+        }
+
+        function toggleSetupQR() {
+            const box = document.getElementById('qr-setup-box');
+            const qrImg = document.getElementById('qr-image');
+            box.classList.toggle('hidden');
+            if (!box.classList.contains('hidden')) {
+                qrImg.src = '/api/auth/2fa/qr?t=' + new Date().getTime();
+            }
+        }
+
+        async function submit2FAVerification() {
+            const code = document.getElementById('auth-otp-code').value.trim();
+            const errorEl = document.getElementById('auth-error-msg');
+            errorEl.classList.add('hidden');
+
+            if (code.length !== 6) {
+                errorEl.innerText = "يرجى إدخال 6 أرقام كاملة";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/2fa/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+
+                if (res.ok) {
+                    localStorage.setItem('fdc_auth_token', 'AUTHENTICATED');
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    check2FAStatus();
+                    loadAllData();
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    errorEl.innerText = data.detail || "رمز التحقق غير صحيح";
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorEl.innerText = "تعذر الاتصال بالخادم: " + err.message;
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        async function check2FAStatus() {
+            try {
+                const res = await fetch('/api/auth/2fa/status');
+                const data = await res.json();
+                if (data.is_enabled) {
+                    const btn = document.getElementById('qr-setup-btn');
+                    const box = document.getElementById('qr-setup-box');
+                    if (btn) btn.remove();
+                    if (box) box.remove();
+                }
+            } catch (e) {}
+        }
+
+        async function loadExpenseCategories() {
+            try {
+                const res = await fetch('/api/expense-categories');
+                const categories = await res.json();
+                const selectEl = document.getElementById('exp-type-select');
+                if (selectEl) {
+                    selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
+                }
+            } catch (e) {}
+        }
+
         async function loadAllData() {
             loadSavedTestPhone();
             checkWhatsAppLiveStatus();
@@ -1945,7 +2018,7 @@
         window.addEventListener('DOMContentLoaded', () => {
             loadSavedTestPhone();
             check2FAStatus();
-            if (sessionStorage.getItem('fdc_auth_token') === 'AUTHENTICATED') {
+            if (localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED') {
                 document.getElementById('auth-overlay').classList.add('hidden');
                 loadAllData();
             }
