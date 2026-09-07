@@ -1,11 +1,17 @@
 {
-  "name": "fdc-whatsapp-engine",
+  "name": "fdc-sales-crm-whatsapp",
   "version": "1.0.0",
+  "description": "WhatsApp Baileys Service with PostgreSQL Session Persistence for Food Development Company",
+  "main": "whatsapp_service.js",
+  "scripts": {
+    "start": "node whatsapp_service.js"
+  },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.8",
-    "axios": "^1.7.2",
+    "@whiskeysockets/baileys": "^6.6.0",
+    "axios": "^1.6.8",
     "express": "^4.19.2",
-    "pino": "^9.2.0",
+    "pg": "^8.11.3",
+    "pino": "^8.19.0",
     "qrcode": "^1.5.3"
   }
 }
