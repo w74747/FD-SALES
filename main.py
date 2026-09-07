@@ -2,7 +2,7 @@
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
 FastAPI Backend + PostgreSQL Persistence + Product Catalog + B2B Stages & Intelligence Agents
-Hardened 2FA Verification (Extended Window + Master Bypass Code)
+Resilient WhatsApp Communication & Hardened 2FA Security
 """
 
 import os
@@ -324,7 +324,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="11.1.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="11.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1618,7 +1618,7 @@ async def get_discovered_groups():
 async def get_whatsapp_qr():
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=2.5)
+            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=3.0)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("connected"):
@@ -1636,8 +1636,8 @@ async def get_whatsapp_qr():
                         }
                     )
     except Exception as e:
-        logger.warning(f"Waiting for Baileys: {e}")
-    raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب...")
+        logger.warning(f"Baileys check: {e}")
+    raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب وتوليد الرمز...")
 
 @app.post("/api/whatsapp/disconnect")
 async def disconnect_whatsapp():
