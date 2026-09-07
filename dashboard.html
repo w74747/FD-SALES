@@ -481,7 +481,7 @@
     <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[520px] space-y-3 text-xs">
             <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">إضافة وكيل ذكاء اصطناعي جديد (AI Agent)</h3>
+                <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة وكيل ذكاء اصطناعي جديد (AI Agent)</h3>
                 <span class="text-[10px] text-gray-500">مساعد ميداني ذكي</span>
             </div>
             <div>
@@ -561,6 +561,7 @@
         </div>
     </div>
 
+    <!-- نافذة إضافة عضو فريق مبيعات جديد -->
     <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
@@ -583,6 +584,46 @@
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeNewRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitNewRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العضو</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تعديل عضو فريق المبيعات -->
+    <div id="edit-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
+            <input type="hidden" id="edit-rep-id">
+            <div>
+                <label class="block font-bold mb-1">الاسم الكامل:</label>
+                <input type="text" id="edit-rep-name-input" class="w-full p-2 border rounded-lg">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">الكود الوظيفي:</label>
+                    <input type="text" id="edit-rep-code-input" class="w-full p-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">المنطقة البيعية:</label>
+                    <input type="text" id="edit-rep-region-input" class="w-full p-2 border rounded-lg">
+                </div>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">رقم الهاتف المعتمد:</label>
+                <input type="text" id="edit-rep-phone-input" class="w-full p-2 border rounded-lg font-mono">
+            </div>
+            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
+                    <input type="checkbox" id="edit-rep-has-target-toggle" onchange="toggleEditTargetInput(this.checked)" class="w-4 h-4 text-purple-600 rounded">
+                </div>
+                <div id="edit-rep-target-box" class="hidden">
+                    <label class="block mb-1 text-[11px] text-gray-600">المستهدف الشهري (ر.ع):</label>
+                    <input type="number" id="edit-rep-target-input" class="w-full p-1.5 border rounded bg-white" value="0">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeEditRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitUpdateRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
             </div>
         </div>
     </div>
@@ -1128,19 +1169,97 @@
         function openNewRepModal() { document.getElementById('new-rep-modal').classList.remove('hidden'); }
         function closeNewRepModal() { document.getElementById('new-rep-modal').classList.add('hidden'); }
 
+        function openEditRepModal(id, name, code, region, phone, hasTarget, target) {
+            document.getElementById('edit-rep-id').value = id;
+            document.getElementById('edit-rep-name-input').value = unescape(name);
+            document.getElementById('edit-rep-code-input').value = unescape(code);
+            document.getElementById('edit-rep-region-input').value = unescape(region);
+            document.getElementById('edit-rep-phone-input').value = phone;
+            document.getElementById('edit-rep-has-target-toggle').checked = hasTarget;
+            document.getElementById('edit-rep-target-input').value = target || 0;
+            toggleEditTargetInput(hasTarget);
+            document.getElementById('edit-rep-modal').classList.remove('hidden');
+        }
+
+        function closeEditRepModal() {
+            document.getElementById('edit-rep-modal').classList.add('hidden');
+        }
+
+        function toggleEditTargetInput(checked) {
+            document.getElementById('edit-rep-target-box').classList.toggle('hidden', !checked);
+        }
+
+        async function submitUpdateRep() {
+            const id = document.getElementById('edit-rep-id').value;
+            const name = document.getElementById('edit-rep-name-input').value.trim();
+            const code = document.getElementById('edit-rep-code-input').value.trim();
+            const region = document.getElementById('edit-rep-region-input').value.trim();
+            const phone = document.getElementById('edit-rep-phone-input').value.trim();
+            const hasT = document.getElementById('edit-rep-has-target-toggle').checked;
+            const targetVal = parseFloat(document.getElementById('edit-rep-target-input').value) || 0;
+
+            if (!name || !phone) {
+                alert("يرجى ملء الاسم الكامل ورقم الهاتف");
+                return;
+            }
+
+            const payload = {
+                name: name,
+                employee_code: code,
+                region: region,
+                phone_number: phone,
+                has_target: hasT,
+                monthly_target: targetVal
+            };
+
+            try {
+                const res = await fetch(`/api/reps/${id}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeEditRepModal();
+                    await loadAllData();
+                    alert("تم تحديث بيانات عضو الفريق بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "حدث خطأ أثناء التحديث");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لتحديث البيانات");
+            }
+        }
+
+        async function deleteRep(id, repName) {
+            if (!confirm(`هل أنت متأكد من حذف المندوب "${repName}" نهائياً من الفريق؟`)) return;
+            try {
+                const res = await fetch(`/api/reps/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    await loadAllData();
+                    alert("تم حذف عضو الفريق بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "تعذر حذف المندوب");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لحذف المندوب");
+            }
+        }
+
         function openNewCustomerModal() { document.getElementById('new-customer-modal').classList.remove('hidden'); }
         function closeNewCustomerModal() { document.getElementById('new-customer-modal').classList.add('hidden'); }
 
         function openEditCustomerModal(id, comp, brand, sect, reg, pers, ph, repId, notes) {
             document.getElementById('edit-cust-id').value = id;
-            document.getElementById('edit-cust-company-name').value = comp || '';
-            document.getElementById('edit-cust-brand-name').value = brand || '';
-            document.getElementById('edit-cust-sector').value = sect || '';
-            document.getElementById('edit-cust-region').value = reg || '';
-            document.getElementById('edit-cust-contact-person').value = pers || '';
+            document.getElementById('edit-cust-company-name').value = unescape(comp) || '';
+            document.getElementById('edit-cust-brand-name').value = unescape(brand) || '';
+            document.getElementById('edit-cust-sector').value = unescape(sect) || '';
+            document.getElementById('edit-cust-region').value = unescape(reg) || '';
+            document.getElementById('edit-cust-contact-person').value = unescape(pers) || '';
             document.getElementById('edit-cust-phone').value = ph || '';
             document.getElementById('edit-cust-rep-select').value = repId || '';
-            document.getElementById('edit-cust-notes').value = notes || '';
+            document.getElementById('edit-cust-notes').value = unescape(notes) || '';
             document.getElementById('edit-customer-modal').classList.remove('hidden');
         }
         function closeEditCustomerModal() { document.getElementById('edit-customer-modal').classList.add('hidden'); }
@@ -1604,17 +1723,23 @@
             document.getElementById('kpi-total-expenses').innerText = `${totalExp.toLocaleString()} ر.ع`;
 
             document.getElementById('reps-grid-cards').innerHTML = reps.map(r => `
-                <div class="p-4 rounded-xl border brand-border brand-tint space-y-2">
-                    <div class="flex justify-between items-center">
-                        <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                <div class="p-4 rounded-xl border brand-border brand-tint space-y-2 flex flex-col justify-between">
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                        </div>
+                        <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
+                        <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
+                        <div class="pt-2 border-t brand-border space-y-1 text-xs">
+                            <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</span></div>
+                            <div class="flex justify-between"><span>المستهدف:</span><span>${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع' : 'قياس نتائج مفتوح'}</span></div>
+                            <div class="flex justify-between"><span>إجمالي المصاريف:</span><span class="font-bold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</span></div>
+                        </div>
                     </div>
-                    <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
-                    <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
-                    <div class="pt-2 border-t brand-border space-y-1 text-xs">
-                        <div class="flex justify-between"><span>المبيعات المحققة:</span><span class="font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</span></div>
-                        <div class="flex justify-between"><span>المستهدف:</span><span>${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع' : 'قياس نتائج مفتوح'}</span></div>
-                        <div class="flex justify-between"><span>إجمالي المصاريف:</span><span class="font-bold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</span></div>
+                    <div class="pt-2 border-t border-purple-200/60 flex justify-end gap-2 text-xs no-print">
+                        <button onclick="openEditRepModal(${r.id}, '${escape(r.name)}', '${escape(r.employee_code)}', '${escape(r.region)}', '${r.phone_number}', ${r.has_target}, ${r.monthly_target || 0})" class="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded">تعديل</button>
+                        <button onclick="deleteRep(${r.id}, '${r.name}')" class="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded">حذف</button>
                     </div>
                 </div>
             `).join('');
