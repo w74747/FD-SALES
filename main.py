@@ -100,6 +100,7 @@ def init_database():
                 monthly_target NUMERIC(12, 2) DEFAULT 0.00,
                 achieved_sales NUMERIC(12, 2) DEFAULT 0.00,
                 total_expenses NUMERIC(12, 2) DEFAULT 0.00,
+                preferred_language VARCHAR(10) DEFAULT 'AR',
                 status VARCHAR(20) DEFAULT 'نشط'
             );
             """)
@@ -165,10 +166,10 @@ def init_database():
             cur.execute("""
             CREATE TABLE IF NOT EXISTS sample_deliveries (
                 id SERIAL PRIMARY KEY,
-                customer_name VARCHAR(200) NOT NULL,
-                rep_name VARCHAR(150) NOT NULL,
-                product_name VARCHAR(200) NOT NULL,
-                qty_free INT NOT NULL,
+                customer_name VARCHAR(200),
+                rep_name VARCHAR(150),
+                product_name VARCHAR(200),
+                qty_free INT NOT NULL DEFAULT 1,
                 delivery_date DATE DEFAULT CURRENT_DATE,
                 status VARCHAR(20) DEFAULT 'PENDING',
                 converted_po_id VARCHAR(100),
@@ -180,11 +181,11 @@ def init_database():
             cur.execute("""
             CREATE TABLE IF NOT EXISTS calendar_events (
                 id SERIAL PRIMARY KEY,
-                customer_name VARCHAR(200) NOT NULL,
-                rep_name VARCHAR(150) NOT NULL,
-                task_type VARCHAR(150) NOT NULL,
-                scheduled_at VARCHAR(50) NOT NULL,
-                location VARCHAR(255) NOT NULL,
+                customer_name VARCHAR(200),
+                rep_name VARCHAR(150),
+                task_type VARCHAR(150),
+                scheduled_at VARCHAR(50),
+                location VARCHAR(255),
                 route_code VARCHAR(50) DEFAULT 'R-01',
                 execution_status VARCHAR(20) DEFAULT 'PENDING'
             );
@@ -219,72 +220,25 @@ def init_database():
     finally:
         conn.close()
 
-    # ترقية وتأكيد وجود كافة الأعمدة المطلوبة للجداول
+    # ترقية الجداول القديمة وإسقاط قيود NOT NULL المسببة للخطأ
+    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(10) DEFAULT 'AR';")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS has_target BOOLEAN DEFAULT FALSE;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS monthly_target NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS achieved_sales NUMERIC(12, 2) DEFAULT 0.00;")
     run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS total_expenses NUMERIC(12, 2) DEFAULT 0.00;")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS brand_name VARCHAR(200) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS region VARCHAR(100) DEFAULT 'مسقط';")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS assigned_rep_name VARCHAR(150) DEFAULT '';")
-
-    # ترقية جدول العينات لضمان وجود الأعمدة النصية
+    
+    # حل قيد NOT NULL في جدول العينات والتقويم
+    run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN customer_id DROP NOT NULL;")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN rep_id DROP NOT NULL;")
     run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS customer_name VARCHAR(200) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS rep_name VARCHAR(150) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS product_name VARCHAR(200) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS qty_free INT DEFAULT 1;")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS delivery_date DATE DEFAULT CURRENT_DATE;")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'PENDING';")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS converted_po_id VARCHAR(100) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS po_value NUMERIC(12, 2) DEFAULT 0.00;")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'يدوي';")
-
-    # ترقية جدول التقويم لضمان وجود الأعمدة
+    
+    run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN customer_id DROP NOT NULL;")
+    run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN rep_id DROP NOT NULL;")
     run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS customer_name VARCHAR(200) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS rep_name VARCHAR(150) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS task_type VARCHAR(150) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS scheduled_at VARCHAR(50) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS location VARCHAR(255) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS route_code VARCHAR(50) DEFAULT 'R-01';")
-    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS execution_status VARCHAR(20) DEFAULT 'PENDING';")
-
-    run_isolated_ddl("""
-    INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
-    VALUES 
-    (
-        'متابعة العينات واسترجاع الـ PO',
-        'SAMPLES_CONVERSION',
-        'أنت المنسق الميداني لشركة تنمية الغذاء. اكتب رسالة مهنية ودية إلى عضو الفريق لمتابعة العينات المسلمة التي لم يُصدر لها أمر شراء حتى الآن، واطلب منه بلباقة موافاتك بقرار الشيف أو مدير المشتريات وإرسال رقم أمر الشراء PO عند اعتماده.',
-        'DAILY_10AM',
-        '+96898996963',
-        TRUE
-    ),
-    (
-        'التذكير الصباحي بالمسارات',
-        'CALENDAR_DISPATCH',
-        'أنت منسق جدول العمليات في شركة تنمية الغذاء. قم بصياغة رسالة صباحية مشجعة وموجزة تذكر فيها عضو الفريق بالزيارات الميدانية المجدولة له اليوم، وأسماء العملاء والمواقع المستهدفة.',
-        'DAILY_08AM',
-        '+96898996963',
-        TRUE
-    ),
-    (
-        'إنعاش الأهداف والفرص الراكدة',
-        'STAGNANT_TARGETS',
-        'أنت مستشار الصفقات في شركة تنمية الغذاء. اكتب رسالة تحفيزية لعضو الفريق بخصوص الفرص البيعية التي مر عليها أكثر من 3 أيام دون أي تحديث، واقترح عليه إجراء مكالمة هاتفية أو طلب عينة دعم للإغلاق.',
-        'WEEKLY_SUNDAY',
-        '+96898996963',
-        TRUE
-    )
-    ON CONFLICT DO NOTHING;
-    """)
-
-    run_isolated_ddl("""
-    INSERT INTO expense_categories (category_name) VALUES 
-    ('وقود سيارة'), ('إيجار سيارة / نقل'), ('علاوة يومية (انتداب مدينة أخرى)'),
-    ('ضيافة واجتماعات عملاء'), ('شحن ونثريات عينات'), ('صيانة وإصلاحات طارئة')
-    ON CONFLICT DO NOTHING;
-    """)
 
 def start_whatsapp_service():
     global whatsapp_process
@@ -307,7 +261,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="10.4.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="10.5.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -398,6 +352,7 @@ class NewRepPayload(BaseModel):
     region: str
     has_target: Optional[bool] = False
     monthly_target: Optional[float] = 0.0
+    preferred_language: Optional[str] = "AR"
 
 class UpdateRepPayload(BaseModel):
     name: str
@@ -406,6 +361,7 @@ class UpdateRepPayload(BaseModel):
     region: str
     has_target: Optional[bool] = False
     monthly_target: Optional[float] = 0.0
+    preferred_language: Optional[str] = "AR"
 
 class NewCustomerPayload(BaseModel):
     company_name: str
@@ -532,7 +488,6 @@ def preview_sales_report(payload: ReportPreviewPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات وكلاء الذكاء الاصطناعي -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -611,41 +566,73 @@ async def test_agent_global(payload: dict):
             if not agent:
                 raise HTTPException(status_code=404, detail="الوكيل غير موجود")
 
+            # التحقق من اللغة المفضلة للمندوب صاحب الرقم إن وجد
+            clean_search_phone = test_target.replace("+", "").strip()
+            cur.execute("SELECT preferred_language FROM sales_executives WHERE REPLACE(phone_number, '+', '') = %s;", (clean_search_phone,))
+            rep_lang_row = cur.fetchone()
+            pref_lang = rep_lang_row["preferred_language"] if rep_lang_row else "AR"
+
             cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC LIMIT 1;")
             sample = cur.fetchone()
-            sample_info = f"العميل: {sample['customer_name']} | المنتج: {sample['product_name']}" if (sample and sample.get('customer_name')) else "العميل: مطاعم الريف | المنتج: صدور دجاج 4B"
 
             clean_title = agent["name"].replace("وكيل ", "").replace("وكيل", "").strip()
 
-            if agent["role_type"] == "SAMPLES_CONVERSION":
-                message_text = (
-                    f"*{clean_title}*\n"
-                    f"━━━━━━━━━\n"
-                    f"مرحبا، يرجى موافاتنا بنتيجة تجربة العينات الميدانية لدى:\n"
-                    f"{sample_info}\n\n"
-                    f"عند الاعتماد نرجو تسجيل رقم أمر الشراء (PO) في النظام."
-                )
-            elif agent["role_type"] == "CALENDAR_DISPATCH":
-                message_text = (
-                    f"*{clean_title}*\n"
-                    f"━━━━━━━━━\n"
-                    f"مرحبا، تذكير بالزيارات الميدانية المجدولة في جدول العمليات اليوم.\n\n"
-                    f"شركة تنمية الغذاء | FDC Sales CRM"
-                )
-            elif agent["role_type"] == "STAGNANT_TARGETS":
-                message_text = (
-                    f"*{clean_title}*\n"
-                    f"━━━━━━━━━\n"
-                    f"مرحبا، يرجى متابعة الفرص البيعية غير المحدثة لإغلاق الصفقات وإصدار أوامر الشراء.\n\n"
-                    f"شركة تنمية الغذاء | FDC Sales CRM"
-                )
+            if pref_lang == "EN":
+                # الصياغة باللغة الإنجليزية بدون خطوط
+                sample_info_en = f"Client: {sample['customer_name']} | Product: {sample['product_name']}" if (sample and sample.get('customer_name')) else "Client: Al Reef Restaurants | Product: Chicken Breast 4B"
+                if agent["role_type"] == "SAMPLES_CONVERSION":
+                    message_text = (
+                        f"*Sample Follow-up & PO Request*\n\n"
+                        f"Hello, please update us on the sample trial result with:\n"
+                        f"{sample_info_en}\n\n"
+                        f"Kindly register the Purchase Order (PO) number once approved."
+                    )
+                elif agent["role_type"] == "CALENDAR_DISPATCH":
+                    message_text = (
+                        f"*Daily Schedule Reminder*\n\n"
+                        f"Hello, reminder of your scheduled field visits for today.\n\n"
+                        f"Food Development Company | FDC Sales CRM"
+                    )
+                elif agent["role_type"] == "STAGNANT_TARGETS":
+                    message_text = (
+                        f"*Pending Sales Pipeline Follow-up*\n\n"
+                        f"Hello, please follow up on pending deals to close POs.\n\n"
+                        f"Food Development Company | FDC Sales CRM"
+                    )
+                else:
+                    message_text = (
+                        f"*{clean_title}*\n\n"
+                        f"Hello,\n«{agent['system_prompt']}»\n\n"
+                        f"Food Development Company | FDC Sales CRM"
+                    )
             else:
-                message_text = (
-                    f"*{clean_title}*\n"
-                    f"━━━━━━━━━\n"
-                    f"مرحبا،\n«{agent['system_prompt']}»\n\n"
-                    f"شركة تنمية الغذاء | FDC Sales CRM"
-                )
+                # الصياغة باللغة العربية الرسمية بدون خطوط
+                sample_info_ar = f"العميل: {sample['customer_name']} | المنتج: {sample['product_name']}" if (sample and sample.get('customer_name')) else "العميل: مطاعم الريف | المنتج: صدور دجاج 4B"
+                if agent["role_type"] == "SAMPLES_CONVERSION":
+                    message_text = (
+                        f"*{clean_title}*\n\n"
+                        f"مرحبا، يرجى موافاتنا بنتيجة تجربة العينات الميدانية لدى:\n"
+                        f"{sample_info_ar}\n\n"
+                        f"عند الاعتماد نرجو تسجيل رقم أمر الشراء (PO) في النظام."
+                    )
+                elif agent["role_type"] == "CALENDAR_DISPATCH":
+                    message_text = (
+                        f"*{clean_title}*\n\n"
+                        f"مرحبا، تذكير بالزيارات الميدانية المجدولة في جدول العمليات اليوم.\n\n"
+                        f"شركة تنمية الغذاء | FDC Sales CRM"
+                    )
+                elif agent["role_type"] == "STAGNANT_TARGETS":
+                    message_text = (
+                        f"*{clean_title}*\n\n"
+                        f"مرحبا، يرجى متابعة الفرص البيعية غير المحدثة لإغلاق الصفقات وإصدار أوامر الشراء.\n\n"
+                        f"شركة تنمية الغذاء | FDC Sales CRM"
+                    )
+                else:
+                    message_text = (
+                        f"*{clean_title}*\n\n"
+                        f"مرحبا،\n«{agent['system_prompt']}»\n\n"
+                        f"شركة تنمية الغذاء | FDC Sales CRM"
+                    )
 
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -661,7 +648,6 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسارات بنود المصاريف -----------------
 @app.get("/api/expense-categories")
 def get_expense_categories():
     conn = get_db_connection()
@@ -707,7 +693,6 @@ def delete_expense_category(cat_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات فريق المبيعات والعمليات -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -733,6 +718,7 @@ def get_reps():
                     "monthly_target": target,
                     "achieved_sales": sales,
                     "total_expenses": float(r.get("total_expenses") or 0),
+                    "preferred_language": r.get("preferred_language") or "AR",
                     "status": r["status"],
                     "achievement_rate": rate
                 })
@@ -749,9 +735,9 @@ def add_rep(payload: NewRepPayload):
         with conn.cursor() as cur:
             target = payload.monthly_target if payload.has_target else 0.0
             cur.execute("""
-            INSERT INTO sales_executives (name, employee_code, phone_number, region, has_target, monthly_target, achieved_sales, total_expenses, status)
-            VALUES (%s, %s, %s, %s, %s, %s, 0.0, 0.0, 'نشط') RETURNING id;
-            """, (payload.name, payload.employee_code, payload.phone_number, payload.region, payload.has_target, target))
+            INSERT INTO sales_executives (name, employee_code, phone_number, region, has_target, monthly_target, achieved_sales, total_expenses, preferred_language, status)
+            VALUES (%s, %s, %s, %s, %s, %s, 0.0, 0.0, %s, 'نشط') RETURNING id;
+            """, (payload.name, payload.employee_code, payload.phone_number, payload.region, payload.has_target, target, payload.preferred_language or "AR"))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
@@ -772,7 +758,7 @@ def update_rep(rep_id: int, payload: UpdateRepPayload):
             cur.execute("""
             UPDATE sales_executives 
             SET name = %s, employee_code = %s, phone_number = %s, region = %s, 
-                has_target = %s, monthly_target = %s 
+                has_target = %s, monthly_target = %s, preferred_language = %s 
             WHERE id = %s;
             """, (
                 payload.name.strip(),
@@ -781,6 +767,7 @@ def update_rep(rep_id: int, payload: UpdateRepPayload):
                 payload.region.strip(),
                 payload.has_target,
                 target,
+                payload.preferred_language or "AR",
                 rep_id
             ))
             cur.execute("UPDATE customer_accounts SET assigned_rep_name = %s WHERE assigned_rep_id = %s;", (payload.name.strip(), rep_id))
@@ -964,10 +951,19 @@ def add_sample(payload: NewSamplePayload):
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
+            # إيجاد customer_id و rep_id إن تواجدا
+            cur.execute("SELECT id FROM customer_accounts WHERE company_name = %s LIMIT 1;", (payload.customer_name,))
+            c_row = cur.fetchone()
+            c_id = c_row["id"] if c_row else None
+
+            cur.execute("SELECT id FROM sales_executives WHERE name = %s LIMIT 1;", (payload.rep_name,))
+            r_row = cur.fetchone()
+            r_id = r_row["id"] if r_row else None
+
             cur.execute("""
-            INSERT INTO sample_deliveries (customer_name, rep_name, product_name, qty_free, delivery_date, status, po_value, source)
-            VALUES (%s, %s, %s, %s, %s, 'PENDING', 0.0, 'يدوي') RETURNING id;
-            """, (payload.customer_name, payload.rep_name, payload.product_name, payload.qty_free, payload.delivery_date))
+            INSERT INTO sample_deliveries (customer_id, rep_id, customer_name, rep_name, product_name, qty_free, delivery_date, status, po_value, source)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'PENDING', 0.0, 'يدوي') RETURNING id;
+            """, (c_id, r_id, payload.customer_name, payload.rep_name, payload.product_name, payload.qty_free, payload.delivery_date))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
@@ -997,10 +993,18 @@ def add_calendar_event(payload: NewCalendarEventPayload):
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
+            cur.execute("SELECT id FROM customer_accounts WHERE company_name = %s LIMIT 1;", (payload.customer_name,))
+            c_row = cur.fetchone()
+            c_id = c_row["id"] if c_row else None
+
+            cur.execute("SELECT id FROM sales_executives WHERE name = %s LIMIT 1;", (payload.rep_name,))
+            r_row = cur.fetchone()
+            r_id = r_row["id"] if r_row else None
+
             cur.execute("""
-            INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, route_code, execution_status)
-            VALUES (%s, %s, %s, %s, %s, %s, 'PENDING') RETURNING id;
-            """, (payload.customer_name, payload.rep_name, payload.task_type, payload.scheduled_at, payload.location, payload.route_code or "R-01"))
+            INSERT INTO calendar_events (customer_id, rep_id, customer_name, rep_name, task_type, scheduled_at, location, route_code, execution_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'PENDING') RETURNING id;
+            """, (c_id, r_id, payload.customer_name, payload.rep_name, payload.task_type, payload.scheduled_at, payload.location, payload.route_code or "R-01"))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
