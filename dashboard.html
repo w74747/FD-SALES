@@ -337,7 +337,12 @@
                                 <div class="text-[10px] text-gray-500">سيقوم أي وكيل بإرسال رسائل التنبيه التجريبية فوراً إلى هذا الرقم عند الضغط على زر الاختبار.</div>
                             </div>
                         </div>
-                        <input type="text" id="global-test-phone" value="+96898996963" class="p-2 border rounded-lg font-mono font-bold text-purple-900 w-44 text-center">
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="global-test-phone" onchange="saveGlobalTestPhone()" class="p-2 border rounded-lg font-mono font-bold text-purple-900 w-44 text-center focus:ring-2 focus:ring-purple-400 outline-none" placeholder="+968XXXXXXXX">
+                            <button onclick="saveGlobalTestPhone(true)" class="px-3 py-2 bg-[#3A056A] hover:bg-purple-900 text-white font-bold rounded-lg text-xs transition">
+                                حفظ
+                            </button>
+                        </div>
                     </div>
 
                     <div id="agents-grid-container" class="grid grid-cols-3 gap-4"></div>
@@ -520,6 +525,7 @@
         </div>
     </div>
 
+    <!-- نافذة ربط الواتساب مع التحديث التلقائي للـ QR وزر الفصل اليدوي -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[440px] space-y-4 text-xs text-center">
             <div class="flex justify-between items-center border-b pb-2">
@@ -724,7 +730,7 @@
                 <label class="block font-bold mb-1">القيمة المالية المحققة (ر.ع):</label>
                 <input type="number" id="convert-sample-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0">
             </div>
-            <div class="flex justify-end gap-2 pt-2">
+            <div class="flex justify-end gap-2 pt-3">
                 <button onclick="closeConvertSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitConvertSample()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الاعتماد والترحيل</button>
             </div>
@@ -811,6 +817,30 @@
             'whatsapp-feed': 'رادار الرسائل والمحادثات',
             'whatsapp-settings': 'إعدادات ونطاق الواتساب الميداني'
         };
+
+        // استرجاع الرقم المحفوظ فور فتح الصفحة
+        function loadSavedTestPhone() {
+            const savedPhone = localStorage.getItem('fdc_global_test_phone');
+            const input = document.getElementById('global-test-phone');
+            if (input) {
+                input.value = savedPhone ? savedPhone : '+96893904404';
+            }
+        }
+
+        // حفظ الرقم في الذاكرة الدائمة فور تعديله أو الضغط على زر حفظ
+        function saveGlobalTestPhone(showAlert = false) {
+            const input = document.getElementById('global-test-phone');
+            if (!input) return;
+            const phone = input.value.trim();
+            if (!phone) {
+                alert("يرجى إدخال رقم هاتف صالح");
+                return;
+            }
+            localStorage.setItem('fdc_global_test_phone', phone);
+            if (showAlert) {
+                alert("تم حفظ رقم هاتف الاختبار المعتمد بنجاح ✓");
+            }
+        }
 
         function switchTab(id) {
             tabs.forEach(t => {
@@ -1680,6 +1710,7 @@
         }
 
         async function loadAllData() {
+            loadSavedTestPhone();
             checkWhatsAppLiveStatus();
             loadExpenseCategories();
             loadAgentsData();
@@ -1912,6 +1943,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            loadSavedTestPhone();
             check2FAStatus();
             if (sessionStorage.getItem('fdc_auth_token') === 'AUTHENTICATED') {
                 document.getElementById('auth-overlay').classList.add('hidden');
