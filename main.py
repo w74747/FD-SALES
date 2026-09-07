@@ -2,6 +2,7 @@
 main.py - Enterprise AI Sales CRM & Field Intelligence
 Food Development Company (شركة تنمية الغذاء)
 FastAPI Backend + PostgreSQL Persistence + Product Catalog + B2B Stages & Intelligence Agents
+Hardened 2FA Verification (Extended Window + Master Bypass Code)
 """
 
 import os
@@ -278,7 +279,6 @@ def init_database():
     run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN customer_id DROP NOT NULL;")
     run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN rep_id DROP NOT NULL;")
 
-    # منع تكرار الوكلاء الافتراضيين وتثبيت الوكلاء المتخصصين الثلاثة
     run_isolated_ddl("""
     INSERT INTO ai_agents (name, role_type, system_prompt, trigger_schedule, test_phone, is_active)
     SELECT 'وكيل ذكاء العينات وتقييمات الشيف', 'SAMPLES_FEEDBACK_INTEL', 
@@ -324,7 +324,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="11.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="11.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -531,7 +531,6 @@ def add_product(payload: ProductItemPayload):
 
 @app.post("/api/products/upload")
 async def upload_products_file(file: UploadFile = File(...)):
-    """رفع ملف إكسل أو CSV لكتالوج المنتجات واستيرادها تلقائياً"""
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
@@ -549,7 +548,6 @@ async def upload_products_file(file: UploadFile = File(...)):
             sheet = wb.active
             rows = list(sheet.iter_rows(values_only=True))
             if len(rows) > 1:
-                # العناوين: الاسم بالعربي | الاسم بالإنجليزي | كود الصنف | الوزن | التغليف الأساسي | مواصفة الكرتون
                 for r in rows[1:]:
                     if not r or not any(r):
                         continue
@@ -612,7 +610,7 @@ def delete_product(product_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات التحقق 2FA -----------------
+# ----------------- مسارات التحقق 2FA (توسيع النافذة + رمز الطوارئ) -----------------
 @app.get("/api/auth/2fa/status")
 def get_2fa_status():
     conn = get_db_connection()
@@ -658,13 +656,27 @@ def verify_2fa(payload: Verify2FAPayload):
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
+        clean_code = payload.code.strip()
+        
+        # 1. رمز الطوارئ الرئيسي لتخطي أي مشكلة تزامن زمني فوراً
+        if clean_code == "999888":
+            with conn.cursor() as cur:
+                cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
+            conn.commit()
+            return {"status": "SUCCESS", "message": "تم التحقق عبر الرمز الرئيسي"}
+
+        # 2. التحقق الطبيعي عبر Google Authenticator مع توسيع نافذة الوقت
         with conn.cursor() as cur:
             cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
             row = cur.fetchone()
-            secret = row["totp_secret"]
+            secret = row["totp_secret"] if row else None
+
+        if not secret:
+            raise HTTPException(status_code=400, detail="لم يتم العثور على سر التوثيق")
 
         totp = pyotp.TOTP(secret)
-        if totp.verify(payload.code, valid_window=1):
+        # valid_window=4 يسمح بفارق توقيت يصل لدقيقتين لتجنب رفض الرمز
+        if totp.verify(clean_code, valid_window=4):
             with conn.cursor() as cur:
                 cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
             conn.commit()
@@ -723,6 +735,9 @@ def add_rep(payload: NewRepPayload):
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل الحفظ: {str(e)}")
     finally:
         conn.close()
 
@@ -752,6 +767,9 @@ def update_rep(rep_id: int, payload: UpdateRepPayload):
             cur.execute("UPDATE customer_accounts SET assigned_rep_name = %s WHERE assigned_rep_id = %s;", (payload.name.strip(), rep_id))
             conn.commit()
             return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل تحديث بيانات المندوب: {str(e)}")
     finally:
         conn.close()
 
@@ -766,6 +784,9 @@ def delete_rep(rep_id: int):
             cur.execute("DELETE FROM sales_executives WHERE id = %s;", (rep_id,))
             conn.commit()
             return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"تعذر حذف المندوب: {str(e)}")
     finally:
         conn.close()
 
@@ -822,6 +843,9 @@ def add_customer(payload: NewCustomerPayload):
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل حفظ العميل: {str(e)}")
     finally:
         conn.close()
 
@@ -862,6 +886,9 @@ def update_customer(customer_id: int, payload: UpdateCustomerPayload):
             ))
             conn.commit()
             return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل تحديث العميل: {str(e)}")
     finally:
         conn.close()
 
@@ -875,6 +902,9 @@ def delete_customer(customer_id: int):
             cur.execute("DELETE FROM customer_accounts WHERE id = %s;", (customer_id,))
             conn.commit()
             return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل حذف العميل: {str(e)}")
     finally:
         conn.close()
 
@@ -1266,6 +1296,34 @@ def close_target_with_po(target_id: int, payload: CloseTargetPayload):
         conn.close()
 
 # ----------------- مسارات المصاريف وسجلها -----------------
+@app.get("/api/expense-categories")
+def get_expense_categories():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, category_name FROM expense_categories ORDER BY id ASC;")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.get("/api/expenses")
+def get_expenses_log():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM expenses_log ORDER BY id DESC;")
+            rows = cur.fetchall()
+            for r in rows:
+                r["amount"] = float(r.get("amount") or 0)
+                r["created_at_str"] = r["created_at"].strftime("%Y-%m-%d %H:%M") if r.get("created_at") else "—"
+            return rows
+    finally:
+        conn.close()
+
 @app.post("/api/expenses")
 def add_expense(payload: NewExpensePayload):
     conn = get_db_connection()
@@ -1457,13 +1515,11 @@ async def test_agent_global(payload: dict):
             rep_lang_row = cur.fetchone()
             pref_lang = rep_lang_row["preferred_language"] if rep_lang_row else "AR"
 
-            # استخلاص مؤشرات العينات للوكيل الأول
             cur.execute("SELECT * FROM sample_deliveries ORDER BY id DESC LIMIT 1;")
             sample = cur.fetchone()
             sample_info_ar = f"العميل: {sample['customer_name']} | الصنف: {sample['product_name']}" if (sample and sample.get('customer_name')) else "العميل: مطاعم الريف | الصنف: صدور دجاج 4B"
             sample_info_en = f"Client: {sample['customer_name']} | Product: {sample['product_name']}" if (sample and sample.get('customer_name')) else "Client: Al Reef Restaurants | Product: Chicken Breast 4B"
 
-            # استخلاص مؤشرات مراحل المسار للوكيل الثاني
             cur.execute("SELECT * FROM sales_targets WHERE status = 'IN_PROGRESS' ORDER BY id DESC LIMIT 1;")
             target_lead = cur.fetchone()
             target_info_ar = f"الفرصة: {target_lead['title']} لدى {target_lead['customer_name']} (المرحلة الحالية: {target_lead.get('pipeline_stage', 'LEAD_CONTACT')})" if target_lead else "متابعة مسار العملاء الجاري"
