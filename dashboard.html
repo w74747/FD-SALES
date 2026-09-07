@@ -134,8 +134,12 @@
 
                 <div class="pt-4 pb-1 text-[10px] font-bold text-[#C194FB] px-2 uppercase tracking-wider">الإدارة والتقارير التنفيذية</div>
 
-                <button onclick="openExpenseModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-amber-600/90 text-white hover:bg-amber-600 text-right">
-                    <span>قيد مصاريف ميدانية</span>
+                <button onclick="switchTab('expenses-log')" id="nav-expenses-log" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-amber-600/90 text-white hover:bg-amber-600 text-right">
+                    <span>سجل المصاريف الميدانية</span>
+                </button>
+
+                <button onclick="openExpenseModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-amber-700/80 text-white hover:bg-amber-700 text-right mt-1">
+                    <span>+ قيد سند مصروف جديد</span>
                 </button>
 
                 <button onclick="openReportModal()" class="w-full flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold bg-[#C194FB]/20 text-purple-100 border border-[#C194FB]/40 hover:bg-[#C194FB]/30 text-right mt-1.5">
@@ -326,7 +330,12 @@
                             <h3 class="font-bold text-sm brand-primary-text">منظومة وكلاء الذكاء الاصطناعي للمتابعة الميدانية (AI Agents)</h3>
                             <div class="text-xs text-gray-500">وكلاء متخصصون لمتابعة العينات، الأهداف، والمهام عبر إرسال رسائل WhatsApp مخصصة وتجربتها على رقمك الموحد أولاً.</div>
                         </div>
-                        <button onclick="openNewAgentModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة وكيل ذكي جديد</button>
+                        <div class="flex gap-2">
+                            <button onclick="cleanDuplicateAgents()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg border">
+                                تنظيف المكررات 🧹
+                            </button>
+                            <button onclick="openNewAgentModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة وكيل ذكي جديد</button>
+                        </div>
                     </div>
 
                     <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between no-print">
@@ -346,6 +355,35 @@
                     </div>
 
                     <div id="agents-grid-container" class="grid grid-cols-3 gap-4"></div>
+                </div>
+            </div>
+
+            <!-- تبويب سجل المصاريف الميدانية المضاف بالكامل -->
+            <div id="tab-expenses-log" class="tab-content hidden space-y-4">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
+                    <div class="flex justify-between items-center mb-4 no-print">
+                        <div>
+                            <h3 class="font-bold text-sm text-amber-800">سجل المصاريف الميدانية والتشغيلية المفصل</h3>
+                            <div class="text-xs text-gray-500">متابعة كافة السندات المقيدة حسب المندوب، النوع، والتاريخ مع إمكانية التعديل والحذف</div>
+                        </div>
+                        <button onclick="openExpenseModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-sm">
+                            + قيد سند مصروف جديد
+                        </button>
+                    </div>
+                    <table class="w-full text-right text-xs border border-[#E4D9F5]">
+                        <thead class="bg-amber-50 text-amber-900 font-bold">
+                            <tr>
+                                <th class="p-3">رقم السند</th>
+                                <th class="p-3">عضو فريق المبيعات</th>
+                                <th class="p-3">بند ونوع المصروف</th>
+                                <th class="p-3">المبلغ (ر.ع)</th>
+                                <th class="p-3">البيان والملاحظات</th>
+                                <th class="p-3">تاريخ القيد</th>
+                                <th class="p-3 no-print">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y brand-border" id="expenses-log-table-body"></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -525,7 +563,7 @@
         </div>
     </div>
 
-    <!-- نافذة ربط الواتساب مع التحديث التلقائي للـ QR وزر الفصل اليدوي -->
+    <!-- نافذة ربط الواتساب -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[440px] space-y-4 text-xs text-center">
             <div class="flex justify-between items-center border-b pb-2">
@@ -567,7 +605,7 @@
         </div>
     </div>
 
-    <!-- نافذة إضافة عضو فريق مبيعات جديد مع خيار اللغة المفضلة -->
+    <!-- نافذة إضافة عضو فريق مبيعات جديد -->
     <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
@@ -765,16 +803,32 @@
         </div>
     </div>
 
+    <!-- نافذة قيد سند مصروف جديد -->
     <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[470px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm text-amber-800 border-b pb-2">قيد مصاريف ميدانية وتشغيلية</h3>
+            <h3 class="font-bold text-sm text-amber-800 border-b pb-2">قيد سند مصاريف ميدانية وتشغيلية</h3>
             <div><label class="block font-bold mb-1">عضو فريق المبيعات:</label><select id="exp-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="block font-bold mb-1">نوع وبند المصروف:</label><select id="exp-type-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]"></select></div>
-                <div><label class="block font-bold mb-1">قيمة المصروف (ر.ع):</label><input type="number" id="exp-amount" class="w-full p-2 border rounded-lg font-bold text-amber-900" value="25"></div>
+                <div><label class="block font-bold mb-1">قيمة المصروف (ر.ع):</label><input type="number" step="0.1" id="exp-amount" class="w-full p-2 border rounded-lg font-bold text-amber-900" value="25"></div>
             </div>
             <div><label class="block font-bold mb-1">ملاحظات وبيان المصروف:</label><input type="text" id="exp-notes" class="w-full p-2 border rounded-lg" placeholder="رحلة عمل لمتابعة العملاء"></div>
-            <div class="flex justify-end gap-2 pt-2"><button onclick="closeExpenseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitExpense()" class="px-4 py-2 bg-amber-600 text-white font-bold rounded-lg">قيد المصروف</button></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeExpenseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitExpense()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg">قيد المصروف</button></div>
+        </div>
+    </div>
+
+    <!-- نافذة تعديل سند المصروف -->
+    <div id="edit-expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[470px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm text-amber-800 border-b pb-2">تعديل سند المصروف الميداني</h3>
+            <input type="hidden" id="edit-exp-id">
+            <div><label class="block font-bold mb-1">عضو فريق المبيعات:</label><select id="edit-exp-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">نوع وبند المصروف:</label><select id="edit-exp-type-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]"></select></div>
+                <div><label class="block font-bold mb-1">قيمة المصروف (ر.ع):</label><input type="number" step="0.1" id="edit-exp-amount" class="w-full p-2 border rounded-lg font-bold text-amber-900"></div>
+            </div>
+            <div><label class="block font-bold mb-1">ملاحظات وبيان المصروف:</label><input type="text" id="edit-exp-notes" class="w-full p-2 border rounded-lg"></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeEditExpenseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitUpdateExpense()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg">حفظ التعديل</button></div>
         </div>
     </div>
 
@@ -805,7 +859,7 @@
     </div>
 
     <script>
-        const tabs = ['overview', 'targets', 'reps', 'customers', 'samples', 'calendar', 'agents', 'whatsapp-feed', 'whatsapp-settings'];
+        const tabs = ['overview', 'targets', 'reps', 'customers', 'samples', 'calendar', 'agents', 'expenses-log', 'whatsapp-feed', 'whatsapp-settings'];
         const titles = {
             overview: 'لوحة التحكم العامة',
             targets: 'الأهداف والفرص البيعية (Target Pipeline)',
@@ -814,11 +868,11 @@
             samples: 'سجل حركة العينات والتحويل التجاري',
             calendar: 'تقويم العمليات والمسارات الميدانية',
             agents: 'وكلاء المتابعة الذكية (AI Agents)',
+            'expenses-log': 'سجل المصاريف الميدانية والتشغيلية',
             'whatsapp-feed': 'رادار الرسائل والمحادثات',
             'whatsapp-settings': 'إعدادات ونطاق الواتساب الميداني'
         };
 
-        // استرجاع الرقم المحفوظ فور فتح الصفحة
         function loadSavedTestPhone() {
             const savedPhone = localStorage.getItem('fdc_global_test_phone');
             const input = document.getElementById('global-test-phone');
@@ -827,7 +881,6 @@
             }
         }
 
-        // حفظ الرقم في الذاكرة الدائمة فور تعديله أو الضغط على زر حفظ
         function saveGlobalTestPhone(showAlert = false) {
             const input = document.getElementById('global-test-phone');
             if (!input) return;
@@ -1064,6 +1117,28 @@
             }
         }
 
+        async function deleteAgent(id, name) {
+            if (!confirm(`هل أنت متأكد من حذف الوكيل "${name}"؟`)) return;
+            try {
+                const res = await fetch(`/api/agents/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    await loadAgentsData();
+                    alert("تم حذف الوكيل بنجاح ✓");
+                }
+            } catch(e) {}
+        }
+
+        async function cleanDuplicateAgents() {
+            if (!confirm("هل تريد إزالة كافة الوكلاء المكررين والإبقاء على نسخة واحدة فقط من كل وكيل؟")) return;
+            try {
+                const res = await fetch('/api/agents/clean-duplicates', { method: 'POST' });
+                if (res.ok) {
+                    await loadAgentsData();
+                    alert("تم تنظيف المكررات بنجاح ✓");
+                }
+            } catch(e) {}
+        }
+
         async function toggleAgentStatus(id, newStatus) {
             await fetch(`/api/agents/${id}/toggle`, {
                 method: 'POST',
@@ -1133,13 +1208,14 @@
 
                             <div class="pt-2 border-t flex justify-between items-center gap-1 no-print">
                                 <button onclick="testAgentNowGlobal(${a.id}, '${a.name}')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10px] flex items-center gap-1 shadow-2xs">
-                                    <span>🧪</span> <span>إرسال تجربة لهاتفي</span>
+                                    <span>🧪</span> <span>إرسال تجربة</span>
                                 </button>
                                 <div class="flex gap-1">
                                     <button onclick="openEditAgentModal(${a.id}, '${a.name}', '${safePromptB64}', '${a.trigger_schedule}')" class="px-2 py-1 border border-purple-300 text-[#3A056A] font-bold rounded text-[10px]">✏️ تعديل</button>
                                     <button onclick="toggleAgentStatus(${a.id}, ${!a.is_active})" class="px-2 py-1 border ${a.is_active ? 'border-amber-400 text-amber-800' : 'border-emerald-500 text-emerald-800'} font-bold rounded text-[10px]">
                                         ${a.is_active ? 'إيقاف' : 'تفعيل'}
                                     </button>
+                                    <button onclick="deleteAgent(${a.id}, '${a.name}')" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-[10px]">حذف</button>
                                 </div>
                             </div>
                         </div>
@@ -1378,6 +1454,51 @@
             document.getElementById('edit-customer-modal').classList.remove('hidden');
         }
         function closeEditCustomerModal() { document.getElementById('edit-customer-modal').classList.add('hidden'); }
+
+        async function submitNewCustomer() {
+            const company = document.getElementById('cust-company-name').value.trim();
+            const brand = document.getElementById('cust-brand-name').value.trim();
+            const region = document.getElementById('cust-region').value.trim();
+            const sector = document.getElementById('cust-sector').value.trim();
+            const person = document.getElementById('cust-contact-person').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const repSelect = document.getElementById('cust-rep-select');
+            const notes = document.getElementById('cust-notes').value.trim();
+
+            if (!company || !phone) {
+                alert("يرجى ملء اسم الشركة ورقم الهاتف");
+                return;
+            }
+
+            const payload = {
+                company_name: company,
+                brand_name: brand || "",
+                sector: sector || "عام",
+                region: region || "مسقط",
+                contact_person: person || "المسؤول",
+                phone: phone,
+                assigned_rep_id: (repSelect && repSelect.value) ? parseInt(repSelect.value) : null,
+                notes: notes || ""
+            };
+
+            try {
+                const res = await fetch('/api/customers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeNewCustomerModal();
+                    await loadAllData();
+                    alert("تمت إضافة العميل بنجاح ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(err.detail || "حدث خطأ أثناء حفظ العميل");
+                }
+            } catch (e) {
+                alert("تعذر الاتصال بالسيرفر لحفظ العميل");
+            }
+        }
 
         async function submitUpdateCustomer() {
             const id = document.getElementById('edit-cust-id').value;
@@ -1686,6 +1807,16 @@
         function openExpenseModal() { document.getElementById('expense-modal').classList.remove('hidden'); }
         function closeExpenseModal() { document.getElementById('expense-modal').classList.add('hidden'); }
 
+        function openEditExpenseModal(id, repId, type, amount, notes) {
+            document.getElementById('edit-exp-id').value = id;
+            document.getElementById('edit-exp-rep-select').value = repId;
+            document.getElementById('edit-exp-type-select').value = type;
+            document.getElementById('edit-exp-amount').value = amount;
+            document.getElementById('edit-exp-notes').value = unescape(notes) || '';
+            document.getElementById('edit-expense-modal').classList.remove('hidden');
+        }
+        function closeEditExpenseModal() { document.getElementById('edit-expense-modal').classList.add('hidden'); }
+
         async function submitExpense() {
             const payload = {
                 rep_id: parseInt(document.getElementById('exp-rep-select').value),
@@ -1705,8 +1836,45 @@
             if (res.ok) {
                 closeExpenseModal();
                 await loadAllData();
-                alert("تم قيد المصروف بنجاح ✓");
+                alert("تم قيد سند المصروف بنجاح ✓");
             }
+        }
+
+        async function submitUpdateExpense() {
+            const id = document.getElementById('edit-exp-id').value;
+            const payload = {
+                rep_id: parseInt(document.getElementById('edit-exp-rep-select').value),
+                expense_type: document.getElementById('edit-exp-type-select').value,
+                amount: parseFloat(document.getElementById('edit-exp-amount').value) || 0,
+                notes: document.getElementById('edit-exp-notes').value.trim()
+            };
+            if (payload.amount <= 0) {
+                alert("يرجى إدخال قيمة المصروف");
+                return;
+            }
+            try {
+                const res = await fetch(`/api/expenses/${id}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeEditExpenseModal();
+                    await loadAllData();
+                    alert("تم تحديث سند المصروف بنجاح ✓");
+                }
+            } catch(e) {}
+        }
+
+        async function deleteExpense(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا المصروف؟ سيتم خصمه تلقائياً من إجمالي مصاريف المندوب.")) return;
+            try {
+                const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    await loadAllData();
+                    alert("تم حذف المصروف بنجاح ✓");
+                }
+            } catch(e) {}
         }
 
         function logoutSession() {
@@ -1776,9 +1944,10 @@
                 const res = await fetch('/api/expense-categories');
                 const categories = await res.json();
                 const selectEl = document.getElementById('exp-type-select');
-                if (selectEl) {
-                    selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
-                }
+                const editSelectEl = document.getElementById('edit-exp-type-select');
+                const opts = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
+                if (selectEl) selectEl.innerHTML = opts;
+                if (editSelectEl) editSelectEl.innerHTML = opts;
             } catch (e) {}
         }
 
@@ -1843,6 +2012,7 @@
             document.getElementById('edit-cust-rep-select').innerHTML = '<option value="">-- بدون تعيين حالي --</option>' + repOptionsHTML;
             document.getElementById('tgt-rep-select').innerHTML = repOptionsHTML;
             document.getElementById('exp-rep-select').innerHTML = repOptionsHTML;
+            document.getElementById('edit-exp-rep-select').innerHTML = repOptionsHTML;
             document.getElementById('sample-rep-select').innerHTML = repNamesOnlyHTML;
             document.getElementById('cal-rep-select').innerHTML = repNamesOnlyHTML;
 
@@ -1996,11 +2166,32 @@
                         </span>
                         ${(!isCompleted && !isCancelled) ? `
                         <button onclick="updateCalendarStatus(${e.id}, 'COMPLETED')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px]">إتمام المهمة ✓</button>
-                        <button onclick="updateCalendarStatus(${e.id}, 'CANCELLED')" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-[11px]">إلغاء</button>
+                        <button onclick="updateCalendarStatus(${e.id}, 'CANCELLED')" class="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-[11px]">إلغاء</button>
                         ` : ''}
                     </div>
                 </div>`;
             }).join('');
+
+            // جلب وعرض سجل المصاريف التفصيلي
+            const expRes = await fetch('/api/expenses');
+            const expenses = await expRes.json();
+            document.getElementById('expenses-log-table-body').innerHTML = expenses.length > 0 ? expenses.map(x => `
+                <tr>
+                    <td class="p-3 font-mono font-bold text-gray-500">#EXP-${x.id}</td>
+                    <td class="p-3 font-bold text-[#3A056A]">${x.rep_name}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-purple-50 text-purple-900 font-bold border border-purple-200">${x.expense_type}</span></td>
+                    <td class="p-3 font-black text-amber-800">${x.amount.toLocaleString()} ر.ع</td>
+                    <td class="p-3 text-gray-600">${x.notes || '—'}</td>
+                    <td class="p-3 text-gray-400 font-mono text-[11px]">${x.created_at_str}</td>
+                    <td class="p-3 no-print">
+                        <div class="flex gap-2">
+                            <button onclick="openEditExpenseModal(${x.id}, ${x.rep_id}, '${x.expense_type}', ${x.amount}, '${escape(x.notes || '')}')" class="text-blue-600 hover:text-blue-800 font-bold">تعديل</button>
+                            <span class="text-gray-300">|</span>
+                            <button onclick="deleteExpense(${x.id})" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('') : '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا توجد سندات مصاريف مسجلة حتى الآن</td></tr>';
 
             const wRes = await fetch('/api/whatsapp/logs');
             const wLogs = await wRes.json();
