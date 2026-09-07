@@ -79,7 +79,7 @@
         </div>
     </div>
 
-    <!-- القائمة الجانبية النظيفة المحدثة تماماً بالأسماء والترتيب المطلوب -->
+    <!-- القائمة الجانبية المباشرة -->
     <aside class="w-64 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
@@ -726,184 +726,6 @@
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeEditCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitUpdateCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديل وإرسال تنبيه للموظف</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة ربط الواتساب -->
-    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[440px] space-y-4 text-xs text-center">
-            <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">ربط جهاز الواتساب بالمنظومة</h3>
-                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">مشفر وآمن ✓</span>
-            </div>
-
-            <div id="whatsapp-connected-card" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3">
-                <div class="w-12 h-12 bg-emerald-500 text-white text-2xl flex items-center justify-center rounded-full mx-auto">✓</div>
-                <div class="font-bold text-emerald-900 text-sm">الجلسة متصلة وتعمل بنجاح!</div>
-                <div class="text-xs text-emerald-700">رقم الهاتف المقترن: <span id="connected-phone-display" class="font-mono font-bold"></span></div>
-                
-                <div class="p-2.5 bg-white border border-emerald-200 rounded-lg text-[11px] text-gray-600 leading-relaxed text-right">
-                    <strong>تنبيه الاستمرارية:</strong> يعمل محرك الواتساب كخدمة مستقلة ومستمرة في الخلفية ومحفوظة في قاعدة بيانات PostgreSQL، ولن تفصل الجلسة عند تسجيل الخروج إلا بطلبك.
-                </div>
-
-                <div class="pt-2">
-                    <button onclick="disconnectWhatsAppSession()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 font-bold rounded-lg transition text-xs flex items-center justify-center gap-1.5 mx-auto">
-                        <span>فصل ارتباط الواتساب (تسجيل خروج الرقم)</span>
-                    </button>
-                </div>
-            </div>
-
-            <div id="whatsapp-qr-wrapper" class="space-y-3">
-                <div class="font-bold text-gray-700">امسح الرمز لربط الهاتف بالنظام:</div>
-                <div class="relative w-48 h-48 mx-auto flex items-center justify-center bg-white border rounded-lg shadow-sm">
-                    <img id="whatsapp-qr-image" src="" alt="WhatsApp QR" class="w-44 h-44 object-contain">
-                    <div id="whatsapp-qr-loader" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-2 text-center text-gray-500 text-[11px]">
-                        <span class="animate-spin text-2xl mb-1">⚙️</span>
-                        <span id="whatsapp-loader-text">جاري الاتصال بمحرك الواتساب...</span>
-                    </div>
-                </div>
-                <div class="text-[10px] text-gray-400">يتم تجديد الرمز تلقائياً قبل انتهاء صلاحيته</div>
-            </div>
-
-            <div class="flex justify-end pt-2 border-t">
-                <button onclick="closeWhatsAppModal()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs">إغلاق</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة إضافة عضو فريق مبيعات جديد -->
-    <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
-            <div><label class="block font-bold mb-1">الاسم الكامل:</label><input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: عبدالله"></div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">الكود الوظيفي:</label><input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="0144"></div>
-                <div><label class="block font-bold mb-1">المنطقة البيعية:</label><input type="text" id="rep-region-input" class="w-full p-2 border rounded-lg" placeholder="نزوى - الداخلية"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">رقم الهاتف المعتمد:</label><input type="text" id="rep-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX"></div>
-                <div>
-                    <label class="block font-bold mb-1">لغة استلام الرسائل:</label>
-                    <select id="rep-language-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
-                        <option value="AR">العربية (Arabic)</option>
-                        <option value="EN">الإنجليزية (English)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
-                    <input type="checkbox" id="rep-has-target-toggle" onchange="toggleTargetInput(this.checked)" class="w-4 h-4 text-purple-600 rounded">
-                </div>
-                <div id="rep-target-box" class="hidden">
-                    <label class="block mb-1 text-[11px] text-gray-600">المستهدف الشهري (ر.ع):</label>
-                    <input type="number" id="rep-target-input" class="w-full p-1.5 border rounded bg-white" value="0">
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeNewRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العضو</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة تعديل عضو فريق المبيعات -->
-    <div id="edit-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
-            <input type="hidden" id="edit-rep-id">
-            <div>
-                <label class="block font-bold mb-1">الاسم الكامل:</label>
-                <input type="text" id="edit-rep-name-input" class="w-full p-2 border rounded-lg">
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">الكود الوظيفي:</label>
-                    <input type="text" id="edit-rep-code-input" class="w-full p-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">المنطقة البيعية:</label>
-                    <input type="text" id="edit-rep-region-input" class="w-full p-2 border rounded-lg">
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">رقم الهاتف المعتمد:</label>
-                    <input type="text" id="edit-rep-phone-input" class="w-full p-2 border rounded-lg font-mono">
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">لغة استلام الرسائل:</label>
-                    <select id="edit-rep-language-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
-                        <option value="AR">العربية (Arabic)</option>
-                        <option value="EN">الإنجليزية (English)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
-                    <input type="checkbox" id="edit-rep-has-target-toggle" onchange="toggleEditTargetInput(this.checked)" class="w-4 h-4 text-purple-600 rounded">
-                </div>
-                <div id="edit-rep-target-box" class="hidden">
-                    <label class="block mb-1 text-[11px] text-gray-600">المستهدف الشهري (ر.ع):</label>
-                    <input type="number" id="edit-rep-target-input" class="w-full p-1.5 border rounded bg-white" value="0">
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeEditRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitUpdateRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة إضافة عميل جديد -->
-    <div id="new-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة حساب عميل جديد</h3>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم العميل (الشركة):</label><input type="text" id="cust-company-name" class="w-full p-2 border rounded-lg" placeholder="شركة التغذية المتكاملة"></div>
-                <div><label class="block font-bold mb-1">اسم العلامة التجارية:</label><input type="text" id="cust-brand-name" class="w-full p-2 border rounded-lg" placeholder="مطاعم الريف"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">المنطقة:</label><input type="text" id="cust-region" class="w-full p-2 border rounded-lg" value="مسقط"></div>
-                <div><label class="block font-bold mb-1">القطاع:</label><input type="text" id="cust-sector" class="w-full p-2 border rounded-lg" placeholder="مطاعم / فنادق"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم المسؤول:</label><input type="text" id="cust-contact-person" class="w-full p-2 border rounded-lg" placeholder="علي"></div>
-                <div><label class="block font-bold mb-1">رقم التواصل:</label><input type="text" id="cust-phone" class="w-full p-2 border rounded-lg font-mono" placeholder="+9689XXXXXXX"></div>
-            </div>
-            <div><label class="block font-bold mb-1">عضو الفريق المتابع:</label><select id="cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-            <div><label class="block font-bold mb-1">تعليمات وملاحظات العميل:</label><textarea id="cust-notes" rows="2" class="w-full p-2 border rounded-lg" placeholder="أوقات الاستلام..."></textarea></div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeNewCustomerModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewCustomer()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العميل</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة تعديل العميل -->
-    <div id="edit-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات حساب العميل</h3>
-            <input type="hidden" id="edit-cust-id">
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم العميل (الشركة):</label><input type="text" id="edit-cust-company-name" class="w-full p-2 border rounded-lg"></div>
-                <div><label class="block font-bold mb-1">اسم العلامة التجارية:</label><input type="text" id="edit-cust-brand-name" class="w-full p-2 border rounded-lg"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">المنطقة:</label><input type="text" id="edit-cust-region" class="w-full p-2 border rounded-lg"></div>
-                <div><label class="block font-bold mb-1">القطاع:</label><input type="text" id="edit-cust-sector" class="w-full p-2 border rounded-lg"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم المسؤول:</label><input type="text" id="edit-cust-contact-person" class="w-full p-2 border rounded-lg"></div>
-                <div><label class="block font-bold mb-1">رقم التواصل:</label><input type="text" id="edit-cust-phone" class="w-full p-2 border rounded-lg font-mono"></div>
-            </div>
-            <div><label class="block font-bold mb-1">عضو الفريق المتابع:</label><select id="edit-cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-            <div><label class="block font-bold mb-1">تعليمات وملاحظات العميل:</label><textarea id="edit-cust-notes" rows="2" class="w-full p-2 border rounded-lg"></textarea></div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeEditCustomerModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitUpdateCustomer()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
             </div>
         </div>
     </div>
@@ -1577,7 +1399,7 @@
                                 <div class="text-gray-600 mt-0.5">
                                     العميل: <strong>${e.customer_name}</strong> | عضو الفريق: <strong>${e.rep_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span> | الموقع: ${e.location}
                                 </div>
-                                ${e.reminder_at ? `<div class="text-[10px] text-purple-700 font-mono mt-0.5">توقيت التذكير المجدول: ${e.reminder_at}</div>` : ''}
+                                ${e.reminder_at ? `<div class="text-[10px] text-purple-700 font-mono mt-0.5">توقيت التذكير: ${e.reminder_at}</div>` : ''}
                                 ${e.change_notes ? `<div class="text-[11px] text-amber-800 bg-amber-50 p-1 rounded mt-1 border border-amber-200"><strong>ملاحظة التعديل:</strong> ${e.change_notes}</div>` : ''}
                             </div>
                             <div class="flex items-center gap-1.5 no-print">
@@ -1614,6 +1436,7 @@
             } catch(e) {}
         }
 
+        // بدء التشغيل الدائم عبر localStorage
         window.addEventListener('DOMContentLoaded', () => {
             loadSavedTestPhone();
             check2FAStatus();
