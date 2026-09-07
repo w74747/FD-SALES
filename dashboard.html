@@ -277,27 +277,50 @@
                 </div>
             </div>
 
+            <!-- تبويب العينات مع الفلترة المتقدمة ودورة الحياة -->
             <div id="tab-samples" class="tab-content hidden space-y-4">
-                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4 no-print">
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
+                    <div class="flex justify-between items-center no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">سجل حركة العينات المجانية والتحويل التجاري</h3>
-                            <div class="text-xs text-gray-500">رصد تسليم العينات وربطها بالعميل وعضو الفريق المعتمد</div>
+                            <div class="text-xs text-gray-500">تتبع الأصناف المسلمة ومتابعة قرار العميل حتى التحويل لأمر شراء (PO)</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ تسليم عينة جديدة</button>
                             <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">طباعة السجل</button>
                         </div>
                     </div>
+
+                    <!-- شريط أدوات الفلترة الفورية للأصناف والتواريخ -->
+                    <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-xl grid grid-cols-4 gap-3 text-xs no-print">
+                        <div>
+                            <label class="block font-bold mb-1 text-gray-700">بحث بالصنف / المنتج:</label>
+                            <input type="text" id="filter-sample-product" oninput="applySamplesFilter()" placeholder="اسم الصنف..." class="w-full p-2 border rounded-lg bg-white">
+                        </div>
+                        <div>
+                            <label class="block font-bold mb-1 text-gray-700">بحث بالعميل المستلم:</label>
+                            <input type="text" id="filter-sample-customer" oninput="applySamplesFilter()" placeholder="اسم العميل..." class="w-full p-2 border rounded-lg bg-white">
+                        </div>
+                        <div>
+                            <label class="block font-bold mb-1 text-gray-700">من تاريخ:</label>
+                            <input type="date" id="filter-sample-from-date" onchange="applySamplesFilter()" class="w-full p-2 border rounded-lg bg-white">
+                        </div>
+                        <div>
+                            <label class="block font-bold mb-1 text-gray-700">إلى تاريخ:</label>
+                            <input type="date" id="filter-sample-to-date" onchange="applySamplesFilter()" class="w-full p-2 border rounded-lg bg-white">
+                        </div>
+                    </div>
+
                     <table class="w-full text-right text-xs">
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
                             <tr>
-                                <th class="p-3">العميل</th>
+                                <th class="p-3">العميل المستلم</th>
                                 <th class="p-3">عضو الفريق المسلّم</th>
-                                <th class="p-3">المنتج المسلّم</th>
+                                <th class="p-3">الصنف / المنتج</th>
                                 <th class="p-3">الكمية</th>
                                 <th class="p-3">تاريخ التسليم</th>
-                                <th class="p-3">الحالة</th>
+                                <th class="p-3">موعد التذكير</th>
+                                <th class="p-3">الحالة الميدانية</th>
                                 <th class="p-3">أمر الشراء (PO)</th>
                                 <th class="p-3 no-print">إجراءات الحالة</th>
                             </tr>
@@ -307,12 +330,13 @@
                 </div>
             </div>
 
+            <!-- تبويب التقويم والمسارات الميدانية مع التعديل والملاحظات -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">تقويم العمليات والزيارات الميدانية المعتمدة</h3>
-                            <div class="text-xs text-gray-500">جدولة وتكليف المهام لأعضاء فريق المبيعات</div>
+                            <div class="text-xs text-gray-500">جدولة وتكليف المهام مع إشعار WhatsApp فوري للموظف المكلف وإمكانية تعديل الموعد</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openNewCalendarModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ جدولة مهمة جديدة</button>
@@ -358,7 +382,7 @@
                 </div>
             </div>
 
-            <!-- تبويب سجل المصاريف الميدانية المضاف بالكامل -->
+            <!-- تبويب سجل المصاريف الميدانية -->
             <div id="tab-expenses-log" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -491,74 +515,107 @@
         </div>
     </div>
 
-    <div id="edit-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-3 text-xs">
-            <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">تعديل وكيل المتابعة الذكي</h3>
-                <span class="text-[10px] text-gray-500">تحديث التعليمات والمشغّل</span>
-            </div>
-            <input type="hidden" id="edit-agent-id">
+    <!-- نافذة إضافة تسليم عينة جديدة (مع تحديد موعد التذكير وقبول اسم عميل غير مسجل) -->
+    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينة جديدة (إشعار واتساب تلقائي للموظف)</h3>
             <div>
-                <label class="block font-bold mb-1">اسم الوكيل:</label>
-                <input type="text" id="edit-agent-name" class="w-full p-2 border rounded-lg">
+                <label class="block font-bold mb-1">العميل المستلم (اختر من القائمة أو اكتب اسماً جديداً):</label>
+                <input type="text" id="sample-customer-input" list="sample-customers-datalist" class="w-full p-2 border rounded-lg bg-white" placeholder="اكتب أو اختر اسم العميل...">
+                <datalist id="sample-customers-datalist"></datalist>
             </div>
-            <div>
-                <label class="block font-bold mb-1">توقيت التشغيل والمشغّل:</label>
-                <select id="edit-agent-schedule" class="w-full p-2 border rounded-lg bg-white">
-                    <option value="DAILY_10AM">يومياً الساعة 10:00 صباحاً</option>
-                    <option value="DAILY_08AM">يومياً الساعة 08:30 صباحاً</option>
-                    <option value="WEEKLY_SUNDAY">أسبوعياً (كل يوم أحد)</option>
-                    <option value="MANUAL">تشغيل يدوي عند الطلب فقط</option>
-                </select>
+            <div><label class="block font-bold mb-1">عضو الفريق المسلّم:</label><select id="sample-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">الصنف / المنتج المسلّم:</label><input type="text" id="sample-product-name" class="w-full p-2 border rounded-lg" placeholder="مثال: صدور دجاج متبلة 4B"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">الكمية المجانية:</label><input type="number" id="sample-qty" class="w-full p-2 border rounded-lg" value="10"></div>
+                <div><label class="block font-bold mb-1">تاريخ التسليم:</label><input type="date" id="sample-date" class="w-full p-2 border rounded-lg" value="2026-09-07"></div>
             </div>
             <div>
-                <label class="block font-bold mb-1">توجيهات البرومبت والتعليمات المخصصة (System Prompt):</label>
-                <textarea id="edit-agent-prompt" rows="4" class="w-full p-2 border rounded-lg"></textarea>
+                <label class="block font-bold mb-1 text-purple-900">موعد رسالة التذكير للمتابعة (Reminder Date/Time):</label>
+                <input type="datetime-local" id="sample-reminder-at" class="w-full p-2 border rounded-lg bg-purple-50/50">
             </div>
-            <div class="flex justify-end gap-2 pt-2 border-t">
-                <button onclick="closeEditAgentModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitUpdateAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تحديث التوجيه</button>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العينة وإرسال إشعار للموظف</button>
             </div>
         </div>
     </div>
 
-    <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-3 text-xs">
-            <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">إضافة وكيل ذكاء اصطناعي جديد (AI Agent)</h3>
-                <span class="text-[10px] text-gray-500">مساعد ميداني ذكي</span>
+    <!-- نافذة تحويل العينة لأمر شراء PO -->
+    <div id="convert-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[440px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">تحويل العينة لأمر شراء رسمي (PO)</h3>
+            <input type="hidden" id="convert-sample-id">
+            <div>
+                <label class="block font-bold mb-1">رقم أمر الشراء (PO Number):</label>
+                <input type="text" id="convert-sample-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX">
             </div>
             <div>
-                <label class="block font-bold mb-1">اسم الوكيل:</label>
-                <input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: متابعة العينات">
+                <label class="block font-bold mb-1">القيمة المالية المحققة (ر.ع):</label>
+                <input type="number" id="convert-sample-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0">
             </div>
+            <div class="flex justify-end gap-2 pt-3">
+                <button onclick="closeConvertSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitConvertSample()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الاعتماد والترحيل</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة جدولة مهمة جديدة مع موعد التذكير والإشعار التلقائي -->
+    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية (إشعار واتساب تلقائي للموظف)</h3>
+            <div>
+                <label class="block font-bold mb-1">العميل المستهدف:</label>
+                <input type="text" id="cal-customer-input" list="cal-customers-datalist" class="w-full p-2 border rounded-lg bg-white" placeholder="اكتب أو اختر اسم العميل...">
+                <datalist id="cal-customers-datalist"></datalist>
+            </div>
+            <div><label class="block font-bold mb-1">عضو الفريق المكلّف:</label><select id="cal-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">نوع المهمة:</label><input type="text" id="cal-task-type" class="w-full p-2 border rounded-lg" placeholder="زيارة فحص جودة وتفاوض"></div>
             <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">نوع التخصص والمهام:</label>
-                    <select id="agent-role-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
-                        <option value="SAMPLES_CONVERSION">متابعة العينات وتحويلها لأوامر شراء</option>
-                        <option value="CALENDAR_DISPATCH">التذكير الصباحي بالزيارات والتقويم</option>
-                        <option value="STAGNANT_TARGETS">إنعاش الفرص والأهداف الراكدة</option>
-                        <option value="CUSTOM_ASSISTANT">مساعد ذكي مخصص</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block font-bold mb-1">توقيت التشغيل والمشغّل:</label>
-                    <select id="agent-schedule-select" class="w-full p-2 border rounded-lg bg-white">
-                        <option value="DAILY_10AM">يومياً الساعة 10:00 صباحاً</option>
-                        <option value="DAILY_08AM">يومياً الساعة 08:30 صباحاً</option>
-                        <option value="WEEKLY_SUNDAY">أسبوعياً (كل يوم أحد)</option>
-                        <option value="MANUAL">تشغيل يدوي عند الطلب فقط</option>
-                    </select>
-                </div>
+                <div><label class="block font-bold mb-1">موعد المهمة:</label><input type="datetime-local" id="cal-scheduled-at" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">الموقع:</label><input type="text" id="cal-location" class="w-full p-2 border rounded-lg" placeholder="مقر العميل"></div>
             </div>
             <div>
-                <label class="block font-bold mb-1">توجيهات البرومبت والتعليمات المخصصة للوكيل (System Prompt):</label>
-                <textarea id="agent-prompt-input" rows="3" class="w-full p-2 border rounded-lg" placeholder="أنت المنسق الميداني لشركة تنمية الغذاء..."></textarea>
+                <label class="block font-bold mb-1 text-purple-900">موعد إرسال رسالة التذكير (Reminder Date/Time):</label>
+                <input type="datetime-local" id="cal-reminder-at" class="w-full p-2 border rounded-lg bg-purple-50/50">
             </div>
-            <div class="flex justify-end gap-2 pt-2 border-t">
-                <button onclick="closeNewAgentModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ الوكيل الذكي</button>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeNewCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تأكيد الجدولة وإرسال التنبيه</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تعديل المهمة المجدولة وتعيين شخص آخر أو تغيير الموعد مع الملاحظة -->
+    <div id="edit-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل المهمة المجدولة (إعادة تعيين / تغيير الموعد)</h3>
+            <input type="hidden" id="edit-cal-id">
+            <div>
+                <label class="block font-bold mb-1">العميل:</label>
+                <input type="text" id="edit-cal-customer-input" class="w-full p-2 border rounded-lg bg-gray-50">
+            </div>
+            <div>
+                <label class="block font-bold mb-1 text-purple-900">تعيين عضو فريق آخر أو تثبيت الحالي:</label>
+                <select id="edit-cal-rep-select" class="w-full p-2 border rounded-lg bg-white font-bold"></select>
+            </div>
+            <div><label class="block font-bold mb-1">نوع المهمة:</label><input type="text" id="edit-cal-task-type" class="w-full p-2 border rounded-lg"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">الموعد الجديد:</label><input type="datetime-local" id="edit-cal-scheduled-at" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">الموقع:</label><input type="text" id="edit-cal-location" class="w-full p-2 border rounded-lg"></div>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">موعد رسالة التذكير:</label>
+                <input type="datetime-local" id="edit-cal-reminder-at" class="w-full p-2 border rounded-lg bg-purple-50/50">
+            </div>
+            <div>
+                <label class="block font-bold mb-1 text-amber-800">ملاحظة وسبب التعديل (تصل في التنبيه للموظف):</label>
+                <textarea id="edit-cal-notes" rows="2" class="w-full p-2 border rounded-lg" placeholder="مثال: تم التعديل بناء على طلب العميل بتأجيل الموعد..."></textarea>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeEditCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitUpdateCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديل وإرسال تنبيه للموظف</button>
             </div>
         </div>
     </div>
@@ -641,7 +698,7 @@
         </div>
     </div>
 
-    <!-- نافذة تعديل عضو فريق المبيعات -->
+    <!-- نافذة تعديل عضو فريق مبيعات -->
     <div id="edit-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
@@ -741,68 +798,6 @@
         </div>
     </div>
 
-    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينة جديدة</h3>
-            <div><label class="block font-bold mb-1">العميل المستلم:</label><select id="sample-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-            <div><label class="block font-bold mb-1">عضو الفريق المسلّم:</label><select id="sample-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-            <div><label class="block font-bold mb-1">المنتج المسلّم:</label><input type="text" id="sample-product-name" class="w-full p-2 border rounded-lg" placeholder="صدور دجاج متبلة"></div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">الكمية:</label><input type="number" id="sample-qty" class="w-full p-2 border rounded-lg" value="10"></div>
-                <div><label class="block font-bold mb-1">التاريخ:</label><input type="date" id="sample-date" class="w-full p-2 border rounded-lg" value="2026-09-07"></div>
-            </div>
-            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العينة</button></div>
-        </div>
-    </div>
-
-    <!-- نافذة تحويل العينة لأمر شراء PO -->
-    <div id="convert-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[440px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">تحويل العينة لأمر شراء رسمي (PO)</h3>
-            <input type="hidden" id="convert-sample-id">
-            <div>
-                <label class="block font-bold mb-1">رقم أمر الشراء (PO Number):</label>
-                <input type="text" id="convert-sample-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX">
-            </div>
-            <div>
-                <label class="block font-bold mb-1">القيمة المالية المحققة (ر.ع):</label>
-                <input type="number" id="convert-sample-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0">
-            </div>
-            <div class="flex justify-end gap-2 pt-3">
-                <button onclick="closeConvertSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitConvertSample()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الاعتماد والترحيل</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية</h3>
-            <div><label class="block font-bold mb-1">العميل المستهدف:</label><select id="cal-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-            <div><label class="block font-bold mb-1">عضو الفريق المكلّف:</label><select id="cal-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-            <div><label class="block font-bold mb-1">نوع المهمة:</label><input type="text" id="cal-task-type" class="w-full p-2 border rounded-lg" placeholder="زيارة فحص جودة وتفاوض"></div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">الموعد:</label><input type="text" id="cal-scheduled-at" class="w-full p-2 border rounded-lg" value="2026-09-08 10:00"></div>
-                <div><label class="block font-bold mb-1">الموقع:</label><input type="text" id="cal-location" class="w-full p-2 border rounded-lg" placeholder="مقر العميل"></div>
-            </div>
-            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تأكيد الجدولة</button></div>
-        </div>
-    </div>
-
-    <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي جديد</h3>
-            <div><label class="block font-bold mb-1">مسمى الهدف:</label><input type="text" id="tgt-title" class="w-full p-2 border rounded-lg" placeholder="توريد دواجن طازجة أسبوعي"></div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">العميل المستهدف:</label><select id="tgt-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-                <div><label class="block font-bold mb-1">عضو الفريق المكلّف:</label><select id="tgt-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-            </div>
-            <div><label class="block font-bold mb-1">القيمة المتوقعة (ر.ع):</label><input type="number" id="tgt-value" class="w-full p-2 border rounded-lg" value="5000"></div>
-            <div><label class="block font-bold mb-1">ملاحظة البداية:</label><textarea id="tgt-note" rows="2" class="w-full p-2 border rounded-lg" placeholder="تم الاتصال بالعميل..."></textarea></div>
-            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewTargetModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewTarget()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">بدء العداد وحفظ الهدف</button></div>
-        </div>
-    </div>
-
     <!-- نافذة قيد سند مصروف جديد -->
     <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[470px] space-y-3 text-xs">
@@ -872,6 +867,8 @@
             'whatsapp-feed': 'رادار الرسائل والمحادثات',
             'whatsapp-settings': 'إعدادات ونطاق الواتساب الميداني'
         };
+
+        let allSamplesCache = [];
 
         function loadSavedTestPhone() {
             const savedPhone = localStorage.getItem('fdc_global_test_phone');
@@ -1455,51 +1452,6 @@
         }
         function closeEditCustomerModal() { document.getElementById('edit-customer-modal').classList.add('hidden'); }
 
-        async function submitNewCustomer() {
-            const company = document.getElementById('cust-company-name').value.trim();
-            const brand = document.getElementById('cust-brand-name').value.trim();
-            const region = document.getElementById('cust-region').value.trim();
-            const sector = document.getElementById('cust-sector').value.trim();
-            const person = document.getElementById('cust-contact-person').value.trim();
-            const phone = document.getElementById('cust-phone').value.trim();
-            const repSelect = document.getElementById('cust-rep-select');
-            const notes = document.getElementById('cust-notes').value.trim();
-
-            if (!company || !phone) {
-                alert("يرجى ملء اسم الشركة ورقم الهاتف");
-                return;
-            }
-
-            const payload = {
-                company_name: company,
-                brand_name: brand || "",
-                sector: sector || "عام",
-                region: region || "مسقط",
-                contact_person: person || "المسؤول",
-                phone: phone,
-                assigned_rep_id: (repSelect && repSelect.value) ? parseInt(repSelect.value) : null,
-                notes: notes || ""
-            };
-
-            try {
-                const res = await fetch('/api/customers', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (res.ok) {
-                    closeNewCustomerModal();
-                    await loadAllData();
-                    alert("تمت إضافة العميل بنجاح ✓");
-                } else {
-                    const err = await res.json().catch(() => ({}));
-                    alert(err.detail || "حدث خطأ أثناء حفظ العميل");
-                }
-            } catch (e) {
-                alert("تعذر الاتصال بالسيرفر لحفظ العميل");
-            }
-        }
-
         async function submitUpdateCustomer() {
             const id = document.getElementById('edit-cust-id').value;
             const comp = document.getElementById('edit-cust-company-name').value.trim();
@@ -1624,17 +1576,22 @@
         }
 
         async function submitNewSample() {
-            const custSelect = document.getElementById('sample-customer-select');
+            const custInput = document.getElementById('sample-customer-input');
             const repSelect = document.getElementById('sample-rep-select');
             const product = document.getElementById('sample-product-name').value.trim();
             const qty = parseInt(document.getElementById('sample-qty').value) || 1;
             const date = document.getElementById('sample-date').value;
+            const reminder = document.getElementById('sample-reminder-at').value;
 
-            const custName = custSelect.value;
+            const custName = custInput.value.trim();
             const repName = repSelect.value;
 
+            if (!custName) {
+                alert("يرجى كتابة أو اختيار اسم العميل المستلم");
+                return;
+            }
             if (!product) {
-                alert("يرجى كتابة اسم المنتج المسلّم");
+                alert("يرجى كتابة اسم الصنف / المنتج المسلّم");
                 return;
             }
             if (!date) {
@@ -1647,7 +1604,8 @@
                 rep_name: repName,
                 product_name: product,
                 qty_free: qty,
-                delivery_date: date
+                delivery_date: date,
+                reminder_at: reminder || ""
             };
 
             try {
@@ -1659,8 +1617,10 @@
                 if (res.ok) {
                     closeNewSampleModal();
                     document.getElementById('sample-product-name').value = '';
+                    document.getElementById('sample-customer-input').value = '';
+                    document.getElementById('sample-reminder-at').value = '';
                     await loadAllData();
-                    alert("تم حفظ تسليم العينة بنجاح ✓");
+                    alert("تم حفظ تسليم العينة وإرسال إشعار WhatsApp فوري للموظف المكلف بنجاح ✓");
                 } else {
                     const err = await res.json().catch(() => ({}));
                     alert(err.detail || "حدث خطأ أثناء حفظ العينة");
@@ -1670,25 +1630,103 @@
             }
         }
 
-        function openNewCalendarModal() { document.getElementById('new-calendar-modal').classList.remove('hidden'); }
+        function renderSamplesTable(samplesList) {
+            const tbody = document.getElementById('samples-table-body');
+            if (!tbody) return;
+
+            tbody.innerHTML = samplesList.map(s => {
+                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">قيد التسليم (PENDING)</span>`;
+                if (s.status === 'DELIVERED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">تم التسليم الميداني ✓</span>`;
+                if (s.status === 'CONVERTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">أمر شراء معتمد ✓</span>`;
+                if (s.status === 'REJECTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">لم تُعتمد</span>`;
+
+                return `
+                <tr>
+                    <td class="p-3 font-bold">${s.customer_name || '—'}</td>
+                    <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name || '—'}</td>
+                    <td class="p-3 font-bold text-gray-800">${s.product_name || '—'}</td>
+                    <td class="p-3">${s.qty_free} وحدة</td>
+                    <td class="p-3 text-gray-500">${s.delivery_date}</td>
+                    <td class="p-3 font-mono text-[10px] text-purple-700">${s.reminder_at || '—'}</td>
+                    <td class="p-3">${statusBadge}</td>
+                    <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id + ' (' + (s.po_value || 0) + ' ر.ع)' : '—'}</td>
+                    <td class="p-3 no-print">
+                        <div class="flex gap-1.5 flex-wrap">
+                            ${s.status === 'PENDING' ? `
+                            <button onclick="updateSampleDirectStatus(${s.id}, 'DELIVERED')" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-[10px]">تأكيد التسليم</button>
+                            ` : ''}
+                            ${(s.status === 'PENDING' || s.status === 'DELIVERED') ? `
+                            <button onclick="openConvertSampleModal(${s.id})" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px]">تحويل لـ PO</button>
+                            <button onclick="updateSampleDirectStatus(${s.id}, 'REJECTED')" class="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded text-[10px]">رفض</button>
+                            ` : `<span class="text-[10px] text-gray-400">مكتمل</span>`}
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function applySamplesFilter() {
+            const productTerm = document.getElementById('filter-sample-product').value.trim().toLowerCase();
+            const customerTerm = document.getElementById('filter-sample-customer').value.trim().toLowerCase();
+            const fromDate = document.getElementById('filter-sample-from-date').value;
+            const toDate = document.getElementById('filter-sample-to-date').value;
+
+            const filtered = allSamplesCache.filter(s => {
+                const matchProduct = !productTerm || (s.product_name && s.product_name.toLowerCase().includes(productTerm));
+                const matchCustomer = !customerTerm || (s.customer_name && s.customer_name.toLowerCase().includes(customerTerm));
+                
+                let matchDate = true;
+                if (fromDate && s.delivery_date < fromDate) matchDate = false;
+                if (toDate && s.delivery_date > toDate) matchDate = false;
+
+                return matchProduct && matchCustomer && matchDate;
+            });
+
+            renderSamplesTable(filtered);
+        }
+
+        function openNewCalendarModal() { 
+            const now = new Date();
+            const formatted = now.toISOString().slice(0, 16);
+            document.getElementById('cal-scheduled-at').value = formatted;
+            document.getElementById('new-calendar-modal').classList.remove('hidden'); 
+        }
         function closeNewCalendarModal() { document.getElementById('new-calendar-modal').classList.add('hidden'); }
 
+        function openEditCalendarModal(id, cust, rep, task, sched, reminder, loc, notes) {
+            document.getElementById('edit-cal-id').value = id;
+            document.getElementById('edit-cal-customer-input').value = unescape(cust) || '';
+            document.getElementById('edit-cal-rep-select').value = unescape(rep) || '';
+            document.getElementById('edit-cal-task-type').value = unescape(task) || '';
+            document.getElementById('edit-cal-scheduled-at').value = sched ? sched.replace(" ", "T") : '';
+            document.getElementById('edit-cal-reminder-at').value = reminder ? reminder.replace(" ", "T") : '';
+            document.getElementById('edit-cal-location').value = unescape(loc) || '';
+            document.getElementById('edit-cal-notes').value = unescape(notes) || '';
+            document.getElementById('edit-calendar-modal').classList.remove('hidden');
+        }
+        function closeEditCalendarModal() { document.getElementById('edit-calendar-modal').classList.add('hidden'); }
+
         async function submitNewCalendarEvent() {
-            const custSelect = document.getElementById('cal-customer-select');
+            const custInput = document.getElementById('cal-customer-input');
             const repSelect = document.getElementById('cal-rep-select');
             const task = document.getElementById('cal-task-type').value.trim();
             const sched = document.getElementById('cal-scheduled-at').value.trim();
+            const reminder = document.getElementById('cal-reminder-at').value.trim();
             const loc = document.getElementById('cal-location').value.trim();
 
-            const custName = custSelect.value;
+            const custName = custInput.value.trim();
             const repName = repSelect.value;
 
+            if (!custName) {
+                alert("يرجى كتابة أو اختيار اسم العميل المستهدف");
+                return;
+            }
             if (!task) {
                 alert("يرجى تحديد نوع المهمة");
                 return;
             }
             if (!sched) {
-                alert("يرجى إدخال الموعد المجدول");
+                alert("يرجى تحديد موعد المهمة");
                 return;
             }
 
@@ -1696,7 +1734,8 @@
                 customer_name: custName,
                 rep_name: repName,
                 task_type: task,
-                scheduled_at: sched,
+                scheduled_at: sched.replace("T", " "),
+                reminder_at: reminder ? reminder.replace("T", " ") : "",
                 location: loc || "مقر العميل",
                 route_code: "R-01"
             };
@@ -1710,14 +1749,53 @@
                 if (res.ok) {
                     closeNewCalendarModal();
                     document.getElementById('cal-task-type').value = '';
+                    document.getElementById('cal-customer-input').value = '';
                     await loadAllData();
-                    alert("تمت جدولة المهمة بنجاح ✓");
+                    alert("تمت جدولة المهمة وإرسال إشعار WhatsApp فوري للموظف المكلف بنجاح ✓");
                 } else {
                     const err = await res.json().catch(() => ({}));
                     alert(err.detail || "حدث خطأ أثناء جدولة المهمة");
                 }
             } catch (e) {
                 alert("تعذر الاتصال بالسيرفر لجدولة المهمة");
+            }
+        }
+
+        async function submitUpdateCalendarEvent() {
+            const id = document.getElementById('edit-cal-id').value;
+            const cust = document.getElementById('edit-cal-customer-input').value.trim();
+            const rep = document.getElementById('edit-cal-rep-select').value;
+            const task = document.getElementById('edit-cal-task-type').value.trim();
+            const sched = document.getElementById('edit-cal-scheduled-at').value.trim();
+            const reminder = document.getElementById('edit-cal-reminder-at').value.trim();
+            const loc = document.getElementById('edit-cal-location').value.trim();
+            const notes = document.getElementById('edit-cal-notes').value.trim();
+
+            const payload = {
+                customer_name: cust,
+                rep_name: rep,
+                task_type: task,
+                scheduled_at: sched.replace("T", " "),
+                reminder_at: reminder ? reminder.replace("T", " ") : "",
+                location: loc || "مقر العميل",
+                change_notes: notes || ""
+            };
+
+            try {
+                const res = await fetch(`/api/calendar/${id}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    closeEditCalendarModal();
+                    await loadAllData();
+                    alert("تم تحديث بيانات المهمة وإرسال إشعار التغيير للموظف المعني بنجاح ✓");
+                } else {
+                    alert("فشل تحديث المهمة المجدولة");
+                }
+            } catch(e) {
+                alert("تعذر الاتصال بالسيرفر");
             }
         }
 
@@ -2015,6 +2093,7 @@
             document.getElementById('edit-exp-rep-select').innerHTML = repOptionsHTML;
             document.getElementById('sample-rep-select').innerHTML = repNamesOnlyHTML;
             document.getElementById('cal-rep-select').innerHTML = repNamesOnlyHTML;
+            document.getElementById('edit-cal-rep-select').innerHTML = repNamesOnlyHTML;
 
             document.getElementById('settings-reps-whitelist-list').innerHTML = reps.map(r => `
                 <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-xl flex justify-between items-center text-xs">
@@ -2050,12 +2129,12 @@
             `).join('');
 
             const custOptionsHTML = custs.map(c => `<option value="${c.id}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
-            const custNamesOnlyHTML = custs.map(c => `<option value="${c.company_name}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
+            const custDatalistHTML = custs.map(c => `<option value="${c.company_name}">${c.brand_name ? c.brand_name : c.region}</option>`).join('');
 
             document.getElementById('tgt-customer-select').innerHTML = custOptionsHTML;
-            document.getElementById('sample-customer-select').innerHTML = custNamesOnlyHTML;
-            document.getElementById('cal-customer-select').innerHTML = custNamesOnlyHTML;
             document.getElementById('settings-wa-customer-select').innerHTML = custOptionsHTML;
+            document.getElementById('sample-customers-datalist').innerHTML = custDatalistHTML;
+            document.getElementById('cal-customers-datalist').innerHTML = custDatalistHTML;
 
             const monitoredCusts = custs.filter(c => c.whatsapp_group_id);
             document.getElementById('settings-monitored-groups-tbody').innerHTML = monitoredCusts.length > 0 ? monitoredCusts.map(c => `
@@ -2121,33 +2200,12 @@
                 </div>
             `).join('');
 
+            // جلب العينات وتفعيل جدول الجرد مع الفلترة
             const sRes = await fetch('/api/samples');
-            const samples = await sRes.json();
-            document.getElementById('samples-table-body').innerHTML = samples.map(s => {
-                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">قيد التجربة (PENDING)</span>`;
-                if (s.status === 'CONVERTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">أمر شراء معتمد ✓</span>`;
-                if (s.status === 'REJECTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">لم تُعتمد</span>`;
+            allSamplesCache = await sRes.json();
+            applySamplesFilter();
 
-                return `
-                <tr>
-                    <td class="p-3 font-bold">${s.customer_name || '—'}</td>
-                    <td class="p-3 text-[#3A056A]">${s.rep_name || '—'}</td>
-                    <td class="p-3">${s.product_name || '—'}</td>
-                    <td class="p-3">${s.qty_free} وحدة</td>
-                    <td class="p-3 text-gray-500">${s.delivery_date}</td>
-                    <td class="p-3">${statusBadge}</td>
-                    <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id + ' (' + (s.po_value || 0) + ' ر.ع)' : '—'}</td>
-                    <td class="p-3 no-print">
-                        ${s.status === 'PENDING' ? `
-                        <div class="flex gap-1.5">
-                            <button onclick="openConvertSampleModal(${s.id})" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px]">تحويل لـ PO</button>
-                            <button onclick="updateSampleDirectStatus(${s.id}, 'REJECTED')" class="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded text-[10px]">رفض</button>
-                        </div>
-                        ` : `<span class="text-[10px] text-gray-400">مغلق</span>`}
-                    </td>
-                </tr>`;
-            }).join('');
-
+            // جلب التقويم مع زر التعديل وإظهار الملاحظات
             const cRes = await fetch('/api/calendar');
             const cal = await cRes.json();
             document.getElementById('calendar-events-list').innerHTML = cal.map(e => {
@@ -2158,15 +2216,20 @@
                 <div class="p-3.5 rounded-xl border ${isCompleted ? 'border-emerald-300 bg-emerald-50/40' : (isCancelled ? 'border-gray-200 bg-gray-50 opacity-60' : 'brand-border brand-tint')} flex justify-between items-center text-xs">
                     <div>
                         <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
-                        <div class="text-gray-500 mt-0.5">العميل: <strong>${e.customer_name}</strong> | عضو الفريق: <strong>${e.rep_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span> | الموقع: ${e.location}</div>
+                        <div class="text-gray-600 mt-0.5">
+                            العميل: <strong>${e.customer_name}</strong> | عضو الفريق: <strong>${e.rep_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span> | الموقع: ${e.location}
+                        </div>
+                        ${e.reminder_at ? `<div class="text-[10px] text-purple-700 font-mono mt-0.5">توقيت التذكير المجدول: ${e.reminder_at}</div>` : ''}
+                        ${e.change_notes ? `<div class="text-[11px] text-amber-800 bg-amber-50 p-1 rounded mt-1 border border-amber-200"><strong>ملاحظة التعديل:</strong> ${e.change_notes}</div>` : ''}
                     </div>
-                    <div class="flex items-center gap-2 no-print">
+                    <div class="flex items-center gap-1.5 no-print">
                         <span class="px-2.5 py-1 rounded text-xs font-bold ${isCompleted ? 'bg-emerald-100 text-emerald-800' : (isCancelled ? 'bg-gray-200 text-gray-700' : 'bg-amber-100 text-amber-800')}">
                             ${isCompleted ? 'مكتملة ومُنفذة ✓' : (isCancelled ? 'ملغاة' : 'مجدولة (PENDING)')}
                         </span>
                         ${(!isCompleted && !isCancelled) ? `
+                        <button onclick="openEditCalendarModal(${e.id}, '${escape(e.customer_name)}', '${escape(e.rep_name)}', '${escape(e.task_type)}', '${e.scheduled_at}', '${e.reminder_at || ''}', '${escape(e.location)}', '${escape(e.change_notes || '')}')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[11px]">تعديل</button>
                         <button onclick="updateCalendarStatus(${e.id}, 'COMPLETED')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px]">إتمام المهمة ✓</button>
-                        <button onclick="updateCalendarStatus(${e.id}, 'CANCELLED')" class="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-[11px]">إلغاء</button>
+                        <button onclick="updateCalendarStatus(${e.id}, 'CANCELLED')" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-[11px]">إلغاء</button>
                         ` : ''}
                     </div>
                 </div>`;
