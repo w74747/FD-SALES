@@ -1,7 +1,7 @@
 """
-main.py - Enterprise AI Sales CRM & Field Intelligence
+main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Self-Messaging AI Agent + Logistics Dispatch + Executive Analysis
+Advisory Board Agents + Field Operations Agents + WhatsApp Dispatcher
 """
 
 import os
@@ -53,7 +53,7 @@ def get_db_connection():
         if conn_url.startswith("postgres://"):
             conn_url = conn_url.replace("postgres://", "postgresql://", 1)
         return psycopg2.connect(conn_url, cursor_factory=RealDictCursor, connect_timeout=5)
-    except Exception as e:
+    except Exception:
         return None
 
 def run_isolated_ddl(sql_statement: str):
@@ -64,19 +64,19 @@ def run_isolated_ddl(sql_statement: str):
         conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute(sql_statement)
-    except Exception as e:
+    except Exception:
         pass
     finally:
         conn.close()
 
-async def send_whatsapp_direct(target_phone: str, message: str) -> bool:
-    if not target_phone:
+async def send_whatsapp_direct(target_phone_or_group: str, message: str) -> bool:
+    if not target_phone_or_group:
         return False
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 "http://127.0.0.1:3001/send-message",
-                json={"phone_or_group": target_phone, "message": message},
+                json={"phone_or_group": target_phone_or_group, "message": message},
                 timeout=5.0
             )
             return resp.status_code == 200
@@ -263,14 +263,16 @@ def init_database():
             );
             """)
 
+            # جدول الوكلاء مع دعم التصنيف وقناة الإرسال المحددة
             cur.execute("""
             CREATE TABLE IF NOT EXISTS ai_agents (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(150) NOT NULL,
+                category VARCHAR(50) DEFAULT 'ADVISORY',
                 role_type VARCHAR(100) NOT NULL,
                 system_prompt TEXT NOT NULL,
                 trigger_schedule VARCHAR(100) DEFAULT 'DAILY_MORNING',
-                test_phone VARCHAR(30) DEFAULT '',
+                target_channel VARCHAR(100) DEFAULT '',
                 is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -281,26 +283,37 @@ def init_database():
     finally:
         conn.close()
 
+    run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'ADVISORY';")
+    run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS target_channel VARCHAR(100) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE whatsapp_logs ADD COLUMN IF NOT EXISTS channel_name VARCHAR(150) DEFAULT 'محادثة مباشرة';")
-    run_isolated_ddl("ALTER TABLE sales_targets ADD COLUMN IF NOT EXISTS pipeline_stage VARCHAR(50) DEFAULT 'LEAD_CONTACT';")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS feedback_notes TEXT DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS product_id INT REFERENCES products_catalog(id) ON DELETE SET NULL;")
-    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(10) DEFAULT 'AR';")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS reminder_at VARCHAR(50) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS reminder_at VARCHAR(50) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS change_notes TEXT DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN customer_id DROP NOT NULL;")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN rep_id DROP NOT NULL;")
-    run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN customer_id DROP NOT NULL;")
-    run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN rep_id DROP NOT NULL;")
 
-    # تكوين المجموعات الخاصة
+    # إدخال وكلاء المجلس الاستشاري الافتراضيين لصناعة المخبوزات
     run_isolated_ddl("""
-    INSERT INTO system_config (key_name, key_value) VALUES 
-    ('logistics_group_id', ''),
-    ('management_group_id', '')
-    ON CONFLICT DO NOTHING;
+    INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
+    SELECT 'وكيل كبار العملاء والتصنيع للغير (Private Label)', 'ADVISORY', 'KEY_ACCOUNTS_OEM',
+           'أنت المستشار الاستراتيجي للشراكات الكبرى لشركة تنمية الغذاء (أكبر وأحدث مصنع مخبوزات في عمان). مهمتك دراسة متطلبات سلاسل الهايبرماركت الكبرى مثل اللولو وهايبرماكس والموزعين الإقليميين مثل Bidfood، وتقديم عروض تصنيع مخصصة للعلامات الخاصة (Private Label) بالأوزان ومواصفات الكرتون المطلوبة.',
+           'DAILY_09AM', '', TRUE
+    WHERE NOT EXISTS (SELECT 1 FROM ai_agents WHERE role_type = 'KEY_ACCOUNTS_OEM');
     """)
+
+    run_isolated_ddl("""
+    INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
+    SELECT 'وكيل استخبارات المنافسين وبدائل المنتجات', 'ADVISORY', 'COMPETITIVE_DISPLACEMENT',
+           'أنت خبير تحليل السوق والمنافسة لمصنع تنمية الغذاء. تتابع منتجات المنافسين المباشرين كشركة لوزين (المراعي) ومخبز أطياب، وتحلل أسعارهم، أوزانهم، وتفاصيل تغليفهم (كرواسون، بف، بنز البرجر)، وتجهز نقاط إقناع للمشترين والمطاعم للتحويل لمنتجاتنا المحلية الأعلى طراوة وجودة.',
+           'DAILY_10AM', '', TRUE
+    WHERE NOT EXISTS (SELECT 1 FROM ai_agents WHERE role_type = 'COMPETITIVE_DISPLACEMENT');
+    """)
+
+    run_isolated_ddl("""
+    INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
+    SELECT 'وكيل أبحاث التصدير والتوسع الإقليمي', 'ADVISORY', 'EXPORT_EXPANSION',
+           'أنت مستشار التصدير والتوسع الجغرافي لمصنع تنمية الغذاء. تبحث في فرص تصدير المخبوزات المجمدة والمجففة لأسواق السعودية والإمارات وقطر، وتحدد متطلبات فترات الصلاحية (Shelf-life) والشحن والاشتراطات الجمركية وسلاسل المطاعم الإقليمية التي تبحث عن توريد معتمد.',
+           'WEEKLY_MONDAY', '', TRUE
+    WHERE NOT EXISTS (SELECT 1 FROM ai_agents WHERE role_type = 'EXPORT_EXPANSION');
+    """)
+
+    # تصنيف وكلاء المتابعة الميدانية
+    run_isolated_ddl("UPDATE ai_agents SET category = 'FIELD_OPERATIONS' WHERE role_type IN ('SAMPLES_FEEDBACK_INTEL', 'PIPELINE_VELOCITY', 'EXPENSE_ROI_ANALYST', 'SAMPLES_CONVERSION', 'CALENDAR_DISPATCH', 'STAGNANT_TARGETS');")
 
 def start_whatsapp_service():
     global whatsapp_process
@@ -323,7 +336,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="12.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="12.5.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -418,9 +431,6 @@ class ConvertSamplePayload(BaseModel):
     po_number: str
     po_value: float
 
-class UpdateStatusPayload(BaseModel):
-    status: str
-
 class NewCalendarEventPayload(BaseModel):
     customer_name: str
     rep_name: str
@@ -429,15 +439,6 @@ class NewCalendarEventPayload(BaseModel):
     reminder_at: Optional[str] = ""
     location: str
     route_code: Optional[str] = "R-01"
-
-class UpdateCalendarEventPayload(BaseModel):
-    customer_name: str
-    rep_name: str
-    task_type: str
-    scheduled_at: str
-    reminder_at: Optional[str] = ""
-    location: str
-    change_notes: Optional[str] = ""
 
 class NewTargetPayload(BaseModel):
     title: str
@@ -451,9 +452,6 @@ class UpdateTargetStagePayload(BaseModel):
     pipeline_stage: str
     note: Optional[str] = ""
 
-class UpdateTargetNotePayload(BaseModel):
-    note: str
-
 class CloseTargetPayload(BaseModel):
     po_number: str
     po_value: float
@@ -465,18 +463,20 @@ class NewExpensePayload(BaseModel):
     amount: float
     notes: Optional[str] = ""
 
-class UpdateExpensePayload(BaseModel):
-    rep_id: int
-    expense_type: str
-    amount: float
-    notes: Optional[str] = ""
-
 class NewAgentPayload(BaseModel):
     name: str
+    category: Optional[str] = "ADVISORY"
     role_type: str
     system_prompt: str
     trigger_schedule: Optional[str] = "DAILY_MORNING"
-    test_phone: Optional[str] = ""
+    target_channel: Optional[str] = ""
+
+class UpdateAgentPayload(BaseModel):
+    name: str
+    category: Optional[str] = "ADVISORY"
+    system_prompt: str
+    trigger_schedule: Optional[str] = "DAILY_MORNING"
+    target_channel: Optional[str] = ""
 
 class ToggleAgentPayload(BaseModel):
     is_active: bool
@@ -490,6 +490,149 @@ class IncomingWhatsAppMessage(BaseModel):
 class ReportPreviewPayload(BaseModel):
     report_recipient: Optional[str] = "سعادة رئيس مجلس الإدارة / المدير العام"
     recommendation: Optional[str] = ""
+
+# ----------------- مسارات الوكلاء (إنشاء، تعديل، حذف، تصنيف) -----------------
+@app.get("/api/agents")
+def get_ai_agents():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM ai_agents ORDER BY category ASC, id ASC;")
+            rows = cur.fetchall()
+            for r in rows:
+                r["category"] = r.get("category") or "ADVISORY"
+                r["target_channel"] = r.get("target_channel") or ""
+            return rows
+    finally:
+        conn.close()
+
+@app.post("/api/agents")
+def create_ai_agent(payload: NewAgentPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, TRUE) RETURNING id;
+            """, (
+                payload.name.strip(),
+                payload.category or "ADVISORY",
+                payload.role_type.strip(),
+                payload.system_prompt.strip(),
+                payload.trigger_schedule or "DAILY_MORNING",
+                payload.target_channel.strip() if payload.target_channel else ""
+            ))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/{agent_id}/update")
+def update_ai_agent(agent_id: int, payload: UpdateAgentPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE ai_agents 
+            SET name = %s, category = %s, system_prompt = %s, trigger_schedule = %s, target_channel = %s 
+            WHERE id = %s;
+            """, (
+                payload.name.strip(),
+                payload.category or "ADVISORY",
+                payload.system_prompt.strip(),
+                payload.trigger_schedule,
+                payload.target_channel.strip() if payload.target_channel else "",
+                agent_id
+            ))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.delete("/api/agents/{agent_id}")
+def delete_ai_agent(agent_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM ai_agents WHERE id = %s;", (agent_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/clean-duplicates")
+def clean_duplicate_agents():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            DELETE FROM ai_agents a USING ai_agents b 
+            WHERE a.id < b.id AND a.name = b.name;
+            """)
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/{agent_id}/toggle")
+def toggle_agent_status(agent_id: int, payload: ToggleAgentPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE ai_agents SET is_active = %s WHERE id = %s;", (payload.is_active, agent_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/test-global")
+async def test_agent_global(payload: dict):
+    agent_id = payload.get("agent_id")
+    test_target = payload.get("test_phone", "").strip()
+
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متصلة")
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM ai_agents WHERE id = %s;", (agent_id,))
+            agent = cur.fetchone()
+            if not agent:
+                raise HTTPException(status_code=404, detail="الوكيل غير موجود")
+
+            # إذا كان للوكيل قناة مخصصة نرسل إليها، أو نستخدم رقم الاختبار الموحد
+            target_destination = agent.get("target_channel") or test_target
+            if not target_destination:
+                raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار الموحد")
+
+            message_text = (
+                f"*{agent['name']}*\n"
+                f"فئة الوكيل: {'المجلس الاستشاري التنفيذي' if agent.get('category') == 'ADVISORY' else 'المتابعة الميدانية'}\n\n"
+                f"«{agent['system_prompt']}»\n\n"
+                f"شركة تنمية الغذاء (Food Development Company)"
+            )
+
+        sent = await send_whatsapp_direct(target_destination, message_text)
+        if sent:
+            return {"status": "SUCCESS", "to": target_destination, "message_preview": message_text}
+        else:
+            raise HTTPException(status_code=400, detail="فشل الإرسال عبر محرك الواتساب")
+    finally:
+        conn.close()
 
 # ----------------- مسارات كتالوج المنتجات -----------------
 @app.get("/api/products")
@@ -733,29 +876,6 @@ def add_rep(payload: NewRepPayload):
     finally:
         conn.close()
 
-@app.post("/api/reps/{rep_id}/update")
-def update_rep(rep_id: int, payload: UpdateRepPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            target = payload.monthly_target if payload.has_target else 0.0
-            cur.execute("""
-            UPDATE sales_executives 
-            SET name = %s, employee_code = %s, phone_number = %s, region = %s, 
-                has_target = %s, monthly_target = %s, preferred_language = %s 
-            WHERE id = %s;
-            """, (
-                payload.name.strip(), payload.employee_code.strip(), payload.phone_number.strip(),
-                payload.region.strip(), payload.has_target, target, payload.preferred_language or "AR", rep_id
-            ))
-            cur.execute("UPDATE customer_accounts SET assigned_rep_name = %s WHERE assigned_rep_id = %s;", (payload.name.strip(), rep_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
 @app.delete("/api/reps/{rep_id}")
 def delete_rep(rep_id: int):
     conn = get_db_connection()
@@ -818,40 +938,6 @@ def add_customer(payload: NewCustomerPayload):
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
-    finally:
-        conn.close()
-
-@app.post("/api/customers/{customer_id}/update")
-def update_customer(customer_id: int, payload: UpdateCustomerPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            rep_name = ""
-            rep_id = payload.assigned_rep_id
-            if rep_id:
-                cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (rep_id,))
-                r = cur.fetchone()
-                if r:
-                    rep_name = r["name"]
-                else:
-                    rep_id = None
-
-            cur.execute("""
-            UPDATE customer_accounts 
-            SET company_name = %s, brand_name = %s, sector = %s, region = %s, 
-                contact_person = %s, phone = %s, assigned_rep_id = %s, 
-                assigned_rep_name = %s, notes = %s 
-            WHERE id = %s;
-            """, (
-                payload.company_name.strip(), (payload.brand_name or "").strip(),
-                (payload.sector or "عام").strip(), (payload.region or "مسقط").strip(),
-                payload.contact_person.strip(), payload.phone.strip(), rep_id, rep_name,
-                (payload.notes or "").strip(), customer_id
-            ))
-            conn.commit()
-            return {"status": "SUCCESS"}
     finally:
         conn.close()
 
@@ -1076,78 +1162,17 @@ async def add_calendar_event(payload: NewCalendarEventPayload):
             conn.commit()
 
         if rep_phone:
-            if rep_lang == "EN":
-                msg = (
-                    f"*New Task Scheduled*\n\n"
-                    f"Hello {payload.rep_name},\n"
-                    f"Task: {payload.task_type}\n"
-                    f"Client: {payload.customer_name}\n"
-                    f"Time: {payload.scheduled_at}\n"
-                    f"Location: {payload.location}\n\n"
-                    f"Food Development Company | FDC Sales CRM"
-                )
-            else:
-                msg = (
-                    f"*إشعار جدولة مهمة جديدة*\n\n"
-                    f"مرحبا {payload.rep_name}،\n"
-                    f"تمت جدولة مهمة جديدة لك في النظام:\n"
-                    f"المهمة: {payload.task_type}\n"
-                    f"العميل: {payload.customer_name}\n"
-                    f"الموعد: {payload.scheduled_at}\n"
-                    f"الموقع: {payload.location}\n\n"
-                    f"شركة تنمية الغذاء | FDC Sales CRM"
-                )
+            msg = (
+                f"*إشعار جدولة مهمة جديدة*\n\n"
+                f"المهمة: {payload.task_type}\n"
+                f"العميل: {payload.customer_name}\n"
+                f"الموعد: {payload.scheduled_at}\n"
+                f"الموقع: {payload.location}\n\n"
+                f"شركة تنمية الغذاء | FDC Sales CRM"
+            )
             await send_whatsapp_direct(rep_phone, msg)
 
         return {"status": "SUCCESS", "id": new_id}
-    finally:
-        conn.close()
-
-@app.post("/api/calendar/{event_id}/update")
-async def update_calendar_event(event_id: int, payload: UpdateCalendarEventPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, phone_number, preferred_language FROM sales_executives WHERE name = %s LIMIT 1;", (payload.rep_name,))
-            r_row = cur.fetchone()
-            r_id = r_row["id"] if r_row else None
-            rep_phone = r_row["phone_number"] if r_row else None
-            rep_lang = r_row["preferred_language"] if r_row else "AR"
-
-            cur.execute("""
-            UPDATE calendar_events 
-            SET customer_name = %s, rep_id = %s, rep_name = %s, task_type = %s, 
-                scheduled_at = %s, reminder_at = %s, location = %s, change_notes = %s 
-            WHERE id = %s;
-            """, (payload.customer_name, r_id, payload.rep_name, payload.task_type, payload.scheduled_at, payload.reminder_at or "", payload.location, payload.change_notes or "", event_id))
-            conn.commit()
-
-        if rep_phone:
-            reason_txt = f"\nملاحظة التعديل: {payload.change_notes}" if payload.change_notes else ""
-            if rep_lang == "EN":
-                msg = (
-                    f"*Task Schedule Updated*\n\n"
-                    f"Hello {payload.rep_name},\n"
-                    f"Task: {payload.task_type} for {payload.customer_name}\n"
-                    f"New Time: {payload.scheduled_at} at {payload.location}"
-                    f"{f'{chr(10)}Reason: {payload.change_notes}' if payload.change_notes else ''}\n\n"
-                    f"Food Development Company | FDC Sales CRM"
-                )
-            else:
-                msg = (
-                    f"*تحديث في موعد المهمة المجدولة*\n\n"
-                    f"مرحبا {payload.rep_name}،\n"
-                    f"تم تحديث بيانات المهمة: {payload.task_type} لدى {payload.customer_name}\n"
-                    f"الموعد الجديد: {payload.scheduled_at}\n"
-                    f"الموقع: {payload.location}"
-                    f"{reason_txt}\n\n"
-                    f"شركة تنمية الغذاء | FDC Sales CRM"
-                )
-            await send_whatsapp_direct(rep_phone, msg)
-
-        return {"status": "SUCCESS"}
     finally:
         conn.close()
 
@@ -1243,7 +1268,7 @@ def close_target_with_po(target_id: int, payload: CloseTargetPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات المصاريف وسجلها -----------------
+# ----------------- مسارات المصاريف -----------------
 @app.get("/api/expense-categories")
 def get_expense_categories():
     conn = get_db_connection()
@@ -1314,82 +1339,7 @@ def delete_expense_record(expense_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات الوكلاء ومحرك التحليل -----------------
-@app.get("/api/agents")
-def get_ai_agents():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM ai_agents ORDER BY id ASC;")
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.post("/api/agents/clean-duplicates")
-def clean_duplicate_agents():
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            DELETE FROM ai_agents a USING ai_agents b 
-            WHERE a.id < b.id AND a.name = b.name;
-            """)
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/{agent_id}/toggle")
-def toggle_agent_status(agent_id: int, payload: ToggleAgentPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE ai_agents SET is_active = %s WHERE id = %s;", (payload.is_active, agent_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/test-global")
-async def test_agent_global(payload: dict):
-    agent_id = payload.get("agent_id")
-    test_target = payload.get("test_phone", "").strip()
-
-    if not test_target:
-        raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار")
-
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متصلة")
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM ai_agents WHERE id = %s;", (agent_id,))
-            agent = cur.fetchone()
-            if not agent:
-                raise HTTPException(status_code=404, detail="الوكيل غير موجود")
-
-            message_text = (
-                f"*{agent['name']}*\n\n"
-                f"مرحبا، رسالة تجريبية لاختبار عمل الوكيل الميداني الذكي.\n\n"
-                f"شركة تنمية الغذاء | FDC Sales CRM"
-            )
-
-        sent = await send_whatsapp_direct(test_target, message_text)
-        if sent:
-            return {"status": "SUCCESS", "to": test_target, "message_preview": message_text}
-        else:
-            raise HTTPException(status_code=400, detail="فشل الإرسال عبر محرك الواتساب")
-    finally:
-        conn.close()
-
-# ----------------- مسارات الواتساب ورادار المحادثات الذكي -----------------
+# ----------------- مسارات الواتساب ورادار المحادثات -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
@@ -1463,12 +1413,6 @@ def get_whatsapp_logs():
 
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
-    """
-    معالج الذكاء الاصطناعي للمحادثات الواردة:
-    1. دعم Self-Messaging والتفاعل المباشر معك.
-    2. التقاط طلبات الشراء من موظفي العميل بالمجموعات وإعادة التوجيه للوجستيك.
-    3. تسجيل الرسائل برادار المحادثات مع اسم القناة والجهة.
-    """
     conn = get_db_connection()
     if not conn:
         return {"status": "ERROR"}
@@ -1499,22 +1443,34 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                     cur.execute("SELECT COUNT(*) FROM sample_deliveries WHERE status = 'PENDING';")
                     pending_s = cur.fetchone()["count"]
                     reply_text = (
-                        f"*تقرير موجز من الوكيل الذكي:*\n\n"
+                        f"*تقرير موجز من الوكيل الذكي (شركة تنمية الغذاء):*\n\n"
                         f"• الفرص البيعية الجارية: {active_t}\n"
                         f"• العينات قيد التجربة الميدانية: {pending_s}\n\n"
-                        f"النظام يعمل بنجاح ويرصد المجموعات المعتمدة."
+                        f"النظام يعمل بنجاح ويرصد مجموعات العملاء المعتمدة."
                     )
-                elif "تحليل" in text or "إدارة" in text or "مشاكل" in text:
+                elif "تصدير" in text or "سعودية" in text or "إمارات" in text:
+                    reply_text = (
+                        f"*وكيل أبحاث التصدير والتوسع الإقليمي:*\n\n"
+                        f"• دراسة سوق الرياض: سلاسل البرجر السريعة تبحث عن توريد مجمد معتمد لخبز البطاطس والبريوش.\n"
+                        f"• الاشتراطات: صلاحية 6 أشهر بالتجميد، ومطابقة مواصفات هيئة الغذاء والدواء SFDA.\n"
+                        f"• الخطوة المقترحة: تجهيز عينات تجريبية لصالح الموزعين المعتمدين."
+                    )
+                elif "منافس" in text or "لوزين" in text or "أطياب" in text:
+                    reply_text = (
+                        f"*وكيل استخبارات المنافسين وبدائل المنتجات:*\n\n"
+                        f"• ميزة تنافسية: مصنعنا هو الأحدث محلياً ويوفر تلبية فورية دون انقطاع لسلاسل الهايبرماركت.\n"
+                        f"• نقطة القوة ضد لوزين: طراوة أعلى بنسبة رطوبة مدروسة وتخصيص الكرتون بحسب رغبة المشترين."
+                    )
+                elif "تحليل" in text or "إدارة" in text or "أزمات" in text:
                     reply_text = (
                         f"*ملخص وكيل التحليل التنفيذي (Executive Ops):*\n\n"
-                        f"1. التحدي الأول: بعض العملاء يطلبون تقليل نسبة الهدر في صدور الدجاج المتبلة.\n"
-                        f"2. التحدي الثاني: زمن انتقال الفرص من مرحلة العينات إلى أمر الشراء يتطلب متابعة هاتفية أسرع.\n\n"
-                        f"التوصية المقترحة: اعتماد زيارة فنية لمسؤول الجودة مع مندوب المنطقة."
+                        f"1. التحدي: تسريع اعتماد طلبيات التوريد الخاصة بسلاسل الهايبرماركت الكبرى.\n"
+                        f"2. التوصية: تقديم عروض أسعار تعتمد على الحجم الإجمالي لرفع هوامش ربح الموزع كـ Bidfood."
                     )
                 else:
                     reply_text = (
-                        f"مرحباً بك. أنا وكيل شركة تنمية الغذاء.\n"
-                        f"يمكنك إرسال: 'تقرير' للحصول على مؤشرات المبيعات، أو 'تحليل الإدارة' لعرض أبرز التحديات والتوصيات."
+                        f"مرحباً بك. أنا وكيلك الذكي لمصنع تنمية الغذاء.\n"
+                        f"يمكنك إرسال: 'تقرير' أو 'منافس' أو 'تصدير' أو 'تحليل الإدارة' للحصول على استشارة فورية."
                     )
 
             # 2. فحص مجموعات العملاء المعتمدة
@@ -1526,12 +1482,9 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 rep = cur.fetchone()
 
                 if customer:
-                    channel_name = f"مجموعة العميل: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
-                    
-                    # الكشف عن نية طلب شراء (طلب أصناف أو كميات)
+                    channel_name = f"مجموعة: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
                     trigger_words = ["نحتاج", "ارسلوا", "طلب", "كرتون", "طلبية", "محتاجين", "كيلو", "order", "need"]
                     if any(w in text.lower() for w in trigger_words):
-                        # مطابقة الصنف مع كتالوج المنتجات
                         cur.execute("SELECT name_ar, name_en FROM products_catalog;")
                         prods = cur.fetchall()
                         detected = []
@@ -1546,11 +1499,10 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         VALUES (%s, %s, %s, %s, %s, 'FORWARDED_TO_LOGISTICS');
                         """, (customer['company_name'], msg.sender_name, msg.sender_phone, text, items_str))
 
-                        # إعداد رسالة التوجيه لفريق اللوجستيك
                         if logistics_group:
                             forward_to_logistics = logistics_group
                             logistics_text = (
-                                f"*إشعار طلبية جديدة من العميل 📦*\n\n"
+                                f"*إشعار طلبية جديدة من العميل (مصنع تنمية الغذاء) 📦*\n\n"
                                 f"• العميل: {customer['company_name']}\n"
                                 f"• طالب الشراء: {msg.sender_name} ({msg.sender_phone})\n"
                                 f"• المنتجات المطابقة: {items_str}\n"
@@ -1565,7 +1517,6 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 else:
                     return {"status": "IGNORED", "reason": "خارج النطاق المعتمد"}
 
-            # حفظ الرسالة في رادار المحادثات
             cur.execute("""
             INSERT INTO whatsapp_logs (created_at, sender_name, channel_name, is_external_call, message_body)
             VALUES (%s, %s, %s, FALSE, %s);
