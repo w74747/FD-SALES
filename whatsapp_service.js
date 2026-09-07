@@ -1,6 +1,6 @@
 /**
- * whatsapp_service.js - Resilient Baileys WhatsApp Engine
- * Enterprise Multi-Device Connector with Hybrid Storage & Auto-Recovery
+ * whatsapp_service.js - Enterprise WhatsApp Bot & Dispatch Engine
+ * Supports Self-Messaging Bot, Multi-User Group Listening, and Logistics Forwarding
  */
 
 const express = require('express');
@@ -19,11 +19,10 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-// منع توقف الخدمة عند حدوث أي استثناء غير متوقع
 process.on('uncaughtException', (err) => {
   console.error('[Baileys UncaughtException]:', err.message);
 });
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   console.error('[Baileys UnhandledRejection]:', reason);
 });
 
@@ -40,14 +39,12 @@ if (DATABASE_URL) {
     if (connStr.startsWith('postgres://')) {
       connStr = connStr.replace('postgres://', 'postgresql://');
     }
-    // دعم الاتصال بقاعدة بيانات Railway مع تجاوز قيود SSL الذاتية
     const isLocal = connStr.includes('localhost') || connStr.includes('127.0.0.1');
     pool = new Pool({
       connectionString: connStr,
       ssl: isLocal ? false : { rejectUnauthorized: false }
     });
   } catch (e) {
-    console.error('[Postgres Init Error]:', e.message);
     pool = null;
   }
 }
@@ -62,15 +59,12 @@ async function initPostgresStorage() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('✅ [Baileys] جدول الجلسات في PostgreSQL جاهز ومفعل.');
     return true;
   } catch (e) {
-    console.warn('⚠️ [Baileys] تعذر تهيئة جدول PostgreSQL، سيتم الاعتماد على التخزين المحلي:', e.message);
     return false;
   }
 }
 
-// محول تخزين هجين: يحفظ في PostgreSQL إن وجد، أو في مجلد محلي دائم
 async function getHybridAuthState() {
   const pgReady = await initPostgresStorage();
 
@@ -83,9 +77,7 @@ async function getHybridAuthState() {
           VALUES ($1, $2, NOW())
           ON CONFLICT (key_id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW();
         `, [key_id, serialized]);
-      } catch (e) {
-        console.error('[Postgres Write Error]:', e.message);
-      }
+      } catch (e) {}
     };
 
     const readData = async (key_id) => {
@@ -94,9 +86,7 @@ async function getHybridAuthState() {
         if (res.rows.length > 0) {
           return JSON.parse(res.rows[0].data, BufferJSON.reviver);
         }
-      } catch (e) {
-        console.error('[Postgres Read Error]:', e.message);
-      }
+      } catch (e) {}
       return null;
     };
 
@@ -145,7 +135,6 @@ async function getHybridAuthState() {
       saveCreds: () => writeData('creds', creds)
     };
   } else {
-    // حل احتياطي: استخدام التخزين المحلي في حال عدم استجابة قاعدة البيانات
     const authFolder = path.join(__dirname, 'auth_info');
     if (!fs.existsSync(authFolder)) {
       fs.mkdirSync(authFolder, { recursive: true });
@@ -157,6 +146,7 @@ async function getHybridAuthState() {
 let latestQR = null;
 let isConnected = false;
 let connectedUser = null;
+let myJid = null;
 let sock = null;
 let isStarting = false;
 
@@ -164,7 +154,6 @@ async function startWhatsApp() {
   if (isStarting) return;
   isStarting = true;
 
-  console.log('[Baileys] جاري تشغيل محرك الواتساب واستعادة الجلسة...');
   try {
     const { state, saveCreds } = await getHybridAuthState();
 
@@ -176,10 +165,7 @@ async function startWhatsApp() {
       auth: state,
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false,
-      browser: ['FDC Sales CRM', 'Chrome', '11.0.0'],
-      connectTimeoutMs: 60000,
-      defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 10000
+      browser: ['FDC Sales CRM', 'Chrome', '11.0.0']
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -191,9 +177,7 @@ async function startWhatsApp() {
         try {
           latestQR = await QRCode.toDataURL(qr);
           isConnected = false;
-        } catch (err) {
-          console.error('[QR Generation Error]:', err);
-        }
+        } catch (err) {}
       }
 
       if (connection === 'close') {
@@ -201,23 +185,21 @@ async function startWhatsApp() {
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
         isConnected = false;
         latestQR = null;
-        console.log(`[Baileys Status] انقطع الاتصال (كود: ${statusCode})، إعادة المحاولة: ${shouldReconnect}`);
 
         if (shouldReconnect) {
           isStarting = false;
           setTimeout(startWhatsApp, 3000);
         } else {
           isStarting = false;
-          console.log('[Baileys] تم تسجيل الخروج من الجهاز، بانتظار مسح جديد.');
           if (pool) {
             try { await pool.query('DELETE FROM baileys_auth_sessions;'); } catch (e) {}
           }
           setTimeout(startWhatsApp, 3000);
         }
       } else if (connection === 'open') {
-        console.log('✅ [Baileys] جلسة الواتساب متصلة ونشطة بنجاح!');
         isConnected = true;
         latestQR = null;
+        myJid = sock?.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : null;
         connectedUser = sock?.user?.id ? sock.user.id.split(':')[0] : 'متصل';
         isStarting = false;
       }
@@ -226,32 +208,52 @@ async function startWhatsApp() {
     sock.ev.on('messages.upsert', async (m) => {
       try {
         const msg = m.messages[0];
-        if (!msg || !msg.message || msg.key.fromMe) return;
+        if (!msg || !msg.message) return;
 
         const chatId = msg.key.remoteJid;
+        const fromMe = Boolean(msg.key.fromMe);
+        const myPhoneNumber = connectedUser ? connectedUser.replace(/[^0-9]/g, '') : '';
+        const isSelfChat = chatId.includes(myPhoneNumber);
+
+        // تجاهل الرسائل الصادرة باستثناء الرسائل الموجهة لنفسك (Self-Messaging)
+        if (fromMe && !isSelfChat) return;
+
         const senderPhone = (msg.key.participant || chatId).split('@')[0];
         const senderName = msg.pushName || senderPhone;
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
 
         if (!text) return;
 
-        await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
+        // إرسال الرسالة إلى الباكيند لمعالجتها والرد عليها
+        const resp = await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
           chat_id: chatId,
           sender_phone: `+${senderPhone.replace(/^\+/, '')}`,
           sender_name: senderName,
           message_text: text
-        }, { timeout: 4000 });
+        }, { timeout: 6000 });
+
+        // إذا أعاد الباكيند رداً تلقائياً (مثل الرد على استفسارك في الشات الخاص أو تأكيد طلب)
+        if (resp.data && resp.data.reply_text) {
+          await sock.sendMessage(chatId, { text: resp.data.reply_text });
+        }
+
+        // إذا تطلب الأمر إعادة التوجيه التلقائي لفريق اللوجستيك
+        if (resp.data && resp.data.forward_to_logistics && resp.data.logistics_text) {
+          const logJid = resp.data.forward_to_logistics.includes('@g.us') 
+            ? resp.data.forward_to_logistics 
+            : `${resp.data.forward_to_logistics.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+          await sock.sendMessage(logJid, { text: resp.data.logistics_text });
+        }
+
       } catch (e) {}
     });
 
   } catch (err) {
-    console.error('[Baileys Startup Error]:', err.message);
     isStarting = false;
     setTimeout(startWhatsApp, 5000);
   }
 }
 
-// واجهات الاستعلام
 app.get('/qr-status', (req, res) => {
   res.json({
     connected: isConnected,
@@ -305,11 +307,6 @@ app.post('/disconnect', async (req, res) => {
 
     if (pool) {
       try { await pool.query('DELETE FROM baileys_auth_sessions;'); } catch (e) {}
-    }
-
-    const authFolder = path.join(__dirname, 'auth_info');
-    if (fs.existsSync(authFolder)) {
-      try { fs.rmSync(authFolder, { recursive: true, force: true }); } catch (e) {}
     }
 
     isStarting = false;
