@@ -238,6 +238,20 @@ def init_database():
     run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS rep_name VARCHAR(150) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS task_type VARCHAR(150) DEFAULT '';")
 
+    # إدخال البنود والوكلاء الافتراضيين مرة واحدة فقط دون تكرار
+    run_isolated_ddl("""
+    INSERT INTO expense_categories (category_name) VALUES 
+    ('وقود سيارة'), ('إيجار سيارة / نقل'), ('علاوة يومية (انتداب مدينة أخرى)'),
+    ('ضيافة واجتماعات عملاء'), ('شحن ونثريات عينات'), ('صيانة وإصلاحات طارئة')
+    ON CONFLICT DO NOTHING;
+    """)
+
+    # منع التكرار: نحذف المكررات تلقائياً ونبقي الأحدث فقط
+    run_isolated_ddl("""
+    DELETE FROM ai_agents a USING ai_agents b 
+    WHERE a.id < b.id AND a.name = b.name;
+    """)
+
 def start_whatsapp_service():
     global whatsapp_process
     if os.path.exists("whatsapp_service.js"):
@@ -259,7 +273,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="10.6.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="10.7.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -431,6 +445,12 @@ class NewExpensePayload(BaseModel):
     amount: float
     notes: Optional[str] = ""
 
+class UpdateExpensePayload(BaseModel):
+    rep_id: int
+    expense_type: str
+    amount: float
+    notes: Optional[str] = ""
+
 class NewAgentPayload(BaseModel):
     name: str
     role_type: str
@@ -493,6 +513,7 @@ def preview_sales_report(payload: ReportPreviewPayload):
     finally:
         conn.close()
 
+# ----------------- مسارات وكلاء الذكاء الاصطناعي -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -536,6 +557,35 @@ def update_ai_agent(agent_id: int, payload: dict):
             """, (payload.get("name"), payload.get("system_prompt"), payload.get("trigger_schedule"), agent_id))
             conn.commit()
             return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.delete("/api/agents/{agent_id}")
+def delete_ai_agent(agent_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM ai_agents WHERE id = %s;", (agent_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/clean-duplicates")
+def clean_duplicate_agents():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            DELETE FROM ai_agents a USING ai_agents b 
+            WHERE a.id < b.id AND a.name = b.name;
+            """)
+            conn.commit()
+            return {"status": "SUCCESS", "message": "تم حذف الوكلاء المكررين بنجاح"}
     finally:
         conn.close()
 
@@ -650,6 +700,7 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
+# ----------------- مسارات بنود وسجل المصاريف -----------------
 @app.get("/api/expense-categories")
 def get_expense_categories():
     conn = get_db_connection()
@@ -695,6 +746,85 @@ def delete_expense_category(cat_id: int):
     finally:
         conn.close()
 
+@app.get("/api/expenses")
+def get_expenses_log():
+    """جلب سجل كافة المصاريف الميدانية المسجلة"""
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM expenses_log ORDER BY id DESC;")
+            rows = cur.fetchall()
+            for r in rows:
+                r["amount"] = float(r.get("amount") or 0)
+                r["created_at_str"] = r["created_at"].strftime("%Y-%m-%d %H:%M") if r.get("created_at") else "—"
+            return rows
+    finally:
+        conn.close()
+
+@app.post("/api/expenses/{expense_id}/update")
+def update_expense_record(expense_id: int, payload: UpdateExpensePayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT amount, rep_id FROM expenses_log WHERE id = %s;", (expense_id,))
+            old = cur.fetchone()
+            if not old:
+                raise HTTPException(status_code=404, detail="سند المصروف غير موجود")
+
+            cur.execute("SELECT name FROM sales_executives WHERE id = %s;", (payload.rep_id,))
+            rep = cur.fetchone()
+            if not rep:
+                raise HTTPException(status_code=404, detail="المندوب غير موجود")
+
+            diff = payload.amount - float(old["amount"])
+
+            cur.execute("""
+            UPDATE expenses_log 
+            SET rep_id = %s, rep_name = %s, expense_type = %s, amount = %s, notes = %s 
+            WHERE id = %s;
+            """, (payload.rep_id, rep["name"], payload.expense_type, payload.amount, payload.notes or "", expense_id))
+
+            if old["rep_id"] == payload.rep_id:
+                cur.execute("UPDATE sales_executives SET total_expenses = total_expenses + %s WHERE id = %s;", (diff, payload.rep_id))
+            else:
+                cur.execute("UPDATE sales_executives SET total_expenses = total_expenses - %s WHERE id = %s;", (float(old["amount"]), old["rep_id"]))
+                cur.execute("UPDATE sales_executives SET total_expenses = total_expenses + %s WHERE id = %s;", (payload.amount, payload.rep_id))
+
+            conn.commit()
+            return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل التحديث: {str(e)}")
+    finally:
+        conn.close()
+
+@app.delete("/api/expenses/{expense_id}")
+def delete_expense_record(expense_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT amount, rep_id FROM expenses_log WHERE id = %s;", (expense_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="المصروف غير موجود")
+
+            cur.execute("DELETE FROM expenses_log WHERE id = %s;", (expense_id,))
+            cur.execute("UPDATE sales_executives SET total_expenses = GREATEST(0, total_expenses - %s) WHERE id = %s;", (float(row["amount"]), row["rep_id"]))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=f"فشل الحذف: {str(e)}")
+    finally:
+        conn.close()
+
+# ----------------- مسارات فريق المبيعات والعمليات -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -994,7 +1124,6 @@ def convert_sample_to_po(sample_id: int, payload: ConvertSamplePayload):
             WHERE id = %s;
             """, (payload.po_number.strip(), payload.po_value, sample_id))
 
-            # إضافة قيمة أمر الشراء إلى المبيعات المحققة للمندوب
             if s_row.get("rep_id"):
                 cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s WHERE id = %s;", (payload.po_value, s_row["rep_id"]))
             elif s_row.get("rep_name"):
