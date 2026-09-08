@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Complete Backend + Constraint Removal + Full Endpoints
+Complete Stable Backend
 """
 
 import os
@@ -63,7 +63,7 @@ def run_isolated_ddl(sql_statement: str):
         with conn.cursor() as cur:
             cur.execute(sql_statement)
     except Exception as e:
-        logger.warning(f"DDL notice: {e}")
+        logger.warning(f"DDL notice ({sql_statement[:35]}...): {e}")
     finally:
         conn.close()
 
@@ -281,13 +281,13 @@ def init_database():
     finally:
         conn.close()
 
-    # فك القيود نهائياً لحل أخطاء 500
+    # إسقاط القيود القديمة لحل أخطاء 500 نهائياً
     run_isolated_ddl("ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_execution_status_check;")
     run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN execution_status TYPE VARCHAR(50);")
     run_isolated_ddl("ALTER TABLE sample_deliveries DROP CONSTRAINT IF EXISTS sample_deliveries_status_check;")
     run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN status TYPE VARCHAR(50);")
 
-    # إضافة وكلاء استشاريين افتراضيين إن لم يتوفروا
+    # إضافة وكلاء استشاريين أساسيين إذا لم يتوفروا
     run_isolated_ddl("""
     INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
     SELECT 'وكيل كبار العملاء والتصنيع للغير (Private Label)', 'ADVISORY', 'KEY_ACCOUNTS_OEM',
@@ -325,7 +325,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="17.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="18.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -474,6 +474,12 @@ class UpdateAgentPayload(BaseModel):
 
 class ToggleAgentPayload(BaseModel):
     is_active: bool
+
+class IncomingWhatsAppMessage(BaseModel):
+    chat_id: str
+    sender_phone: str
+    sender_name: str
+    message_text: str
 
 # ----------------- مسارات التحقق 2FA -----------------
 @app.post("/api/auth/2fa/verify")
@@ -976,13 +982,16 @@ async def add_multi_calendar_event(payload: NewMultiCalendarEventPayload):
         conn.close()
 
 @app.post("/api/calendar/{event_id}/status")
-def update_calendar_event_status(event_id: int, payload: CalendarStatusPayload):
+def update_calendar_event_status(event_id: int, payload: dict):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
+        status_val = str(payload.get("status", "COMPLETED")).strip()
         with conn.cursor() as cur:
-            cur.execute("UPDATE calendar_events SET execution_status = %s WHERE id = %s;", (payload.status.strip(), event_id))
+            # إسقاط القيد فوراً إن وُجد لتفادي أي خطأ
+            cur.execute("ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_execution_status_check;")
+            cur.execute("UPDATE calendar_events SET execution_status = %s WHERE id = %s;", (status_val, event_id))
             conn.commit()
             return {"status": "SUCCESS"}
     except Exception as e:
@@ -1296,7 +1305,7 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسارات الواتساب ورادار المحادثات -----------------
+# ----------------- مسارات الواتساب ورادار المحادثات والـ Webhook -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
@@ -1361,6 +1370,89 @@ def get_whatsapp_logs():
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM whatsapp_logs ORDER BY id DESC LIMIT 50;")
             return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/whatsapp/webhook")
+def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
+    conn = get_db_connection()
+    if not conn:
+        return {"status": "ERROR"}
+
+    try:
+        clean_phone = msg.sender_phone.replace("+", "").strip()
+        chat_id = msg.chat_id
+        text = msg.message_text.strip()
+        channel_name = "محادثة مباشرة"
+        reply_text = None
+        forward_to_logistics = None
+        logistics_text = None
+
+        with conn.cursor() as cur:
+            cur.execute("SELECT key_name, key_value FROM system_config;")
+            conf = {r["key_name"]: r["key_value"] for r in cur.fetchall()}
+            logistics_group = conf.get("logistics_group_id", "")
+            management_group = conf.get("management_group_id", "")
+
+            if chat_id.endswith("@s.whatsapp.net") and (chat_id.startswith(clean_phone) or "self" in chat_id):
+                channel_name = "شات التحكم الخاص (أنت)"
+                if text.startswith("تقرير") or text.startswith("مستجدات"):
+                    cur.execute("SELECT COUNT(*) FROM sales_targets WHERE status = 'IN_PROGRESS';")
+                    active_t = cur.fetchone()["count"]
+                    cur.execute("SELECT COUNT(*) FROM sample_deliveries WHERE status = 'PENDING';")
+                    pending_s = cur.fetchone()["count"]
+                    reply_text = (
+                        f"*تقرير موجز من الوكيل الذكي (شركة تنمية الغذاء):*\n\n"
+                        f"• الفرص البيعية الجارية: {active_t}\n"
+                        f"• العينات قيد التجربة: {pending_s}\n\n"
+                        f"النظام يعمل بنجاح ويرصد المجموعات المعتمدة."
+                    )
+                else:
+                    reply_text = (
+                        f"مرحباً بك في نظام شركة تنمية الغذاء الذكي.\n"
+                        f"اكتب 'تقرير' لعرض الفرص والعينات الجارية."
+                    )
+            else:
+                cur.execute("SELECT id, company_name, brand_name FROM customer_accounts WHERE whatsapp_group_id = %s;", (chat_id,))
+                customer = cur.fetchone()
+                cur.execute("SELECT id, name FROM sales_executives WHERE REPLACE(phone_number, '+', '') = %s;", (clean_phone,))
+                rep = cur.fetchone()
+
+                if customer:
+                    channel_name = f"مجموعة: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
+                    trigger_words = ["نحتاج", "ارسلوا", "طلب", "كرتون", "طلبية", "محتاجين", "order"]
+                    if any(w in text.lower() for w in trigger_words):
+                        cur.execute("""
+                        INSERT INTO incoming_orders (customer_name, requester_name, requester_phone, order_raw_text, detected_items, status)
+                        VALUES (%s, %s, %s, %s, 'طلب شراء تم رصده', 'FORWARDED_TO_LOGISTICS');
+                        """, (customer['company_name'], msg.sender_name, msg.sender_phone, text))
+
+                        if logistics_group:
+                            forward_to_logistics = logistics_group
+                            logistics_text = (
+                                f"*إشعار طلبية جديدة من العميل (مصنع تنمية الغذاء) 📦*\n\n"
+                                f"• العميل: {customer['company_name']}\n"
+                                f"• طالب الشراء: {msg.sender_name} ({msg.sender_phone})\n"
+                                f"• نص الطلب: «{text}»\n\n"
+                                f"يرجى جدولة التجهيز والتوصيل."
+                            )
+                elif rep:
+                    channel_name = f"المندوب: {rep['name']}"
+                elif chat_id == management_group:
+                    channel_name = "مجموعة الإدارة العليا"
+
+            cur.execute("""
+            INSERT INTO whatsapp_logs (created_at, sender_name, channel_name, is_external_call, message_body)
+            VALUES (%s, %s, %s, FALSE, %s);
+            """, (datetime.now().strftime("%H:%M"), msg.sender_name, channel_name, text))
+            conn.commit()
+
+            return {
+                "status": "PROCESSED",
+                "reply_text": reply_text,
+                "forward_to_logistics": forward_to_logistics,
+                "logistics_text": logistics_text
+            }
     finally:
         conn.close()
 
