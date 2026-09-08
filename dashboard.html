@@ -47,7 +47,7 @@
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- شاشة التحقق الأمني 2FA (تم إخفاء رابط الـ QR لتجنب أي التباس) -->
+    <!-- شاشة التحقق الأمني 2FA -->
     <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
@@ -60,7 +60,7 @@
                 </div>
             </div>
             <h2 class="text-base font-bold text-gray-800">التحقق الأمني لتسجيل الدخول</h2>
-            <p class="text-xs text-gray-500">أدخل رمز التحقق المكون من 6 أرقام من تطبيق Authenticator أو رمز الطوارئ (999888)</p>
+            <p class="text-xs text-gray-500">أدخل رمز التحقق (أو رمز الطوارئ: 999888)</p>
 
             <div>
                 <input type="text" id="auth-otp-code" maxlength="6" placeholder="000000" 
@@ -74,7 +74,7 @@
         </div>
     </div>
 
-    <!-- القائمة الجانبية -->
+    <!-- القائمة الجانبية المباشرة -->
     <aside class="w-64 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
@@ -201,7 +201,7 @@
                     <div class="flex justify-between items-center no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة والتغليف (مصنع تنمية الغذاء)</h3>
-                            <div class="text-xs text-gray-500">حمل نموذج الإكسل الجاهز، املأ أصناف المصنع ثم ارفعه مباشرة، أو أضف الصنف يدوياً.</div>
+                            <div class="text-xs text-gray-500">حمل نموذج الإكسل، املأ الأصناف ثم ارفعه مباشرة، أو أضف الصنف يدوياً.</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="downloadProductsTemplate()" class="px-3 py-2 bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 font-bold text-xs rounded-lg shadow-2xs flex items-center gap-1.5">
@@ -562,7 +562,7 @@
         </div>
     </main>
 
-    <!-- ==================== كافة النوافذ المنبثقة ==================== -->
+    <!-- ==================== كافة النوافذ المنبثقة (MODALS) ==================== -->
     <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي / فرصة جديدة</h3>
@@ -849,7 +849,7 @@
     </div>
 
     <script>
-        // ----------------- منطق الجلسة والتوثيق المحصن -----------------
+        // ----------------- دوال التوثيق والجلسة -----------------
         function checkSessionPersisted() {
             return localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED' || document.cookie.includes('fdc_auth=AUTHENTICATED');
         }
@@ -877,7 +877,7 @@
 
                 if (res.ok) {
                     localStorage.setItem('fdc_auth_token', 'AUTHENTICATED');
-                    document.cookie = "fdc_auth=AUTHENTICATED; path=/; max-age=31536000"; // عام كامل
+                    document.cookie = "fdc_auth=AUTHENTICATED; path=/; max-age=31536000";
                     const overlay = document.getElementById('auth-overlay');
                     if (overlay) overlay.classList.add('hidden');
                     loadAllData();
@@ -1002,9 +1002,335 @@
         }
 
         function previewReportOfficial() {
-            alert("جاري تجهيز التقرير التنفيذي الرسمي...");
             closeReportModal();
             window.print();
+        }
+
+        // ----------------- الدالة المركزية الشاملة لتحميل البيانات -----------------
+        async function loadAllData() {
+            loadSavedTestPhone();
+            checkWhatsAppLiveStatus();
+            loadAgentsData();
+
+            // 1. المندوبين
+            try {
+                const repsRes = await fetch('/api/reps');
+                const reps = await repsRes.json();
+                let totalSales = 0;
+                let totalExp = 0;
+
+                const overviewTbody = document.getElementById('overview-reps-tbody');
+                if (overviewTbody) {
+                    overviewTbody.innerHTML = reps.map(r => {
+                        totalSales += (r.achieved_sales || 0);
+                        totalExp += (r.total_expenses || 0);
+                        return `
+                        <tr>
+                            <td class="p-3 font-bold">${r.name}</td>
+                            <td class="p-3 text-gray-600">${r.region}</td>
+                            <td class="p-3 font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</td>
+                            <td class="p-3">${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع' : 'قياس مفتوح'}</td>
+                            <td class="p-3 font-semibold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span></td>
+                        </tr>`;
+                    }).join('');
+                }
+
+                document.getElementById('kpi-total-sales').innerText = `${totalSales.toLocaleString()} ر.ع`;
+                document.getElementById('kpi-total-expenses').innerText = `${totalExp.toLocaleString()} ر.ع`;
+
+                const repsGrid = document.getElementById('reps-grid-cards');
+                if (repsGrid) {
+                    repsGrid.innerHTML = reps.map(r => `
+                        <div class="p-4 rounded-xl border brand-border brand-tint space-y-2 flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                                </div>
+                                <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
+                                <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
+                            </div>
+                            <div class="pt-2 border-t flex justify-end">
+                                <button onclick="deleteRep(${r.id}, '${r.name}')" class="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-xs">حذف</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                const repOptionsHTML = reps.map(r => `<option value="${r.id}">${r.name} (${r.region})</option>`).join('');
+                ['cust-rep-select', 'tgt-rep-select', 'exp-rep-select'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = (id.includes('cust-rep') ? '<option value="">-- بدون تعيين --</option>' : '') + repOptionsHTML;
+                });
+                ['sample-rep-select', 'cal-rep-select'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = reps.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+                });
+
+                const repsWhitelist = document.getElementById('settings-reps-whitelist-list');
+                if (repsWhitelist) {
+                    repsWhitelist.innerHTML = reps.map(r => `
+                        <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-xl flex justify-between items-center text-xs">
+                            <div>
+                                <div class="font-bold text-[#3A056A]">${r.name}</div>
+                                <div class="text-[10px] text-gray-500">${r.region}</div>
+                            </div>
+                            <span class="font-mono font-bold text-purple-900 bg-white px-2 py-1 rounded border">${r.phone_number}</span>
+                        </div>
+                    `).join('');
+                }
+            } catch(e) {}
+
+            // 2. العملاء
+            try {
+                const custRes = await fetch('/api/customers');
+                const custs = await custRes.json();
+                const custTableBody = document.getElementById('customers-table-body');
+                if (custTableBody) {
+                    custTableBody.innerHTML = custs.map(c => `
+                        <tr>
+                            <td class="p-3 font-bold">${c.company_name || '—'}</td>
+                            <td class="p-3 font-semibold text-purple-900">${c.brand_name || '—'}</td>
+                            <td class="p-3 text-gray-600">${c.region || 'مسقط'} | ${c.sector || 'عام'}</td>
+                            <td class="p-3"><div>${c.contact_person || '—'}</div><div class="font-mono text-gray-500 text-[10px]">${c.phone || '—'}</div></td>
+                            <td class="p-3 font-bold text-[#3A056A]">${c.assigned_rep_name || '—'}</td>
+                            <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id ? '✓ ' + c.whatsapp_group_id : '<span class="text-gray-400">غير مربوط</span>'}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status || 'نشط'}</span></td>
+                            <td class="p-3 no-print">
+                                <button onclick="deleteCustomer(${c.id}, '${c.company_name}')" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+
+                const custOptionsHTML = custs.map(c => `<option value="${c.id}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
+                const setWaSelect = document.getElementById('settings-wa-customer-select');
+                if (setWaSelect) setWaSelect.innerHTML = custOptionsHTML;
+                const tgtCustSelect = document.getElementById('tgt-customer-select');
+                if (tgtCustSelect) tgtCustSelect.innerHTML = custOptionsHTML;
+                const sampleDList = document.getElementById('sample-customers-datalist');
+                if (sampleDList) sampleDList.innerHTML = custs.map(c => `<option value="${c.company_name}">`).join('');
+                const calDList = document.getElementById('cal-customers-datalist');
+                if (calDList) calDList.innerHTML = custs.map(c => `<option value="${c.company_name}">`).join('');
+
+                const monitoredCusts = custs.filter(c => c.whatsapp_group_id && c.whatsapp_group_id.trim() !== '');
+                const monTbody = document.getElementById('settings-monitored-groups-tbody');
+                if (monTbody) {
+                    monTbody.innerHTML = monitoredCusts.length > 0 ? monitoredCusts.map(c => `
+                        <tr>
+                            <td class="p-2.5 font-bold">${c.company_name}</td>
+                            <td class="p-2.5 font-semibold text-purple-900">${c.brand_name || '—'}</td>
+                            <td class="p-2.5 font-mono text-purple-800">${c.whatsapp_group_id}</td>
+                            <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">مراقبة حصرية نشطة ✓</span></td>
+                            <td class="p-2.5 no-print"><button onclick="unassignGroup(${c.id})" class="text-red-600 hover:text-red-800 underline text-[11px]">فك الربط</button></td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد مجموعات مربوطة حالياً. استخدم الأداة أعلاه لربط المجموعات بنقرة واحدة.</td></tr>';
+                }
+            } catch(e) {}
+
+            // 3. المنتجات
+            try {
+                const pRes = await fetch('/api/products');
+                allProductsCache = await pRes.json();
+                const pTbody = document.getElementById('products-catalog-tbody');
+                if (pTbody) {
+                    pTbody.innerHTML = allProductsCache.length > 0 ? allProductsCache.map(p => `
+                        <tr>
+                            <td class="p-3 font-mono font-bold text-gray-600">${p.sku}</td>
+                            <td class="p-3 font-bold text-[#3A056A]">${p.name_ar}</td>
+                            <td class="p-3 text-gray-700">${p.name_en || '—'}</td>
+                            <td class="p-3 font-semibold">${p.weight_spec || '—'}</td>
+                            <td class="p-3 text-gray-600">${p.primary_packaging || '—'}</td>
+                            <td class="p-3 text-gray-600">${p.carton_pack_spec || '—'}</td>
+                            <td class="p-3 no-print">
+                                <button onclick="deleteProduct(${p.id})" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                            </td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا توجد منتجات مسجلة. حمل نموذج الإكسل من الأعلى أو أضف صنفاً يدوياً.</td></tr>';
+                }
+                const prodDList = document.getElementById('sample-products-datalist');
+                if (prodDList) {
+                    prodDList.innerHTML = allProductsCache.map(p => `<option value="${p.name_ar}">${p.name_en ? p.name_en + ' - ' : ''}${p.weight_spec}</option>`).join('');
+                }
+            } catch(e) {}
+
+            // 4. الأهداف
+            try {
+                const tgtRes = await fetch('/api/targets');
+                const targets = await tgtRes.json();
+                const activeTargets = targets.filter(t => t.status === 'IN_PROGRESS');
+                document.getElementById('kpi-active-targets').innerText = activeTargets.length;
+                const tgtContainer = document.getElementById('targets-cards-container');
+                if (tgtContainer) {
+                    tgtContainer.innerHTML = targets.map(t => {
+                        const stageInfo = STAGES_MAP[t.pipeline_stage] || { text: t.pipeline_stage, color: 'bg-purple-100 text-[#3A056A]' };
+                        return `
+                        <div class="p-4 rounded-xl border ${t.status === 'CLOSED' ? 'border-emerald-300 bg-emerald-50/40' : 'brand-border bg-white'} shadow-xs space-y-3 flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <span class="font-bold text-sm text-gray-900">${t.title}</span>
+                                        <div class="text-xs text-[#3A056A] font-semibold mt-0.5">🏢 العميل: ${t.customer_name}</div>
+                                        <div class="text-xs text-gray-500">👤 المتابع: <strong>${t.rep_name}</strong></div>
+                                    </div>
+                                    <span class="px-2.5 py-1 rounded text-[10px] font-bold ${stageInfo.color}">${stageInfo.text}</span>
+                                </div>
+                                <div class="p-2 bg-purple-50/50 rounded-lg text-xs flex justify-between">
+                                    <span>القيمة المتوقعة:</span>
+                                    <span class="font-bold text-[#3A056A]">${(t.target_value || 0).toLocaleString()} ر.ع</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            } catch(e) {}
+
+            // 5. المصاريف
+            try {
+                const expRes = await fetch('/api/expenses');
+                const expenses = await expRes.json();
+                const expTbody = document.getElementById('expenses-log-table-body');
+                if (expTbody) {
+                    expTbody.innerHTML = expenses.length > 0 ? expenses.map(x => `
+                        <tr>
+                            <td class="p-3 font-mono font-bold text-gray-500">#EXP-${x.id}</td>
+                            <td class="p-3 font-bold text-[#3A056A]">${x.rep_name}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded bg-purple-50 text-purple-900 font-bold border border-purple-200">${x.expense_type}</span></td>
+                            <td class="p-3 font-black text-amber-800">${x.amount.toLocaleString()} ر.ع</td>
+                            <td class="p-3 text-gray-600">${x.notes || '—'}</td>
+                            <td class="p-3 text-gray-400 font-mono text-[11px]">${x.created_at_str}</td>
+                            <td class="p-3 no-print">
+                                <button onclick="deleteExpense(${x.id})" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                            </td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا توجد سندات مصاريف مسجلة حتى الآن</td></tr>';
+                }
+            } catch(e) {}
+
+            // 6. التقويم
+            try {
+                const cRes = await fetch('/api/calendar');
+                const cal = await cRes.json();
+                const calList = document.getElementById('calendar-events-list');
+                if (calList) {
+                    calList.innerHTML = cal.map(e => `
+                        <div class="p-3.5 rounded-xl border brand-border brand-tint flex justify-between items-center text-xs">
+                            <div>
+                                <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
+                                <div class="text-gray-600 mt-0.5">العميل: <strong>${e.customer_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span></div>
+                            </div>
+                            <span class="px-2.5 py-1 rounded text-xs font-bold bg-amber-100 text-amber-800">${e.execution_status}</span>
+                        </div>
+                    `).join('');
+                }
+            } catch(e) {}
+
+            // 7. العينات
+            try {
+                const sRes = await fetch('/api/samples');
+                allSamplesCache = await sRes.json();
+                renderSamplesTable(allSamplesCache);
+            } catch(e) {}
+
+            // 8. إعدادات المجموعات
+            try {
+                const confRes = await fetch('/api/system/config');
+                const conf = await confRes.json();
+                const logInput = document.getElementById('conf-logistics-group');
+                const mgmtInput = document.getElementById('conf-management-group');
+                if (logInput) logInput.value = conf.logistics_group_id || '';
+                if (mgmtInput) mgmtInput.value = conf.management_group_id || '';
+            } catch(e) {}
+
+            loadExpenseCategories();
+            loadWhatsAppLogs();
+        }
+
+        function renderSamplesTable(samplesList) {
+            const tbody = document.getElementById('samples-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = samplesList.map(s => {
+                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">قيد التجربة</span>`;
+                if (s.status === 'DELIVERED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">تم التسليم ✓</span>`;
+                if (s.status === 'CONVERTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">أمر شراء معتمد ✓</span>`;
+
+                return `
+                <tr>
+                    <td class="p-3 font-bold">${s.customer_name || '—'}</td>
+                    <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name || '—'}</td>
+                    <td class="p-3 font-bold text-gray-800">${s.product_name || '—'}</td>
+                    <td class="p-3">${s.qty_free} وحدة</td>
+                    <td class="p-3 text-gray-500">${s.delivery_date}</td>
+                    <td class="p-3">${statusBadge}</td>
+                    <td class="p-3 text-gray-700 max-w-xs text-[11px]">${s.feedback_notes || '—'}</td>
+                    <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id : '—'}</td>
+                    <td class="p-3 no-print">
+                        <span class="text-gray-400 text-xs">—</span>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function applySamplesFilter() {
+            const productTerm = (document.getElementById('filter-sample-product')?.value || '').trim().toLowerCase();
+            const customerTerm = (document.getElementById('filter-sample-customer')?.value || '').trim().toLowerCase();
+            const fromDate = document.getElementById('filter-sample-from-date')?.value || '';
+            const toDate = document.getElementById('filter-sample-to-date')?.value || '';
+
+            const filtered = allSamplesCache.filter(s => {
+                const matchProduct = !productTerm || (s.product_name && s.product_name.toLowerCase().includes(productTerm));
+                const matchCustomer = !customerTerm || (s.customer_name && s.customer_name.toLowerCase().includes(customerTerm));
+                let matchDate = true;
+                if (fromDate && s.delivery_date < fromDate) matchDate = false;
+                if (toDate && s.delivery_date > toDate) matchDate = false;
+                return matchProduct && matchCustomer && matchDate;
+            });
+            renderSamplesTable(filtered);
+        }
+
+        async function loadExpenseCategories() {
+            try {
+                const res = await fetch('/api/expense-categories');
+                const categories = await res.json();
+                const selectEl = document.getElementById('exp-type-select');
+                if (selectEl) {
+                    selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
+                }
+            } catch (e) {}
+        }
+
+        async function loadWhatsAppLogs() {
+            try {
+                const wRes = await fetch('/api/whatsapp/logs');
+                const wLogs = await wRes.json();
+                const feedList = document.getElementById('whatsapp-feed-list');
+                if (feedList) {
+                    if (!wLogs || wLogs.length === 0) {
+                        feedList.innerHTML = `
+                        <div class="p-8 text-center bg-gray-50 border border-dashed border-gray-200 rounded-xl space-y-2">
+                            <span class="text-3xl block">📡</span>
+                            <div class="font-bold text-gray-700 text-sm">رادار المحادثات في وضع الاستماع النشط</div>
+                            <p class="text-xs text-gray-500 max-w-md mx-auto">
+                                لا توجد رسائل ملتقطة حتى الآن. يبدأ الرادار بالتسجيل اللحظي فور كتابة رسالة في مجموعات العملاء المعتمدة أو عند مراسلة الوكيل في شاتك الخاص.
+                            </p>
+                        </div>`;
+                    } else {
+                        feedList.innerHTML = wLogs.map(l => `
+                            <div class="p-3 rounded-xl border brand-border bg-white space-y-1 shadow-2xs">
+                                <div class="flex justify-between items-center text-[10px]">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-bold brand-primary-text text-xs">${l.sender_name}</span>
+                                        <span class="px-2 py-0.5 rounded bg-purple-50 text-[#3A056A] font-semibold border border-purple-200">${l.channel_name || 'محادثة'}</span>
+                                    </div>
+                                    <span class="text-gray-400 font-mono">${l.created_at}</span>
+                                </div>
+                                <p class="text-gray-800 text-xs mt-1 leading-relaxed">${l.message_body}</p>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch(e) {}
         }
 
         // بدء التشغيل المحصن
