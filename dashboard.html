@@ -47,7 +47,7 @@
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- شاشة التحقق الأمني 2FA -->
+    <!-- 1. شاشة التحقق الأمني 2FA -->
     <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
@@ -60,7 +60,7 @@
                 </div>
             </div>
             <h2 class="text-base font-bold text-gray-800">التحقق الأمني لتسجيل الدخول</h2>
-            <p class="text-xs text-gray-500">أدخل رمز التحقق المكون من 6 أرقام (أو رمز الطوارئ: 999888)</p>
+            <p class="text-xs text-gray-500">أدخل رمز التحقق (أو رمز الطوارئ: 999888)</p>
 
             <div>
                 <input type="text" id="auth-otp-code" maxlength="6" placeholder="000000" 
@@ -74,7 +74,7 @@
         </div>
     </div>
 
-    <!-- القائمة الجانبية -->
+    <!-- 2. القائمة الجانبية المباشرة -->
     <aside class="w-64 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
@@ -131,6 +131,7 @@
         </div>
     </aside>
 
+    <!-- 3. منطقة المحتوى الرئيسي -->
     <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
         <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs no-print">
             <div class="flex items-center gap-3">
@@ -157,7 +158,7 @@
 
         <div class="flex-1 overflow-y-auto p-6 space-y-6">
 
-            <!-- 1. لوحة التحكم -->
+            <!-- تبويب 1: لوحة التحكم -->
             <div id="tab-overview" class="tab-content space-y-6">
                 <div class="grid grid-cols-3 gap-4 no-print">
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
@@ -195,13 +196,13 @@
                 </div>
             </div>
 
-            <!-- 2. المنتجات -->
+            <!-- تبويب 2: المنتجات -->
             <div id="tab-products-catalog" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة والتغليف (مصنع تنمية الغذاء)</h3>
-                            <div class="text-xs text-gray-500">حمل نموذج الإكسل الجاهز، املأ أصناف المصنع ثم ارفعه مباشرة، أو أضف الصنف يدوياً.</div>
+                            <div class="text-xs text-gray-500">حمل نموذج الإكسل الجاهز، املأ الأصناف ثم ارفعه مباشرة، أو أضف الصنف يدوياً.</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="downloadProductsTemplate()" class="px-3 py-2 bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 font-bold text-xs rounded-lg shadow-2xs flex items-center gap-1.5">
@@ -234,13 +235,13 @@
                 </div>
             </div>
 
-            <!-- 3. الاهداف -->
+            <!-- تبويب 3: الأهداف (Pipeline) -->
             <div id="tab-targets" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">الأهداف والفرص البيعية (Pipeline Stages)</h3>
-                            <div class="text-xs text-gray-500">متابعة مسار الصفقات عبر مراحل التوريد والاعتماد (مع إشعار واتساب تلقائي للموظف)</div>
+                            <div class="text-xs text-gray-500">متابعة مراحل الفرص من التواصل وحتى أمر الشراء مع إشعار واتساب تلقائي للموظف المكلف</div>
                         </div>
                         <button onclick="openNewTargetModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                             + إضافة فرصة جديدة
@@ -250,13 +251,13 @@
                 </div>
             </div>
 
-            <!-- 4. الفريق -->
+            <!-- تبويب 4: الفريق -->
             <div id="tab-reps" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
-                            <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج واللغة المفضلة</div>
+                            <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج والمصاريف واللغة المفضلة</div>
                         </div>
                         <button onclick="openNewRepModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                             + إضافة عضو جديد
@@ -266,7 +267,7 @@
                 </div>
             </div>
 
-            <!-- 5. العملاء -->
+            <!-- تبويب 5: العملاء -->
             <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -301,7 +302,7 @@
                 </div>
             </div>
 
-            <!-- 6. العينات -->
+            <!-- تبويب 6: العينات -->
             <div id="tab-samples" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
@@ -357,7 +358,7 @@
                 </div>
             </div>
 
-            <!-- 7. التقويم -->
+            <!-- تبويب 7: التقويم -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -376,7 +377,7 @@
                 </div>
             </div>
 
-            <!-- 8. الوكلاء -->
+            <!-- تبويب 8: الوكلاء -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
@@ -430,7 +431,7 @@
                 </div>
             </div>
 
-            <!-- 9. المصاريف -->
+            <!-- تبويب 9: المصاريف -->
             <div id="tab-expenses-log" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -459,7 +460,7 @@
                 </div>
             </div>
 
-            <!-- 10. رادار المحادثات -->
+            <!-- تبويب 10: رادار المحادثات -->
             <div id="tab-whatsapp-feed" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
                     <div class="flex justify-between items-center no-print">
@@ -475,7 +476,7 @@
                 </div>
             </div>
 
-            <!-- 11. اعداد الواتساب -->
+            <!-- تبويب 11: اعداد الواتساب -->
             <div id="tab-whatsapp-settings" class="tab-content hidden space-y-6">
                 <div class="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-2 text-xs no-print">
                     <div class="flex items-center gap-2">
@@ -564,7 +565,7 @@
         </div>
     </main>
 
-    <!-- ==================== النوافذ المنبثقة التفاعلية ==================== -->
+    <!-- ==================== النوافذ المنبثقة (Modals) ==================== -->
 
     <!-- نافذة تسجيل تسليم عينات جديدة (أصناف متعددة مع زر +) -->
     <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
@@ -598,7 +599,7 @@
                                 <input type="number" class="sample-qty-input w-full p-1.5 border rounded text-xs font-bold text-center" value="10">
                             </div>
                             <div class="col-span-1 pt-4 text-center">
-                                <button type="button" onclick="removeSampleItemRow(this)" class="text-red-500 hover:text-red-700 font-bold text-sm">✕</button>
+                                <button type="button" onclick="removeSampleItemRow(this)" class="text-red-500 hover:text-red-700 font-bold text-sm" title="حذف">✕</button>
                             </div>
                         </div>
                     </div>
@@ -1071,9 +1072,38 @@
         </div>
     </div>
 
-    <!-- ==================== دوال التحكم والـ JAVASCRIPT ==================== -->
+    <!-- ==================== كود الـ JAVASCRIPT المحصن بالكامل ==================== -->
     <script>
-        // دوال التوثيق والجلسة في قمة السكريبت
+        // المتغيرات والمصفوفات الأساسية
+        const tabs = ['overview', 'products-catalog', 'targets', 'reps', 'customers', 'samples', 'calendar', 'agents', 'expenses-log', 'whatsapp-feed', 'whatsapp-settings'];
+        const titles = {
+            overview: 'لوحة التحكم',
+            'products-catalog': 'المنتجات',
+            targets: 'الاهداف',
+            reps: 'الفريق',
+            customers: 'العملاء',
+            samples: 'العينات',
+            calendar: 'التقويم',
+            agents: 'الوكلاء',
+            'expenses-log': 'المصاريف',
+            'whatsapp-feed': 'رادار المحادثات',
+            'whatsapp-settings': 'اعداد الواتساب'
+        };
+
+        const STAGES_MAP = {
+            LEAD_CONTACT: { text: '1. التواصل الأولي', color: 'bg-blue-100 text-blue-800' },
+            MEETING_REQUIREMENTS: { text: '2. حصر الاحتياج', color: 'bg-indigo-100 text-indigo-800' },
+            SAMPLE_DELIVERY: { text: '3. تجربة العينات', color: 'bg-purple-100 text-purple-800' },
+            SAMPLE_FEEDBACK: { text: '4. تقييم الشيف', color: 'bg-amber-100 text-amber-800' },
+            PRICE_NEGOTIATION: { text: '5. التفاوض والأسعار', color: 'bg-orange-100 text-orange-800' },
+            PO_CLOSED_WON: { text: '6. أمر شراء معتمد ✓', color: 'bg-emerald-100 text-emerald-800' }
+        };
+
+        let allSamplesCache = [];
+        let allProductsCache = [];
+        let allRepsCache = [];
+
+        // ----------------- دوال التوثيق والجلسة -----------------
         function checkSessionPersisted() {
             return localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED' || document.cookie.includes('fdc_auth=AUTHENTICATED');
         }
@@ -1125,7 +1155,999 @@
             if (codeInput) codeInput.value = '';
         }
 
-        // بدء التشغيل المحصن
+        // ----------------- دوال التبويبات -----------------
+        function switchTab(id) {
+            try {
+                tabs.forEach(t => {
+                    const el = document.getElementById(`tab-${t}`);
+                    const nav = document.getElementById(`nav-${t}`);
+                    if (el) el.classList.add('hidden');
+                    if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
+                });
+                const activeTab = document.getElementById(`tab-${id}`);
+                const activeNav = document.getElementById(`nav-${id}`);
+                if (activeTab) activeTab.classList.remove('hidden');
+                if (activeNav) activeNav.className = "w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
+                const titleEl = document.getElementById('current-tab-title');
+                if (titleEl) titleEl.innerText = titles[id] || '';
+                
+                if (id === 'whatsapp-feed') loadWhatsAppLogs();
+            } catch(e) {}
+        }
+
+        // ----------------- دوال النوافذ المنبثقة (فتح/إغلاق) -----------------
+        function openNewTargetModal() { document.getElementById('new-target-modal').classList.remove('hidden'); }
+        function closeNewTargetModal() { document.getElementById('new-target-modal').classList.add('hidden'); }
+
+        function openTargetStageModal(id, currentStage, currentNote) {
+            document.getElementById('stage-target-id').value = id;
+            document.getElementById('stage-select-input').value = currentStage || 'LEAD_CONTACT';
+            document.getElementById('stage-note-input').value = unescape(currentNote) || '';
+            document.getElementById('target-stage-modal').classList.remove('hidden');
+        }
+        function closeTargetStageModal() { document.getElementById('target-stage-modal').classList.add('hidden'); }
+
+        function openTargetCloseModal(id) {
+            document.getElementById('close-target-id').value = id;
+            document.getElementById('close-target-modal').classList.remove('hidden');
+        }
+        function closeTargetCloseModal() { document.getElementById('close-target-modal').classList.add('hidden'); }
+
+        function openEditRepModal(id, name, code, region, phone, hasTarget, target, lang) {
+            document.getElementById('edit-rep-id').value = id;
+            document.getElementById('edit-rep-name-input').value = unescape(name);
+            document.getElementById('edit-rep-code-input').value = unescape(code);
+            document.getElementById('edit-rep-region-input').value = unescape(region);
+            document.getElementById('edit-rep-phone-input').value = phone;
+            document.getElementById('edit-rep-language-select').value = lang || 'AR';
+            document.getElementById('edit-rep-has-target-toggle').checked = hasTarget;
+            document.getElementById('edit-rep-target-input').value = target || 0;
+            toggleEditTargetInput(hasTarget);
+            document.getElementById('edit-rep-modal').classList.remove('hidden');
+        }
+        function closeEditRepModal() { document.getElementById('edit-rep-modal').classList.add('hidden'); }
+
+        function openEditCustomerModal(id, comp, brand, sect, reg, pers, ph, repId, notes) {
+            document.getElementById('edit-cust-id').value = id;
+            document.getElementById('edit-cust-company-name').value = unescape(comp) || '';
+            document.getElementById('edit-cust-brand-name').value = unescape(brand) || '';
+            document.getElementById('edit-cust-sector').value = unescape(sect) || '';
+            document.getElementById('edit-cust-region').value = unescape(reg) || '';
+            document.getElementById('edit-cust-contact-person').value = unescape(pers) || '';
+            document.getElementById('edit-cust-phone').value = ph || '';
+            document.getElementById('edit-cust-rep-select').value = repId || '';
+            document.getElementById('edit-cust-notes').value = unescape(notes) || '';
+            document.getElementById('edit-customer-modal').classList.remove('hidden');
+        }
+        function closeEditCustomerModal() { document.getElementById('edit-customer-modal').classList.add('hidden'); }
+
+        function openSampleFeedbackModal(id, currentNotes) {
+            document.getElementById('feedback-sample-id').value = id;
+            document.getElementById('feedback-notes-input').value = unescape(currentNotes) || '';
+            document.getElementById('sample-feedback-modal').classList.remove('hidden');
+        }
+        function closeSampleFeedbackModal() { document.getElementById('sample-feedback-modal').classList.add('hidden'); }
+
+        function openConvertSampleModal(id) {
+            document.getElementById('convert-sample-id').value = id;
+            document.getElementById('convert-sample-po-number').value = '';
+            document.getElementById('convert-sample-po-value').value = '';
+            document.getElementById('convert-sample-modal').classList.remove('hidden');
+        }
+        function closeConvertSampleModal() { document.getElementById('convert-sample-modal').classList.add('hidden'); }
+
+        function openEditCalendarModal(id, cust, rep, task, sched, reminder, loc, notes) {
+            document.getElementById('edit-cal-id').value = id;
+            document.getElementById('edit-cal-customer-input').value = unescape(cust) || '';
+            document.getElementById('edit-cal-rep-select').value = unescape(rep) || '';
+            document.getElementById('edit-cal-task-type').value = unescape(task) || '';
+            document.getElementById('edit-cal-scheduled-at').value = sched ? sched.replace(" ", "T") : '';
+            document.getElementById('edit-cal-location').value = unescape(loc) || '';
+            document.getElementById('edit-cal-notes').value = unescape(notes) || '';
+            document.getElementById('edit-calendar-modal').classList.remove('hidden');
+        }
+        function closeEditCalendarModal() { document.getElementById('edit-calendar-modal').classList.add('hidden'); }
+
+        function openNewProductModal() { document.getElementById('new-product-modal').classList.remove('hidden'); }
+        function closeNewProductModal() { document.getElementById('new-product-modal').classList.add('hidden'); }
+
+        function openNewRepModal() { document.getElementById('new-rep-modal').classList.remove('hidden'); }
+        function closeNewRepModal() { document.getElementById('new-rep-modal').classList.add('hidden'); }
+
+        function openNewCustomerModal() { document.getElementById('new-customer-modal').classList.remove('hidden'); }
+        function closeNewCustomerModal() { document.getElementById('new-customer-modal').classList.add('hidden'); }
+
+        function openNewCalendarModal() { 
+            const now = new Date();
+            const input = document.getElementById('cal-scheduled-at');
+            if (input) input.value = now.toISOString().slice(0, 16);
+            document.getElementById('new-calendar-modal').classList.remove('hidden'); 
+        }
+        function closeNewCalendarModal() { document.getElementById('new-calendar-modal').classList.add('hidden'); }
+
+        function openExpenseModal() { document.getElementById('expense-modal').classList.remove('hidden'); }
+        function closeExpenseModal() { document.getElementById('expense-modal').classList.add('hidden'); }
+
+        function openNewSampleModal() { 
+            const d = new Date().toISOString().split('T')[0];
+            const dateIn = document.getElementById('sample-date');
+            if (dateIn) dateIn.value = d;
+            document.getElementById('new-sample-modal').classList.remove('hidden'); 
+        }
+        function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
+
+        function openNewAgentModal() { document.getElementById('new-agent-modal').classList.remove('hidden'); }
+        function closeNewAgentModal() { document.getElementById('new-agent-modal').classList.add('hidden'); }
+
+        function openEditAgentModal(id, name, category, schedule, channel, promptBase64) {
+            document.getElementById('edit-agent-id').value = id;
+            document.getElementById('edit-agent-name').value = unescape(name);
+            document.getElementById('edit-agent-category').value = category || 'ADVISORY';
+            document.getElementById('edit-agent-schedule').value = schedule || 'DAILY_MORNING';
+            document.getElementById('edit-agent-target-channel').value = unescape(channel || '');
+            try {
+                document.getElementById('edit-agent-prompt').value = decodeURIComponent(escape(atob(promptBase64)));
+            } catch(e) {
+                document.getElementById('edit-agent-prompt').value = promptBase64;
+            }
+            document.getElementById('edit-agent-modal').classList.remove('hidden');
+        }
+        function closeEditAgentModal() { document.getElementById('edit-agent-modal').classList.add('hidden'); }
+
+        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
+        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
+
+        function toggleTargetInput(checked) {
+            const el = document.getElementById('rep-target-box');
+            if (el) el.classList.toggle('hidden', !checked);
+        }
+
+        function toggleEditTargetInput(checked) {
+            const el = document.getElementById('edit-rep-target-box');
+            if (el) el.classList.toggle('hidden', !checked);
+        }
+
+        function downloadProductsTemplate() {
+            const csvContent = "\uFEFF" + 
+                "اسم المنتج بالعربي,Product Name EN,كود الصنف SKU,الوزن الحجم,التغليف الداخلي,مواصفة وسعة الكرتون الخارجي\n" +
+                "خبز برجر بريوش 4 إنش,Brioche Burger Bun 4 inch,SKU-BUN-01,75g,كيس مفرغ 6 حبات,8 أكياس (48 حبة)\n" +
+                "كرواسون زبدة سادة ميني,Mini Butter Croissant,SKU-CRO-02,35g,كيس نايلون مخصص,120 حبة بالكرتون مجمد\n" +
+                "خبز توست أبيض فاخر,White Sandwich Bread,SKU-TST-03,600g,كيس مع قفل سلكي,12 كيس بالكرتون\n";
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "نموذج_كتالوج_منتجات_المصنع.csv";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // ----------------- الصفوف الديناميكية (+) للعينات المتعددة -----------------
+        function addSampleItemRow() {
+            const container = document.getElementById('sample-items-rows-container');
+            const row = document.createElement('div');
+            row.className = "sample-item-row grid grid-cols-12 gap-2 items-center bg-white p-2 rounded-lg border";
+            row.innerHTML = `
+                <div class="col-span-8">
+                    <label class="block text-[10px] text-gray-500 mb-0.5">الصنف / المنتج:</label>
+                    <input type="text" list="sample-products-datalist" class="sample-prod-input w-full p-1.5 border rounded text-xs font-bold text-purple-900" placeholder="اكتب اسم الصنف...">
+                </div>
+                <div class="col-span-3">
+                    <label class="block text-[10px] text-gray-500 mb-0.5">الكمية:</label>
+                    <input type="number" class="sample-qty-input w-full p-1.5 border rounded text-xs font-bold text-center" value="10">
+                </div>
+                <div class="col-span-1 pt-4 text-center">
+                    <button type="button" onclick="removeSampleItemRow(this)" class="text-red-500 hover:text-red-700 font-bold text-sm" title="حذف">✕</button>
+                </div>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeSampleItemRow(btn) {
+            const rows = document.querySelectorAll('.sample-item-row');
+            if (rows.length > 1) {
+                btn.closest('.sample-item-row').remove();
+            } else {
+                alert("يجب إبقاء صنف واحد على الأقل في القائمة.");
+            }
+        }
+
+        async function submitNewMultiSample() {
+            const custName = document.getElementById('sample-customer-input').value.trim();
+            const repName = document.getElementById('sample-rep-select').value;
+            const delivery_date = document.getElementById('sample-date').value;
+            const reminder_at = document.getElementById('sample-reminder-at').value;
+
+            if (!custName || !delivery_date) return alert("يرجى إدخال اسم العميل وتاريخ التسليم");
+
+            const rows = document.querySelectorAll('.sample-item-row');
+            const items = [];
+            rows.forEach(r => {
+                const prod = r.querySelector('.sample-prod-input').value.trim();
+                const qty = parseInt(r.querySelector('.sample-qty-input').value) || 1;
+                if (prod) items.push({ product_name: prod, qty_free: qty });
+            });
+
+            if (items.length === 0) return alert("يرجى إدخال صنف واحد على الأقل");
+
+            const res = await fetch('/api/samples/multi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_name: custName, rep_name: repName, items, delivery_date, reminder_at })
+            });
+
+            if (res.ok) {
+                closeNewSampleModal();
+                await loadAllData();
+                alert(`✅ تم بنجاح تسجيل ${items.length} أصناف عينات وإرسال إشعار موحد للموظف عبر الواتساب ✓`);
+            }
+        }
+
+        // ----------------- الصفوف الديناميكية (+) للزيارات المتعددة الموظفين -----------------
+        function addCalendarRepRow() {
+            const container = document.getElementById('calendar-reps-container');
+            const row = document.createElement('div');
+            row.className = "cal-rep-row flex items-center gap-2";
+            
+            const repOptionsHTML = allRepsCache.map(r => `<option value="${r.name}">${r.name} (${r.region})</option>`).join('');
+            row.innerHTML = `
+                <select class="cal-rep-select-item w-full p-2 border rounded-lg bg-white font-bold">${repOptionsHTML}</select>
+                <button type="button" onclick="removeCalendarRepRow(this)" class="px-2 py-1 text-red-500 hover:text-red-700 font-bold" title="إزالة">✕</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeCalendarRepRow(btn) {
+            const rows = document.querySelectorAll('.cal-rep-row');
+            if (rows.length > 1) {
+                btn.closest('.cal-rep-row').remove();
+            } else {
+                alert("يجب تكليف موظف واحد على الأقل بالمهمة.");
+            }
+        }
+
+        async function submitNewMultiCalendarEvent() {
+            const custInput = document.getElementById('cal-customer-input').value.trim();
+            const task = document.getElementById('cal-task-type').value.trim();
+            const sched = document.getElementById('cal-scheduled-at').value.trim();
+            const loc = document.getElementById('cal-location').value.trim();
+            const reminder = document.getElementById('cal-reminder-at').value.trim();
+
+            if (!custInput || !task || !sched) return alert("يرجى إكمال العميل ونوع المهمة والموعد");
+
+            const repSelects = document.querySelectorAll('.cal-rep-select-item');
+            const repNames = [];
+            repSelects.forEach(s => {
+                if (s.value && !repNames.includes(s.value)) repNames.push(s.value);
+            });
+
+            if (repNames.length === 0) return alert("يرجى اختيار موظف واحد على الأقل");
+
+            const res = await fetch('/api/calendar/multi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_name: custInput,
+                    rep_names: repNames,
+                    task_type: task,
+                    scheduled_at: sched.replace("T", " "),
+                    reminder_at: reminder ? reminder.replace("T", " ") : "",
+                    location: loc || "مقر العميل",
+                    route_code: "R-01"
+                })
+            });
+
+            if (res.ok) {
+                closeNewCalendarModal();
+                await loadAllData();
+                alert(`✅ تم بنجاح جدولة المهمة وإرسال إشعار WhatsApp فوري لكافة الموظفين المكلفين (${repNames.join(" ، ")}) ✓`);
+            }
+        }
+
+        // ----------------- دوال العمليات الأساسية -----------------
+        async function submitNewTarget() {
+            const title = document.getElementById('tgt-title').value.trim();
+            const customer_id = parseInt(document.getElementById('tgt-customer-select').value);
+            const rep_id = parseInt(document.getElementById('tgt-rep-select').value);
+            const target_value = parseFloat(document.getElementById('tgt-value').value) || 0;
+            const pipeline_stage = document.getElementById('tgt-stage-select').value;
+            const initial_note = document.getElementById('tgt-note').value.trim();
+
+            if (!title) return alert("يرجى كتابة عنوان الهدف البيعي");
+
+            const res = await fetch('/api/targets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, customer_id, rep_id, target_value, pipeline_stage, initial_note })
+            });
+            if (res.ok) {
+                closeNewTargetModal();
+                await loadAllData();
+                alert("تم إنشاء الفرصة البيعية وإرسال تنبيه WhatsApp فوري للموظف المكلف ✓");
+            }
+        }
+
+        async function submitTargetStageUpdate() {
+            const id = document.getElementById('stage-target-id').value;
+            const stage = document.getElementById('stage-select-input').value;
+            const note = document.getElementById('stage-note-input').value.trim();
+
+            const res = await fetch(`/api/targets/${id}/stage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pipeline_stage: stage, note })
+            });
+            if (res.ok) {
+                closeTargetStageModal();
+                await loadAllData();
+                alert("تم تحديث مرحلة الهدف بنجاح ✓");
+            }
+        }
+
+        async function submitCloseTarget() {
+            const id = document.getElementById('close-target-id').value;
+            const po_number = document.getElementById('close-po-number').value.trim();
+            const po_value = parseFloat(document.getElementById('close-po-value').value) || 0;
+            const po_attachment_url = document.getElementById('close-po-url').value.trim();
+
+            if (!po_number || po_value <= 0) return alert("يرجى إدخال رقم وقيمة أمر الشراء");
+
+            const res = await fetch(`/api/targets/${id}/close`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ po_number, po_value, po_attachment_url })
+            });
+            if (res.ok) {
+                closeTargetCloseModal();
+                await loadAllData();
+                alert("تهانينا! تم إغلاق الهدف بنجاح وترحيل المبيعات للمندوب ✓");
+            }
+        }
+
+        async function deleteTarget(id, title) {
+            if (!confirm(`هل أنت متأكد من حذف الهدف "${title}"؟`)) return;
+            const res = await fetch(`/api/targets/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function submitNewRep() {
+            const name = document.getElementById('rep-name-input').value.trim();
+            const code = document.getElementById('rep-code-input').value.trim();
+            const region = document.getElementById('rep-region-input').value.trim();
+            const phone = document.getElementById('rep-phone-input').value.trim();
+            const lang = document.getElementById('rep-language-select').value;
+            const hasT = document.getElementById('rep-has-target-toggle').checked;
+            const targetVal = parseFloat(document.getElementById('rep-target-input')?.value) || 0;
+
+            if (!name || !phone) return alert("يرجى ملء الاسم ورقم الهاتف");
+
+            const res = await fetch('/api/reps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name, employee_code: code || "SE-" + Math.floor(100 + Math.random() * 900),
+                    region: region || "مسقط", phone_number: phone, has_target: hasT,
+                    monthly_target: targetVal, preferred_language: lang || "AR"
+                })
+            });
+            if (res.ok) {
+                closeNewRepModal();
+                await loadAllData();
+                alert("تم حفظ عضو فريق المبيعات بنجاح ✓");
+            }
+        }
+
+        async function submitUpdateRep() {
+            const id = document.getElementById('edit-rep-id').value;
+            const name = document.getElementById('edit-rep-name-input').value.trim();
+            const code = document.getElementById('edit-rep-code-input').value.trim();
+            const region = document.getElementById('edit-rep-region-input').value.trim();
+            const phone = document.getElementById('edit-rep-phone-input').value.trim();
+            const lang = document.getElementById('edit-rep-language-select').value;
+            const hasT = document.getElementById('edit-rep-has-target-toggle').checked;
+            const targetVal = parseFloat(document.getElementById('edit-rep-target-input').value) || 0;
+
+            const res = await fetch(`/api/reps/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name, employee_code: code, region, phone_number: phone,
+                    has_target: hasT, monthly_target: targetVal, preferred_language: lang || "AR"
+                })
+            });
+            if (res.ok) {
+                closeEditRepModal();
+                await loadAllData();
+                alert("تم تحديث بيانات عضو الفريق بنجاح ✓");
+            }
+        }
+
+        async function deleteRep(id, name) {
+            if (!confirm(`هل أنت متأكد من حذف المندوب "${name}"؟`)) return;
+            const res = await fetch(`/api/reps/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function submitNewCustomer() {
+            const company_name = document.getElementById('cust-company-name').value.trim();
+            const brand_name = document.getElementById('cust-brand-name').value.trim();
+            const region = document.getElementById('cust-region').value.trim();
+            const sector = document.getElementById('cust-sector').value.trim();
+            const contact_person = document.getElementById('cust-contact-person').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const repSelect = document.getElementById('cust-rep-select');
+            const notes = document.getElementById('cust-notes').value.trim();
+
+            if (!company_name || !phone) return alert("يرجى ملء اسم الشركة ورقم الهاتف");
+
+            const res = await fetch('/api/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    company_name, brand_name, sector: sector || "عام",
+                    region: region || "مسقط", contact_person: contact_person || "المسؤول",
+                    phone, assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null, notes
+                })
+            });
+            if (res.ok) {
+                closeNewCustomerModal();
+                await loadAllData();
+                alert("تمت إضافة حساب العميل بنجاح ✓");
+            }
+        }
+
+        async function submitUpdateCustomer() {
+            const id = document.getElementById('edit-cust-id').value;
+            const company_name = document.getElementById('edit-cust-company-name').value.trim();
+            const brand_name = document.getElementById('edit-cust-brand-name').value.trim();
+            const sector = document.getElementById('edit-cust-sector').value.trim();
+            const region = document.getElementById('edit-cust-region').value.trim();
+            const contact_person = document.getElementById('edit-cust-contact-person').value.trim();
+            const phone = document.getElementById('edit-cust-phone').value.trim();
+            const repSelect = document.getElementById('edit-cust-rep-select');
+            const notes = document.getElementById('edit-cust-notes').value.trim();
+
+            const res = await fetch(`/api/customers/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    company_name, brand_name, sector, region, contact_person,
+                    phone, assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null, notes
+                })
+            });
+            if (res.ok) {
+                closeEditCustomerModal();
+                await loadAllData();
+                alert("تم تحديث بيانات العميل بنجاح ✓");
+            }
+        }
+
+        async function deleteCustomer(id, name) {
+            if (!confirm(`هل أنت متأكد من حذف العميل "${name}"؟`)) return;
+            const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function submitSampleFeedback() {
+            const id = document.getElementById('feedback-sample-id').value;
+            const notes = document.getElementById('feedback-notes-input').value.trim();
+            const status = document.getElementById('feedback-status-select').value;
+
+            if (!notes) return alert("يرجى كتابة ملاحظات الشيف");
+
+            const res = await fetch(`/api/samples/${id}/feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ feedback_notes: notes, status })
+            });
+            if (res.ok) {
+                closeSampleFeedbackModal();
+                await loadAllData();
+                alert("تم رصد تقييم الشيف الفني بنجاح ✓");
+            }
+        }
+
+        async function submitConvertSample() {
+            const id = document.getElementById('convert-sample-id').value;
+            const po_number = document.getElementById('convert-sample-po-number').value.trim();
+            const po_value = parseFloat(document.getElementById('convert-sample-po-value').value) || 0;
+
+            if (!po_number || po_value <= 0) return alert("يرجى إدخال رقم وقيمة أمر الشراء");
+
+            const res = await fetch(`/api/samples/${id}/convert`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ po_number, po_value })
+            });
+            if (res.ok) {
+                closeConvertSampleModal();
+                await loadAllData();
+                alert("تهانينا! تم تحويل العينة لأمر شراء وترحيل القيمة للمبيعات ✓");
+            }
+        }
+
+        async function deleteSample(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا السجل؟")) return;
+            const res = await fetch(`/api/samples/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function submitUpdateCalendarEvent() {
+            const id = document.getElementById('edit-cal-id').value;
+            const cust = document.getElementById('edit-cal-customer-input').value.trim();
+            const rep = document.getElementById('edit-cal-rep-select').value;
+            const task = document.getElementById('edit-cal-task-type').value.trim();
+            const sched = document.getElementById('edit-cal-scheduled-at').value.trim();
+            const loc = document.getElementById('edit-cal-location').value.trim();
+            const notes = document.getElementById('edit-cal-notes').value.trim();
+
+            const res = await fetch(`/api/calendar/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_name: cust, rep_name: rep, task_type: task,
+                    scheduled_at: sched.replace("T", " "),
+                    reminder_at: "", location: loc || "مقر العميل", change_notes: notes
+                })
+            });
+            if (res.ok) {
+                closeEditCalendarModal();
+                await loadAllData();
+                alert("تم تحديث المهمة بنجاح ✓");
+            }
+        }
+
+        async function updateCalendarStatus(id, newStatus) {
+            const res = await fetch(`/api/calendar/${id}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            if (res.ok) await loadAllData();
+        }
+
+        async function deleteCalendarEvent(id) {
+            if (!confirm("هل أنت متأكد من حذف هذه الزيارة؟")) return;
+            const res = await fetch(`/api/calendar/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function submitNewProduct() {
+            const name_ar = document.getElementById('prod-name-ar').value.trim();
+            const name_en = document.getElementById('prod-name-en').value.trim();
+            const sku = document.getElementById('prod-sku').value.trim();
+            const weight = document.getElementById('prod-weight').value.trim();
+            const primary_pack = document.getElementById('prod-primary-pack').value.trim();
+            const carton_pack = document.getElementById('prod-carton-pack').value.trim();
+
+            if (!name_ar) return alert("يرجى إدخال اسم الصنف بالعربي");
+
+            const res = await fetch('/api/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name_ar, name_en, sku, weight_spec: weight, primary_packaging: primary_pack, carton_pack_spec: carton_pack })
+            });
+            if (res.ok) {
+                closeNewProductModal();
+                await loadAllData();
+                alert("تمت إضافة المنتج بنجاح ✓");
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+            const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function uploadProductsExcel(input) {
+            if (!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/products/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✅ تم استيراد وتحديث ${data.imported_count} منتج بنجاح!`);
+                    await loadAllData();
+                } else {
+                    alert(`❌ فشل الرفع: ${data.detail}`);
+                }
+            } catch(e) {
+                alert("خطأ أثناء معالجة الملف");
+            } finally {
+                input.value = '';
+            }
+        }
+
+        async function submitExpense() {
+            const rep_id = parseInt(document.getElementById('exp-rep-select').value);
+            const expense_type = document.getElementById('exp-type-select').value;
+            const amount = parseFloat(document.getElementById('exp-amount').value) || 0;
+            const notes = document.getElementById('exp-notes').value.trim();
+
+            if (amount <= 0) return alert("يرجى إدخال مبلغ صحيح للمصروف");
+
+            const res = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rep_id, expense_type, amount, notes })
+            });
+            if (res.ok) {
+                closeExpenseModal();
+                await loadAllData();
+                alert("تم قيد سند المصروف بنجاح ✓");
+            }
+        }
+
+        async function deleteExpense(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا المصروف؟")) return;
+            const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function submitNewAgent() {
+            const name = document.getElementById('agent-name-input').value.trim();
+            const category = document.getElementById('agent-category-select').value;
+            const role_type = document.getElementById('agent-role-input').value.trim();
+            const trigger_schedule = document.getElementById('agent-schedule-select').value;
+            const target_channel = document.getElementById('agent-target-channel-input').value.trim();
+            const system_prompt = document.getElementById('agent-prompt-input').value.trim();
+
+            if (!name || !system_prompt) return alert("يرجى إدخال اسم الوكيل والبرومبت التوجيهي");
+
+            const res = await fetch('/api/agents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name, category, role_type: role_type || "CUSTOM_AGENT",
+                    trigger_schedule, target_channel, system_prompt
+                })
+            });
+            if (res.ok) {
+                closeNewAgentModal();
+                await loadAgentsData();
+                alert("تم إنشاء الوكيل بنجاح ✓");
+            }
+        }
+
+        async function submitUpdateAgent() {
+            const id = document.getElementById('edit-agent-id').value;
+            const name = document.getElementById('edit-agent-name').value.trim();
+            const category = document.getElementById('edit-agent-category').value;
+            const trigger_schedule = document.getElementById('edit-agent-schedule').value;
+            const target_channel = document.getElementById('edit-agent-target-channel').value.trim();
+            const system_prompt = document.getElementById('edit-agent-prompt').value.trim();
+
+            const res = await fetch(`/api/agents/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, category, trigger_schedule, target_channel, system_prompt })
+            });
+            if (res.ok) {
+                closeEditAgentModal();
+                await loadAgentsData();
+                alert("تم تحديث بيانات الوكيل بنجاح ✓");
+            }
+        }
+
+        async function deleteAgent(id, name) {
+            if (!confirm(`هل أنت متأكد من حذف الوكيل "${name}"؟`)) return;
+            const res = await fetch(`/api/agents/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAgentsData();
+        }
+
+        async function cleanDuplicateAgents() {
+            if (!confirm("هل تريد إزالة الوكلاء المكررين؟")) return;
+            const res = await fetch('/api/agents/clean-duplicates', { method: 'POST' });
+            if (res.ok) {
+                await loadAgentsData();
+                alert("تم تنظيف المكررات بنجاح ✓");
+            }
+        }
+
+        async function toggleAgentStatus(id, newStatus) {
+            await fetch(`/api/agents/${id}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: newStatus })
+            });
+            await loadAgentsData();
+        }
+
+        async function testAgentNowGlobal(id, agentName) {
+            const globalPhone = document.getElementById('global-test-phone').value.trim();
+            try {
+                const res = await fetch(`/api/agents/test-global`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agent_id: id, test_phone: globalPhone })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✅ تم إرسال التجربة بنجاح إلى: ${data.to}\n\nالنص المرسل:\n${data.message_preview}`);
+                } else {
+                    alert(`❌ تعذر الإرسال: ${data.detail}`);
+                }
+            } catch (e) {
+                alert("خطأ في الاتصال بالسيرفر");
+            }
+        }
+
+        // ----------------- دوال الواتساب والمجموعات -----------------
+        async function fetchDiscoveredGroups() {
+            const container = document.getElementById('discovered-groups-container');
+            const list = document.getElementById('discovered-groups-list');
+            if (container) container.classList.remove('hidden');
+            if (list) list.innerHTML = '<div class="text-xs text-gray-500 p-2">جاري قراءة المجموعات...</div>';
+
+            try {
+                const res = await fetch('/api/whatsapp/discovered-groups');
+                const groups = await res.json();
+                if (list) {
+                    if (!groups || groups.length === 0) {
+                        list.innerHTML = '<div class="text-xs text-amber-700 p-2 bg-amber-50 rounded">لم يتم العثور على مجموعات أو الجلسة بانتظار المزامنة.</div>';
+                        return;
+                    }
+                    list.innerHTML = groups.map(g => `
+                        <div class="flex justify-between items-center bg-white p-2.5 rounded-lg border text-xs shadow-2xs">
+                            <div>
+                                <span class="font-bold text-gray-800">${g.subject}</span>
+                                <span class="text-[10px] text-gray-400 block font-mono">${g.id}</span>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="useDiscoveredGroupId('${g.id}', 'customer')" class="px-2 py-1 bg-purple-100 text-[#3A056A] font-bold rounded text-[10px]">ربط لعميل</button>
+                                <button onclick="useDiscoveredGroupId('${g.id}', 'logistics')" class="px-2 py-1 bg-blue-100 text-blue-800 font-bold rounded text-[10px]">لوجستيك</button>
+                                <button onclick="useDiscoveredGroupId('${g.id}', 'management')" class="px-2 py-1 bg-amber-100 text-amber-800 font-bold rounded text-[10px]">إدارة</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                if (list) list.innerHTML = '<div class="text-xs text-red-600 p-2">تعذر قراءة المجموعات حالياً.</div>';
+            }
+        }
+
+        function useDiscoveredGroupId(gid, targetType) {
+            if (targetType === 'customer') {
+                const input = document.getElementById('settings-wa-group-id');
+                if (input) input.value = gid;
+            } else if (targetType === 'logistics') {
+                const input = document.getElementById('conf-logistics-group');
+                if (input) input.value = gid;
+            } else if (targetType === 'management') {
+                const input = document.getElementById('conf-management-group');
+                if (input) input.value = gid;
+            }
+            alert(`تم نسخ المعرف بنجاح إلى خانة [${targetType}]`);
+        }
+
+        async function submitSettingsAssignGroup() {
+            const custId = parseInt(document.getElementById('settings-wa-customer-select').value);
+            const gid = document.getElementById('settings-wa-group-id').value.trim();
+            if (!gid) return alert("يرجى تحديد رمز معرّف المجموعة");
+
+            const res = await fetch('/api/customers/group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: custId, whatsapp_group_id: gid })
+            });
+            if (res.ok) {
+                document.getElementById('settings-wa-group-id').value = '';
+                await loadAllData();
+                alert("تم ربط المجموعة بالعميل بنجاح ✓");
+            }
+        }
+
+        async function unassignGroup(custId) {
+            if (!confirm("هل أنت متأكد من فك ربط هذه المجموعة؟")) return;
+            const res = await fetch('/api/customers/group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: custId, whatsapp_group_id: "" })
+            });
+            if (res.ok) await loadAllData();
+        }
+
+        async function saveSpecialGroupsConfig() {
+            const logistics_group_id = document.getElementById('conf-logistics-group').value.trim();
+            const management_group_id = document.getElementById('conf-management-group').value.trim();
+
+            const res = await fetch('/api/system/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logistics_group_id, management_group_id })
+            });
+            if (res.ok) alert("تم حفظ معرّفات المجموعات بنجاح ✓");
+        }
+
+        async function checkWhatsAppLiveStatus() {
+            try {
+                const res = await fetch('/api/whatsapp/status');
+                const data = await res.json();
+                const btn = document.getElementById('top-bar-wa-btn');
+                const dot = document.getElementById('top-bar-wa-dot');
+                const text = document.getElementById('top-bar-wa-text');
+                const connectedCard = document.getElementById('whatsapp-connected-card');
+                const qrWrapper = document.getElementById('whatsapp-qr-wrapper');
+                const phoneDisplay = document.getElementById('connected-phone-display');
+
+                if (data.connected) {
+                    if (btn) btn.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-emerald-50 text-emerald-800 border-emerald-300";
+                    if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
+                    if (text) text.innerText = `واتساب: متصل (${data.phone || 'نشط'})`;
+                    if (connectedCard && qrWrapper) {
+                        connectedCard.classList.remove('hidden');
+                        qrWrapper.classList.add('hidden');
+                        if (phoneDisplay) phoneDisplay.innerText = data.phone || 'متصل';
+                    }
+                    return true;
+                } else {
+                    if (btn) btn.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-amber-50 text-amber-800 border-amber-300";
+                    if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
+                    if (text) text.innerText = "واتساب: بانتظار المسح";
+                    if (connectedCard && qrWrapper) {
+                        connectedCard.classList.add('hidden');
+                        qrWrapper.classList.remove('hidden');
+                    }
+                    return false;
+                }
+            } catch (e) {
+                return false;
+            }
+        }
+
+        async function openWhatsAppModal() {
+            document.getElementById('whatsapp-modal').classList.remove('hidden');
+            const isConn = await checkWhatsAppLiveStatus();
+            if (!isConn) {
+                try {
+                    const res = await fetch('/api/whatsapp/qr?t=' + new Date().getTime());
+                    const contentType = res.headers.get("content-type");
+                    if (res.status === 200 && contentType && contentType.includes("image")) {
+                        const blob = await res.blob();
+                        const img = document.getElementById('whatsapp-qr-image');
+                        if (img) img.src = URL.createObjectURL(blob);
+                        const loader = document.getElementById('whatsapp-qr-loader');
+                        if (loader) loader.classList.add('hidden');
+                    }
+                } catch(e) {}
+            }
+        }
+
+        function closeWhatsAppModal() { document.getElementById('whatsapp-modal').classList.add('hidden'); }
+
+        async function disconnectWhatsAppSession() {
+            if (!confirm("هل أنت متأكد من فك ارتباط الواتساب؟")) return;
+            try {
+                const res = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+                if (res.ok) {
+                    alert("تم فك الارتباط بنجاح.");
+                    await checkWhatsAppLiveStatus();
+                    openWhatsAppModal();
+                }
+            } catch(e) {}
+        }
+
+        function previewReportOfficial() {
+            closeReportModal();
+            window.print();
+        }
+
+        function loadSavedTestPhone() {
+            const savedPhone = localStorage.getItem('fdc_global_test_phone');
+            const input = document.getElementById('global-test-phone');
+            if (input) input.value = savedPhone ? savedPhone : '+96893904404';
+        }
+
+        function saveGlobalTestPhone(showAlert = false) {
+            const input = document.getElementById('global-test-phone');
+            if (!input) return;
+            const phone = input.value.trim();
+            if (!phone) return alert("يرجى إدخال رقم هاتف صالح");
+            localStorage.setItem('fdc_global_test_phone', phone);
+            if (showAlert) alert("تم حفظ رقم هاتف الاختبار بنجاح ✓");
+        }
+
+        // ----------------- دوال تحميل واستعراض الجداول -----------------
+        function renderSamplesTable(samplesList) {
+            const tbody = document.getElementById('samples-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = samplesList.map(s => {
+                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">قيد التجربة</span>`;
+                if (s.status === 'DELIVERED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">تم التسليم ✓</span>`;
+                if (s.status === 'CONVERTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">أمر شراء معتمد ✓</span>`;
+                if (s.status === 'REJECTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">مرفوض</span>`;
+
+                return `
+                <tr>
+                    <td class="p-3 font-bold">${s.customer_name || '—'}</td>
+                    <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name || '—'}</td>
+                    <td class="p-3 font-bold text-gray-800">${s.product_name || '—'}</td>
+                    <td class="p-3">${s.qty_free} وحدة</td>
+                    <td class="p-3 text-gray-500">${s.delivery_date}</td>
+                    <td class="p-3">${statusBadge}</td>
+                    <td class="p-3 text-gray-700 max-w-xs text-[11px]">${s.feedback_notes || '—'}</td>
+                    <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id + ' (' + (s.po_value || 0) + ' ر.ع)' : '—'}</td>
+                    <td class="p-3 no-print">
+                        <div class="flex gap-1.5 flex-wrap">
+                            <button onclick="openSampleFeedbackModal(${s.id}, '${escape(s.feedback_notes || '')}')" class="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded text-[10px]">تقييم الشيف</button>
+                            ${s.status !== 'CONVERTED' ? `
+                            <button onclick="openConvertSampleModal(${s.id})" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px]">تحويل لـ PO</button>
+                            ` : ''}
+                            <button onclick="deleteSample(${s.id})" class="text-red-600 hover:text-red-800 font-bold text-[10px] px-1">حذف</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function applySamplesFilter() {
+            const productTerm = (document.getElementById('filter-sample-product')?.value || '').trim().toLowerCase();
+            const customerTerm = (document.getElementById('filter-sample-customer')?.value || '').trim().toLowerCase();
+            const fromDate = document.getElementById('filter-sample-from-date')?.value || '';
+            const toDate = document.getElementById('filter-sample-to-date')?.value || '';
+
+            const filtered = allSamplesCache.filter(s => {
+                const matchProduct = !productTerm || (s.product_name && s.product_name.toLowerCase().includes(productTerm));
+                const matchCustomer = !customerTerm || (s.customer_name && s.customer_name.toLowerCase().includes(customerTerm));
+                let matchDate = true;
+                if (fromDate && s.delivery_date < fromDate) matchDate = false;
+                if (toDate && s.delivery_date > toDate) matchDate = false;
+                return matchProduct && matchCustomer && matchDate;
+            });
+            renderSamplesTable(filtered);
+        }
+
+        async function loadExpenseCategories() {
+            try {
+                const res = await fetch('/api/expense-categories');
+                const categories = await res.json();
+                const selectEl = document.getElementById('exp-type-select');
+                if (selectEl) {
+                    selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
+                }
+            } catch (e) {}
+        }
+
+        async function loadWhatsAppLogs() {
+            try {
+                const wRes = await fetch('/api/whatsapp/logs');
+                const wLogs = await wRes.json();
+                const feedList = document.getElementById('whatsapp-feed-list');
+                if (feedList) {
+                    if (!wLogs || wLogs.length === 0) {
+                        feedList.innerHTML = `
+                        <div class="p-8 text-center bg-gray-50 border border-dashed border-gray-200 rounded-xl space-y-2">
+                            <span class="text-3xl block">📡</span>
+                            <div class="font-bold text-gray-700 text-sm">رادار المحادثات في وضع الاستماع النشط</div>
+                            <p class="text-xs text-gray-500 max-w-md mx-auto">
+                                لا توجد رسائل ملتقطة حتى الآن. يبدأ الرادار بالتسجيل اللحظي فور كتابة رسالة في مجموعات العملاء المعتمدة أو عند مراسلة الوكيل في شاتك الخاص.
+                            </p>
+                        </div>`;
+                    } else {
+                        feedList.innerHTML = wLogs.map(l => `
+                            <div class="p-3 rounded-xl border brand-border bg-white space-y-1 shadow-2xs">
+                                <div class="flex justify-between items-center text-[10px]">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-bold brand-primary-text text-xs">${l.sender_name}</span>
+                                        <span class="px-2 py-0.5 rounded bg-purple-50 text-[#3A056A] font-semibold border border-purple-200">${l.channel_name || 'محادثة'}</span>
+                                    </div>
+                                    <span class="text-gray-400 font-mono">${l.created_at}</span>
+                                </div>
+                                <p class="text-gray-800 text-xs mt-1 leading-relaxed">${l.message_body}</p>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // ----------------- بدء التشغيل عند تحميل الصفحة -----------------
         window.addEventListener('DOMContentLoaded', () => {
             try { loadSavedTestPhone(); } catch(e) {}
             if (checkSessionPersisted()) {
