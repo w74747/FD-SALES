@@ -73,15 +73,13 @@
         </div>
     </div>
 
-    <!-- 2. القائمة الجانبية -->
+    <!-- 2. القائمة الجانبية (11 تبويب كامل) -->
     <aside class="w-64 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
-                <div class="flex items-center justify-center gap-2.5 w-full h-full px-2 bg-white rounded-xl shadow-sm">
-                    <div class="text-right">
-                        <div class="text-sm font-black text-[#3A056A] leading-tight">شركة تنمية الغذاء</div>
-                        <div class="text-[8.5px] font-bold text-purple-700 tracking-wider uppercase">Food Development Co.</div>
-                    </div>
+                <div class="text-right w-full px-2">
+                    <div class="text-sm font-black text-white leading-tight">شركة تنمية الغذاء</div>
+                    <div class="text-[8.5px] font-bold text-purple-300 uppercase">Food Development Co.</div>
                 </div>
             </div>
 
@@ -210,7 +208,7 @@
                                 <span>📥</span> <span>رفع ملف إكسل (Excel/CSV)</span>
                                 <input type="file" id="products-file-input" accept=".xlsx, .csv" onchange="uploadProductsExcel(this)" class="hidden">
                             </label>
-                            <button onclick="openNewProductModal()" class="px-3 py-2 brand-primary-bg text-white font-bold text-xs rounded-lg shadow-sm">
+                            <button onclick="openModal('new-product-modal')" class="px-3 py-2 brand-primary-bg text-white font-bold text-xs rounded-lg shadow-sm">
                                 + إضافة صنف يدوي
                             </button>
                         </div>
@@ -239,9 +237,9 @@
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">الأهداف والفرص البيعية (Pipeline Stages)</h3>
-                            <div class="text-xs text-gray-500">متابعة مسار الصفقات عبر مراحل التوريد والاعتماد (مع إشعار واتساب تلقائي للموظف)</div>
+                            <div class="text-xs text-gray-500">متابعة مراحل الفرص من التواصل وحتى أمر الشراء مع إشعار واتساب تلقائي للموظف المكلف</div>
                         </div>
-                        <button onclick="openNewTargetModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
+                        <button onclick="openModal('new-target-modal')" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                             + إضافة فرصة جديدة
                         </button>
                     </div>
@@ -257,7 +255,7 @@
                             <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
                             <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج والمصاريف واللغة المفضلة</div>
                         </div>
-                        <button onclick="openNewRepModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
+                        <button onclick="openModal('new-rep-modal')" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                             + إضافة عضو جديد
                         </button>
                     </div>
@@ -274,7 +272,7 @@
                             <div class="text-xs text-gray-500">سلاسل الهايبرماركت، الفنادق والمطاعم، والمجموعات المراقبة</div>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="openNewCustomerModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
+                            <button onclick="openModal('new-customer-modal')" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                                 + إضافة عميل جديد
                             </button>
                             <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">
@@ -387,7 +385,7 @@
                             <button onclick="cleanDuplicateAgents()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg border">
                                 تنظيف المكررات 🧹
                             </button>
-                            <button onclick="openNewAgentModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5">
+                            <button onclick="openModal('new-agent-modal')" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5">
                                 <span>+</span> <span>إضافة وكيل ذكي جديد</span>
                             </button>
                         </div>
@@ -437,7 +435,7 @@
                             <h3 class="font-bold text-sm text-amber-800">سجل المصاريف الميدانية والتشغيلية</h3>
                             <div class="text-xs text-gray-500">متابعة كافة السندات المقيدة</div>
                         </div>
-                        <button onclick="openExpenseModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-sm">
+                        <button onclick="openModal('expense-modal')" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-sm">
                             + قيد سند مصروف جديد
                         </button>
                     </div>
@@ -520,6 +518,23 @@
                     </div>
                 </div>
 
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3 no-print">
+                    <h4 class="font-bold text-sm brand-primary-text">ربط مجموعة واتساب بحساب عميل</h4>
+                    <div class="grid grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <label class="block font-bold mb-1">العميل المستهدف:</label>
+                            <select id="settings-wa-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block font-bold mb-1">رمز معرّف المجموعة (Group ID):</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="settings-wa-group-id" class="w-full p-2 border rounded-lg font-mono" placeholder="1203630XXXXXXXX@g.us">
+                                <button onclick="submitSettingsAssignGroup()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg whitespace-nowrap">حفظ وربط</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
                     <h4 class="font-bold text-sm brand-primary-text">المجموعات المعتمدة الخاضعة للمراقبة حالياً</h4>
                     <table class="w-full text-right text-xs border">
@@ -549,8 +564,8 @@
     <!-- ==================== النوافذ المنبثقة التفاعلية ==================== -->
 
     <!-- نافذة تسجيل تسليم عينات جديدة (أصناف متعددة مع زر +) -->
-    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[560px] space-y-3 text-xs max-h-[90vh] flex flex-col justify-between">
+    <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs max-h-[90vh] flex flex-col justify-between">
             <div class="space-y-3 overflow-y-auto pr-1">
                 <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينات جديدة (أصناف متعددة)</h3>
                 <div>
@@ -597,15 +612,15 @@
                 </div>
             </div>
             <div class="flex justify-end gap-2 pt-3 border-t mt-2">
-                <button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="closeModal('new-sample-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitNewMultiSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow">حفظ وإرسال إشعار للموظف</button>
             </div>
         </div>
     </div>
 
     <!-- نافذة جدولة مهمة ميدانية (فريق متعدد مع زر +) -->
-    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[540px] space-y-3 text-xs max-h-[90vh] flex flex-col justify-between">
+    <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs max-h-[90vh] flex flex-col justify-between">
             <div class="space-y-3 overflow-y-auto pr-1">
                 <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية (فريق متعدد)</h3>
                 <div>
@@ -647,17 +662,17 @@
                 </div>
             </div>
             <div class="flex justify-end gap-2 pt-3 border-t mt-2">
-                <button onclick="closeNewCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="closeModal('new-calendar-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitNewMultiCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow">تأكيد الجدولة وإرسال التنبيهات</button>
             </div>
         </div>
     </div>
 
     <!-- نافذة إضافة فرصة بيعية جديدة -->
-    <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي / فرصة جديدة (إشعار واتساب تلقائي للموظف)</h3>
-            <div><label class="block font-bold mb-1">مسمى الهدف البيعي:</label><input type="text" id="tgt-title" class="w-full p-2 border rounded-lg" placeholder="مثال: توريد خبز برجر أسبوعي لسلسلة مطاعم"></div>
+    <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي / فرصة جديدة</h3>
+            <div><label class="block font-bold mb-1">مسمى الهدف البيعي:</label><input type="text" id="tgt-title" class="w-full p-2 border rounded-lg" placeholder="مثال: توريد خبز برجر أسبوعي"></div>
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="block font-bold mb-1">العميل المستهدف:</label><select id="tgt-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
                 <div><label class="block font-bold mb-1">عضو الفريق المكلّف:</label><select id="tgt-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
@@ -665,7 +680,7 @@
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="block font-bold mb-1">القيمة المتوقعة (ر.ع):</label><input type="number" id="tgt-value" class="w-full p-2 border rounded-lg" value="5000"></div>
                 <div>
-                    <label class="block font-bold mb-1 text-purple-900">مرحلة البداية في المسار:</label>
+                    <label class="block font-bold mb-1 text-purple-900">مرحلة البداية:</label>
                     <select id="tgt-stage-select" class="w-full p-2 border rounded-lg bg-white font-bold">
                         <option value="LEAD_CONTACT">1. التواصل الأولي والتأهيل</option>
                         <option value="MEETING_REQUIREMENTS">2. الاجتماع وحصر الاحتياج</option>
@@ -673,121 +688,19 @@
                     </select>
                 </div>
             </div>
-            <div><label class="block font-bold mb-1">ملاحظة البداية:</label><textarea id="tgt-note" rows="2" class="w-full p-2 border rounded-lg" placeholder="تم التواصل وتحديد موعد الزيارة..."></textarea></div>
-            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewTargetModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewTarget()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ وإرسال التنبيه</button></div>
-        </div>
-    </div>
-
-    <!-- نافذة ترقية مرحلة الهدف -->
-    <div id="target-stage-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديث مرحلة الهدف البيعي (Pipeline Stage)</h3>
-            <input type="hidden" id="stage-target-id">
-            <div>
-                <label class="block font-bold mb-1">المرحلة الحالية للفرصة:</label>
-                <select id="stage-select-input" class="w-full p-2.5 border rounded-lg bg-white font-bold text-[#3A056A]">
-                    <option value="LEAD_CONTACT">1. التواصل الأولي والتأهيل (Lead Contact)</option>
-                    <option value="MEETING_REQUIREMENTS">2. الاجتماع وحصر الاحتياج (Meeting & Needs)</option>
-                    <option value="SAMPLE_DELIVERY">3. تسليم وتجربة العينات (Sample Delivery)</option>
-                    <option value="SAMPLE_FEEDBACK">4. التقييم والملاحظات الفنية (Chef Feedback)</option>
-                    <option value="PRICE_NEGOTIATION">5. التفاوض وتقديم الأسعار (Price Negotiation)</option>
-                    <option value="PO_CLOSED_WON">6. أمر شراء رسمي معتمد (PO Won)</option>
-                </select>
-            </div>
-            <div>
-                <label class="block font-bold mb-1">ملاحظة الترقية والمستجدات الميدانية:</label>
-                <textarea id="stage-note-input" rows="3" class="w-full p-2 border rounded-lg" placeholder="ملخص ما تم إنجازه لنقل الفرصة لهذه المرحلة..."></textarea>
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeTargetStageModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitTargetStageUpdate()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">ترقية المرحلة وحفظ</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة إغلاق الهدف وتحويله لأمر شراء PO -->
-    <div id="close-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">إغلاق الهدف بنجاح وتحويله لأمر شراء (PO)</h3>
-            <input type="hidden" id="close-target-id">
-            <div><label class="block font-bold mb-1">رقم أمر الشراء (PO):</label><input type="text" id="close-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX"></div>
-            <div><label class="block font-bold mb-1">قيمة أمر الشراء المحققة (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0"></div>
-            <div><label class="block font-bold mb-1">رابط المستند المرفق:</label><input type="text" id="close-po-url" class="w-full p-2 border rounded-lg" placeholder="رابط درايف أو مرجع السند"></div>
-            <div class="flex justify-end gap-2 pt-2"><button onclick="closeTargetCloseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitCloseTarget()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الإغلاق والترحيل</button></div>
-        </div>
-    </div>
-
-    <!-- نافذة تعديل عضو فريق المبيعات -->
-    <div id="edit-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
-            <input type="hidden" id="edit-rep-id">
-            <div><label class="block font-bold mb-1">الاسم الكامل:</label><input type="text" id="edit-rep-name-input" class="w-full p-2 border rounded-lg"></div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">الكود الوظيفي:</label><input type="text" id="edit-rep-code-input" class="w-full p-2 border rounded-lg"></div>
-                <div><label class="block font-bold mb-1">المنطقة البيعية:</label><input type="text" id="edit-rep-region-input" class="w-full p-2 border rounded-lg"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">رقم الهاتف المعتمد:</label><input type="text" id="edit-rep-phone-input" class="w-full p-2 border rounded-lg font-mono"></div>
-                <div>
-                    <label class="block font-bold mb-1">لغة استلام الرسائل:</label>
-                    <select id="edit-rep-language-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
-                        <option value="AR">العربية (Arabic)</option>
-                        <option value="EN">الإنجليزية (English)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
-                    <input type="checkbox" id="edit-rep-has-target-toggle" onchange="toggleEditTargetInput(this.checked)" class="w-4 h-4 text-purple-600 rounded">
-                </div>
-                <div id="edit-rep-target-box" class="hidden">
-                    <label class="block mb-1 text-[11px] text-gray-600">المستهدف الشهري (ر.ع):</label>
-                    <input type="number" id="edit-rep-target-input" class="w-full p-1.5 border rounded bg-white" value="0">
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeEditRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitUpdateRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة تعديل العميل -->
-    <div id="edit-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات حساب العميل</h3>
-            <input type="hidden" id="edit-cust-id">
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم العميل (الشركة):</label><input type="text" id="edit-cust-company-name" class="w-full p-2 border rounded-lg"></div>
-                <div><label class="block font-bold mb-1">اسم العلامة التجارية:</label><input type="text" id="edit-cust-brand-name" class="w-full p-2 border rounded-lg"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">المنطقة:</label><input type="text" id="edit-cust-region" class="w-full p-2 border rounded-lg"></div>
-                <div><label class="block font-bold mb-1">القطاع:</label><input type="text" id="edit-cust-sector" class="w-full p-2 border rounded-lg"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم المسؤول:</label><input type="text" id="edit-cust-contact-person" class="w-full p-2 border rounded-lg"></div>
-                <div><label class="block font-bold mb-1">رقم التواصل:</label><input type="text" id="edit-cust-phone" class="w-full p-2 border rounded-lg font-mono"></div>
-            </div>
-            <div><label class="block font-bold mb-1">عضو الفريق المتابع:</label><select id="edit-cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-            <div><label class="block font-bold mb-1">تعليمات وملاحظات العميل:</label><textarea id="edit-cust-notes" rows="2" class="w-full p-2 border rounded-lg"></textarea></div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeEditCustomerModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitUpdateCustomer()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
-            </div>
+            <div><label class="block font-bold mb-1">ملاحظة البداية:</label><textarea id="tgt-note" rows="2" class="w-full p-2 border rounded-lg"></textarea></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeModal('new-target-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewTarget()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ وإرسال التنبيه</button></div>
         </div>
     </div>
 
     <!-- نافذة تقييم الشيف للعينة -->
-    <div id="sample-feedback-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
+    <div id="sample-feedback-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تقييم ورأي الشيف الفني</h3>
             <input type="hidden" id="feedback-sample-id">
             <div>
                 <label class="block font-bold mb-1">رأي وملاحظات الشيف الفنية:</label>
-                <textarea id="feedback-notes-input" rows="4" class="w-full p-2 border rounded-lg" placeholder="الطعم، القوام، نسبة الهدر، درجة التحمير، مدى ملائمته..."></textarea>
+                <textarea id="feedback-notes-input" rows="4" class="w-full p-2 border rounded-lg" placeholder="الطعم، القوام، نسبة الهدر، درجة التحمير..."></textarea>
             </div>
             <div>
                 <label class="block font-bold mb-1">تحديث الحالة الميدانية:</label>
@@ -798,264 +711,157 @@
                 </select>
             </div>
             <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeSampleFeedbackModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="closeModal('sample-feedback-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitSampleFeedback()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التقييم</button>
             </div>
         </div>
     </div>
 
     <!-- نافذة تحويل العينة لأمر شراء PO -->
-    <div id="convert-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[440px] space-y-3 text-xs">
+    <div id="convert-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">تحويل العينة لأمر شراء رسمي (PO)</h3>
             <input type="hidden" id="convert-sample-id">
             <div><label class="block font-bold mb-1">رقم أمر الشراء (PO Number):</label><input type="text" id="convert-sample-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX"></div>
             <div><label class="block font-bold mb-1">القيمة المالية المحققة (ر.ع):</label><input type="number" id="convert-sample-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0"></div>
             <div class="flex justify-end gap-2 pt-3">
-                <button onclick="closeConvertSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="closeModal('convert-sample-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitConvertSample()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الاعتماد والترحيل</button>
             </div>
         </div>
     </div>
 
-    <!-- نافذة تعديل المهمة المجدولة -->
-    <div id="edit-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل المهمة المجدولة</h3>
-            <input type="hidden" id="edit-cal-id">
-            <div><label class="block font-bold mb-1">العميل:</label><input type="text" id="edit-cal-customer-input" class="w-full p-2 border rounded-lg bg-gray-50"></div>
-            <div><label class="block font-bold mb-1 text-purple-900">الموظف المكلّف:</label><select id="edit-cal-rep-select" class="w-full p-2 border rounded-lg bg-white font-bold"></select></div>
-            <div><label class="block font-bold mb-1">نوع المهمة:</label><input type="text" id="edit-cal-task-type" class="w-full p-2 border rounded-lg"></div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">الموعد الجديد:</label><input type="datetime-local" id="edit-cal-scheduled-at" class="w-full p-2 border rounded-lg"></div>
-                <div><label class="block font-bold mb-1">الموقع:</label><input type="text" id="edit-cal-location" class="w-full p-2 border rounded-lg"></div>
-            </div>
-            <div><label class="block font-bold mb-1">سبب وملاحظة التعديل (تصل للموظف):</label><textarea id="edit-cal-notes" rows="2" class="w-full p-2 border rounded-lg"></textarea></div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeEditCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitUpdateCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديل وإرسال تنبيه</button>
-            </div>
-        </div>
-    </div>
-
     <!-- نافذة إضافة صنف يدوي -->
-    <div id="new-product-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
+    <div id="new-product-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة صنف جديد لكتالوج المنتجات</h3>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم الصنف (بالعربي):</label><input type="text" id="prod-name-ar" class="w-full p-2 border rounded-lg" placeholder="مثال: خبز برجر بريوش 4 إنش"></div>
-                <div><label class="block font-bold mb-1">Product Name (English):</label><input type="text" id="prod-name-en" class="w-full p-2 border rounded-lg" placeholder="Brioche Burger Bun 4 inch"></div>
+                <div><label class="block font-bold mb-1">اسم الصنف (بالعربي):</label><input type="text" id="prod-name-ar" class="w-full p-2 border rounded-lg" placeholder="مثال: خبز بريوش"></div>
+                <div><label class="block font-bold mb-1">Product Name (English):</label><input type="text" id="prod-name-en" class="w-full p-2 border rounded-lg"></div>
             </div>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">كود الصنف / الباركود (SKU):</label><input type="text" id="prod-sku" class="w-full p-2 border rounded-lg font-mono" placeholder="اختياري أو يولد تلقائياً"></div>
-                <div><label class="block font-bold mb-1">الوزن / الحجم:</label><input type="text" id="prod-weight" class="w-full p-2 border rounded-lg" placeholder="مثال: 75g"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">التغليف الأساسي الداخلي:</label><input type="text" id="prod-primary-pack" class="w-full p-2 border rounded-lg" placeholder="كيس بلاستيكي مفرغ 6 حبات"></div>
-                <div><label class="block font-bold mb-1">سعة ومواصفة الكرتون:</label><input type="text" id="prod-carton-pack" class="w-full p-2 border rounded-lg" placeholder="8 أكياس × 6 حبات (48 حبة)"></div>
+                <div><label class="block font-bold mb-1">كود SKU:</label><input type="text" id="prod-sku" class="w-full p-2 border rounded-lg font-mono" placeholder="اختياري"></div>
+                <div><label class="block font-bold mb-1">الوزن / الحجم:</label><input type="text" id="prod-weight" class="w-full p-2 border rounded-lg" placeholder="75g"></div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeNewProductModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="closeModal('new-product-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitNewProduct()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ المنتج</button>
             </div>
         </div>
     </div>
 
     <!-- نافذة إضافة عضو مبيعات جديد -->
-    <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
+    <div id="new-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة عضو فريق مبيعات جديد</h3>
             <div><label class="block font-bold mb-1">الاسم الكامل:</label><input type="text" id="rep-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: سالم"></div>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">الكود الوظيفي:</label><input type="text" id="rep-code-input" class="w-full p-2 border rounded-lg" placeholder="0145"></div>
-                <div><label class="block font-bold mb-1">المنطقة البيعية:</label><input type="text" id="rep-region-input" class="w-full p-2 border rounded-lg" placeholder="صلالة - ظفار"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">رقم الهاتف المعتمد:</label><input type="text" id="rep-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+968XXXXXXXX"></div>
-                <div>
-                    <label class="block font-bold mb-1">لغة استلام الرسائل:</label>
-                    <select id="rep-language-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
-                        <option value="AR">العربية (Arabic)</option>
-                        <option value="EN">الإنجليزية (English)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
-                    <input type="checkbox" id="rep-has-target-toggle" onchange="toggleEditTargetInput(this.checked)" class="w-4 h-4 text-purple-600 rounded">
-                </div>
-                <div id="rep-target-box" class="hidden">
-                    <label class="block mb-1 text-[11px] text-gray-600">المستهدف الشهري (ر.ع):</label>
-                    <input type="number" id="rep-target-input" class="w-full p-1.5 border rounded bg-white" value="0">
-                </div>
+                <div><label class="block font-bold mb-1">رقم الهاتف:</label><input type="text" id="rep-phone-input" class="w-full p-2 border rounded-lg font-mono" placeholder="+968XXXXXXXX"></div>
+                <div><label class="block font-bold mb-1">المنطقة البيعية:</label><input type="text" id="rep-region-input" class="w-full p-2 border rounded-lg" placeholder="صلالة / مسقط"></div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeNewRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="closeModal('new-rep-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitNewRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العضو</button>
             </div>
         </div>
     </div>
 
     <!-- نافذة إضافة عميل جديد -->
-    <div id="new-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
+    <div id="new-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة حساب عميل جديد</h3>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم العميل (الشركة):</label><input type="text" id="cust-company-name" class="w-full p-2 border rounded-lg" placeholder="سلسلة مخابز الريف"></div>
-                <div><label class="block font-bold mb-1">اسم العلامة التجارية:</label><input type="text" id="cust-brand-name" class="w-full p-2 border rounded-lg" placeholder="الريف بيكري"></div>
+                <div><label class="block font-bold mb-1">اسم العميل (الشركة):</label><input type="text" id="cust-company-name" class="w-full p-2 border rounded-lg" placeholder="اسم الشركة"></div>
+                <div><label class="block font-bold mb-1">العلامة التجارية:</label><input type="text" id="cust-brand-name" class="w-full p-2 border rounded-lg"></div>
             </div>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">المنطقة:</label><input type="text" id="cust-region" class="w-full p-2 border rounded-lg" value="مسقط"></div>
-                <div><label class="block font-bold mb-1">القطاع:</label><input type="text" id="cust-sector" class="w-full p-2 border rounded-lg" placeholder="هوريكا / تجزئة"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم المسؤول:</label><input type="text" id="cust-contact-person" class="w-full p-2 border rounded-lg" placeholder="سعيد"></div>
+                <div><label class="block font-bold mb-1">المسؤول:</label><input type="text" id="cust-contact-person" class="w-full p-2 border rounded-lg"></div>
                 <div><label class="block font-bold mb-1">رقم التواصل:</label><input type="text" id="cust-phone" class="w-full p-2 border rounded-lg font-mono" placeholder="+968XXXXXXXX"></div>
             </div>
-            <div><label class="block font-bold mb-1">عضو الفريق المتابع:</label><select id="cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
-            <div><label class="block font-bold mb-1">تعليمات وملاحظات العميل:</label><textarea id="cust-notes" rows="2" class="w-full p-2 border rounded-lg" placeholder="أوقات التوريد والشروط الفنية..."></textarea></div>
+            <div><label class="block font-bold mb-1">المندوب المتابع:</label><select id="cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
             <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeNewCustomerModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="closeModal('new-customer-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitNewCustomer()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ العميل</button>
             </div>
         </div>
     </div>
 
     <!-- نافذة قيد سند مصروف جديد -->
-    <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[470px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm text-amber-800 border-b pb-2">قيد سند مصاريف ميدانية وتشغيلية</h3>
+    <div id="expense-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
+            <h3 class="font-bold text-sm text-amber-800 border-b pb-2">قيد سند مصاريف ميدانية</h3>
             <div><label class="block font-bold mb-1">عضو فريق المبيعات:</label><select id="exp-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
             <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">نوع وبند المصروف:</label><select id="exp-type-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]"></select></div>
-                <div><label class="block font-bold mb-1">قيمة المصروف (ر.ع):</label><input type="number" step="0.1" id="exp-amount" class="w-full p-2 border rounded-lg font-bold text-amber-900" value="25"></div>
+                <div><label class="block font-bold mb-1">بند المصروف:</label><select id="exp-type-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]"></select></div>
+                <div><label class="block font-bold mb-1">المبلغ (ر.ع):</label><input type="number" step="0.1" id="exp-amount" class="w-full p-2 border rounded-lg font-bold text-amber-900" value="25"></div>
             </div>
-            <div><label class="block font-bold mb-1">ملاحظات وبيان المصروف:</label><input type="text" id="exp-notes" class="w-full p-2 border rounded-lg" placeholder="وقود / انتداب / عينات ترويجية"></div>
-            <div class="flex justify-end gap-2 pt-2"><button onclick="closeExpenseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitExpense()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg">قيد المصروف</button></div>
+            <div><label class="block font-bold mb-1">البيان والملاحظات:</label><input type="text" id="exp-notes" class="w-full p-2 border rounded-lg" placeholder="وقود / انتداب..."></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeModal('expense-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitExpense()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg">قيد المصروف</button></div>
         </div>
     </div>
 
     <!-- نافذة إضافة وكيل ذكي جديد -->
-    <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-3 text-xs">
+    <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إنشاء وكيل ذكي جديد</h3>
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="block font-bold mb-1">اسم الوكيل:</label><input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: وكيل التصدير"></div>
                 <div>
-                    <label class="block font-bold mb-1 text-purple-900">مستوى وتصنيف الوكيل:</label>
+                    <label class="block font-bold mb-1 text-purple-900">المستوى والتصنيف:</label>
                     <select id="agent-category-select" class="w-full p-2 border rounded-lg bg-purple-50/70 font-bold text-[#3A056A]">
                         <option value="ADVISORY">🏛️ المجلس الاستشاري التنفيذي</option>
                         <option value="FIELD_OPERATIONS">🚚 المتابعة والعمليات الميدانية</option>
                     </select>
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">الكود التخصصي (Role Type):</label><input type="text" id="agent-role-input" class="w-full p-2 border rounded-lg font-mono" placeholder="CUSTOM_ROLE"></div>
-                <div>
-                    <label class="block font-bold mb-1">المشغّل الزمني:</label>
-                    <select id="agent-schedule-select" class="w-full p-2 border rounded-lg bg-white">
-                        <option value="DAILY_MORNING">صباحي يومي (08:00 AM)</option>
-                        <option value="DAILY_10AM">صباحي (10:00 AM)</option>
-                        <option value="WEEKLY_SUNDAY">أسبوعي</option>
-                        <option value="ON_DEMAND">عند الطلب</option>
-                    </select>
-                </div>
-            </div>
-            <div>
-                <label class="block font-bold mb-1 text-[#3A056A]">قناة إرسال واستلام التقارير (WhatsApp Target):</label>
-                <input type="text" id="agent-target-channel-input" class="w-full p-2 border rounded-lg font-mono" placeholder="رقم هاتف أو معرّف مجموعة (اتركه فارغاً لشاتك الخاص)">
-            </div>
-            <div><label class="block font-bold mb-1">البرومبت التوجيهي (System Prompt):</label><textarea id="agent-prompt-input" rows="4" class="w-full p-2.5 border rounded-lg" placeholder="حدد مهام الوكيل وشخصيته..."></textarea></div>
+            <div><label class="block font-bold mb-1">البرومبت التوجيهي:</label><textarea id="agent-prompt-input" rows="4" class="w-full p-2.5 border rounded-lg" placeholder="حدد مهام الوكيل وشخصيته..."></textarea></div>
             <div class="flex justify-end gap-2 pt-2 border-t">
-                <button onclick="closeNewAgentModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="closeModal('new-agent-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitNewAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ واعتماد الوكيل</button>
             </div>
         </div>
     </div>
 
-    <!-- نافذة تعديل الوكيل -->
-    <div id="edit-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات الوكيل الذكي</h3>
-            <input type="hidden" id="edit-agent-id">
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block font-bold mb-1">اسم الوكيل:</label><input type="text" id="edit-agent-name" class="w-full p-2 border rounded-lg"></div>
-                <div>
-                    <label class="block font-bold mb-1 text-purple-900">المستوى والتصنيف:</label>
-                    <select id="edit-agent-category" class="w-full p-2 border rounded-lg bg-purple-50/70 font-bold text-[#3A056A]">
-                        <option value="ADVISORY">🏛️ المجلس الاستشاري التنفيذي</option>
-                        <option value="FIELD_OPERATIONS">🚚 المتابعة والعمليات الميدانية</option>
-                    </select>
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block font-bold mb-1">المشغّل المجدول:</label>
-                    <select id="edit-agent-schedule" class="w-full p-2 border rounded-lg bg-white">
-                        <option value="DAILY_MORNING">صباحي يومي (08:00 AM)</option>
-                        <option value="DAILY_10AM">صباحي (10:00 AM)</option>
-                        <option value="WEEKLY_SUNDAY">أسبوعي</option>
-                        <option value="ON_DEMAND">عند الطلب</option>
-                    </select>
-                </div>
-                <div><label class="block font-bold mb-1 text-[#3A056A]">قناة إرسال التقارير:</label><input type="text" id="edit-agent-target-channel" class="w-full p-2 border rounded-lg font-mono"></div>
-            </div>
-            <div><label class="block font-bold mb-1">البرومبت التوجيهي:</label><textarea id="edit-agent-prompt" rows="4" class="w-full p-2.5 border rounded-lg"></textarea></div>
-            <div class="flex justify-end gap-2 pt-2 border-t">
-                <button onclick="closeEditAgentModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitUpdateAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
-            </div>
-        </div>
-    </div>
-
     <!-- نافذة ربط الواتساب -->
-    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[440px] space-y-4 text-xs text-center">
+    <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4 text-xs text-center">
             <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm brand-primary-text">ربط جهاز الواتساب بالمنظومة</h3>
+                <h3 class="font-bold text-sm brand-primary-text">ربط جهاز الواتساب</h3>
                 <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">مشفر وآمن ✓</span>
             </div>
             <div id="whatsapp-connected-card" class="hidden p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3">
-                <div class="w-12 h-12 bg-emerald-500 text-white text-2xl flex items-center justify-center rounded-full mx-auto">✓</div>
                 <div class="font-bold text-emerald-900 text-sm">الجلسة متصلة وتعمل بنجاح!</div>
-                <div class="text-xs text-emerald-700">رقم الهاتف المقترن: <span id="connected-phone-display" class="font-mono font-bold"></span></div>
-                <div class="pt-2">
-                    <button onclick="disconnectWhatsAppSession()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 font-bold rounded-lg transition text-xs mx-auto">
-                        فصل ارتباط الواتساب
-                    </button>
-                </div>
+                <div class="text-xs text-emerald-700">الرقم المقترن: <span id="connected-phone-display" class="font-mono font-bold"></span></div>
+                <button onclick="disconnectWhatsAppSession()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 font-bold rounded-lg text-xs mx-auto">فصل الارتباط</button>
             </div>
             <div id="whatsapp-qr-wrapper" class="space-y-3">
-                <div class="font-bold text-gray-700">امسح الرمز لربط الهاتف بالنظام:</div>
                 <div class="relative w-48 h-48 mx-auto flex items-center justify-center bg-white border rounded-lg shadow-sm">
                     <img id="whatsapp-qr-image" src="" alt="WhatsApp QR" class="w-44 h-44 object-contain">
                     <div id="whatsapp-qr-loader" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-2 text-center text-gray-500 text-[11px]">
                         <span class="animate-spin text-2xl mb-1">⚙️</span>
-                        <span>جاري الاتصال بمحرك الواتساب...</span>
+                        <span>جاري قراءة رمز الاستجابة...</span>
                     </div>
                 </div>
             </div>
-            <div class="flex justify-end pt-2 border-t"><button onclick="closeWhatsAppModal()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs">إغلاق</button></div>
+            <div class="flex justify-end pt-2 border-t"><button onclick="closeModal('whatsapp-modal')" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs">إغلاق</button></div>
         </div>
     </div>
 
     <!-- نافذة إصدار التقارير التنفيذية الرسمية -->
-    <div id="report-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
-        <div class="bg-white rounded-2xl p-6 w-[520px] space-y-4 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">مركز إصدار التقارير التنفيذية الرسمية (A4)</h3>
-            <div><label class="block font-bold mb-1">ترويسة التوجيه الرسمية:</label><input type="text" id="report-recipient" value="سعادة رئيس مجلس الإدارة / المدير العام" class="w-full p-2 border rounded-lg"></div>
+    <div id="report-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">مركز إصدار التقارير الرسمية (A4)</h3>
+            <div><label class="block font-bold mb-1">ترويسة التوجيه:</label><input type="text" id="report-recipient" value="سعادة رئيس مجلس الإدارة / المدير العام" class="w-full p-2 border rounded-lg"></div>
             <div><label class="block font-bold mb-1">التوصية الإدارية:</label><textarea id="report-custom-recommendation" rows="3" class="w-full p-2.5 border rounded-lg">أظهر الفريق التزاماً بنسبة إنجاز 108.8% مع كفاءة في استهلاك الوقود. يُوصى بمساندة مسار التصدير وتكثيف توريد عينات المخبوزات المجمدة لسلاسل التجزئة والموزعين.</textarea></div>
             <div class="flex justify-between items-center pt-3 border-t">
                 <button onclick="previewReportOfficial()" class="px-5 py-2.5 brand-primary-bg text-white font-bold rounded-lg shadow">معاينة وطباعة التقرير (A4)</button>
-                <button onclick="closeReportModal()" class="px-4 py-2 border rounded-lg">إغلاق</button>
+                <button onclick="closeModal('report-modal')" class="px-4 py-2 border rounded-lg">إغلاق</button>
             </div>
         </div>
     </div>
 
-    <!-- ==================== كود الـ JAVASCRIPT المنقح والمكتمل بالكامل ==================== -->
+    <!-- ==================== كود الـ JAVASCRIPT المحصن بالكامل ==================== -->
     <script>
-        // المتغيرات والمصفوفات العامة
         const tabs = ['overview', 'products-catalog', 'targets', 'reps', 'customers', 'samples', 'calendar', 'agents', 'expenses-log', 'whatsapp-feed', 'whatsapp-settings'];
         const titles = {
             overview: 'لوحة التحكم',
@@ -1084,7 +890,6 @@
         let allProductsCache = [];
         let allRepsCache = [];
 
-        // 1. دوال التوثيق والجلسة
         function checkSessionPersisted() {
             return localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED' || document.cookie.includes('fdc_auth=AUTHENTICATED');
         }
@@ -1130,13 +935,9 @@
         function logoutSession() {
             localStorage.removeItem('fdc_auth_token');
             document.cookie = "fdc_auth=; path=/; max-age=0";
-            const overlay = document.getElementById('auth-overlay');
-            if (overlay) overlay.classList.remove('hidden');
-            const codeInput = document.getElementById('auth-otp-code');
-            if (codeInput) codeInput.value = '';
+            location.reload();
         }
 
-        // 2. دوال التبويبات
         function switchTab(id) {
             try {
                 tabs.forEach(t => {
@@ -1156,151 +957,33 @@
             } catch(e) {}
         }
 
-        // 3. دوال فتح وإغلاق النوافذ (Modals)
-        function openNewTargetModal() { document.getElementById('new-target-modal').classList.remove('hidden'); }
-        function closeNewTargetModal() { document.getElementById('new-target-modal').classList.add('hidden'); }
-
-        function openTargetStageModal(id, currentStage, currentNote) {
-            document.getElementById('stage-target-id').value = id;
-            document.getElementById('stage-select-input').value = currentStage || 'LEAD_CONTACT';
-            document.getElementById('stage-note-input').value = unescape(currentNote) || '';
-            document.getElementById('target-stage-modal').classList.remove('hidden');
+        function openModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.remove('hidden');
         }
-        function closeTargetStageModal() { document.getElementById('target-stage-modal').classList.add('hidden'); }
 
-        function openTargetCloseModal(id) {
-            document.getElementById('close-target-id').value = id;
-            document.getElementById('close-target-modal').classList.remove('hidden');
+        function closeModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.add('hidden');
         }
-        function closeTargetCloseModal() { document.getElementById('close-target-modal').classList.add('hidden'); }
 
-        function openEditRepModal(id, name, code, region, phone, hasTarget, target, lang) {
-            document.getElementById('edit-rep-id').value = id;
-            document.getElementById('edit-rep-name-input').value = unescape(name);
-            document.getElementById('edit-rep-code-input').value = unescape(code);
-            document.getElementById('edit-rep-region-input').value = unescape(region);
-            document.getElementById('edit-rep-phone-input').value = phone;
-            document.getElementById('edit-rep-language-select').value = lang || 'AR';
-            document.getElementById('edit-rep-has-target-toggle').checked = hasTarget;
-            document.getElementById('edit-rep-target-input').value = target || 0;
-            toggleEditTargetInput(hasTarget);
-            document.getElementById('edit-rep-modal').classList.remove('hidden');
-        }
-        function closeEditRepModal() { document.getElementById('edit-rep-modal').classList.add('hidden'); }
-
-        function openEditCustomerModal(id, comp, brand, sect, reg, pers, ph, repId, notes) {
-            document.getElementById('edit-cust-id').value = id;
-            document.getElementById('edit-cust-company-name').value = unescape(comp) || '';
-            document.getElementById('edit-cust-brand-name').value = unescape(brand) || '';
-            document.getElementById('edit-cust-sector').value = unescape(sect) || '';
-            document.getElementById('edit-cust-region').value = unescape(reg) || '';
-            document.getElementById('edit-cust-contact-person').value = unescape(pers) || '';
-            document.getElementById('edit-cust-phone').value = ph || '';
-            document.getElementById('edit-cust-rep-select').value = repId || '';
-            document.getElementById('edit-cust-notes').value = unescape(notes) || '';
-            document.getElementById('edit-customer-modal').classList.remove('hidden');
-        }
-        function closeEditCustomerModal() { document.getElementById('edit-customer-modal').classList.add('hidden'); }
-
-        function openSampleFeedbackModal(id, currentNotes) {
-            document.getElementById('feedback-sample-id').value = id;
-            document.getElementById('feedback-notes-input').value = unescape(currentNotes) || '';
-            document.getElementById('sample-feedback-modal').classList.remove('hidden');
-        }
-        function closeSampleFeedbackModal() { document.getElementById('sample-feedback-modal').classList.add('hidden'); }
-
-        function openConvertSampleModal(id) {
-            document.getElementById('convert-sample-id').value = id;
-            document.getElementById('convert-sample-po-number').value = '';
-            document.getElementById('convert-sample-po-value').value = '';
-            document.getElementById('convert-sample-modal').classList.remove('hidden');
-        }
-        function closeConvertSampleModal() { document.getElementById('convert-sample-modal').classList.add('hidden'); }
-
-        function openEditCalendarModal(id, cust, rep, task, sched, reminder, loc, notes) {
-            document.getElementById('edit-cal-id').value = id;
-            document.getElementById('edit-cal-customer-input').value = unescape(cust) || '';
-            document.getElementById('edit-cal-rep-select').value = unescape(rep) || '';
-            document.getElementById('edit-cal-task-type').value = unescape(task) || '';
-            document.getElementById('edit-cal-scheduled-at').value = sched ? sched.replace(" ", "T") : '';
-            document.getElementById('edit-cal-location').value = unescape(loc) || '';
-            document.getElementById('edit-cal-notes').value = unescape(notes) || '';
-            document.getElementById('edit-calendar-modal').classList.remove('hidden');
-        }
-        function closeEditCalendarModal() { document.getElementById('edit-calendar-modal').classList.add('hidden'); }
-
-        function openNewProductModal() { document.getElementById('new-product-modal').classList.remove('hidden'); }
-        function closeNewProductModal() { document.getElementById('new-product-modal').classList.add('hidden'); }
-
-        function openNewRepModal() { document.getElementById('new-rep-modal').classList.remove('hidden'); }
-        function closeNewRepModal() { document.getElementById('new-rep-modal').classList.add('hidden'); }
-
-        function openNewCustomerModal() { document.getElementById('new-customer-modal').classList.remove('hidden'); }
-        function closeNewCustomerModal() { document.getElementById('new-customer-modal').classList.add('hidden'); }
-
-        function openNewCalendarModal() { 
-            const now = new Date();
-            const input = document.getElementById('cal-scheduled-at');
-            if (input) input.value = now.toISOString().slice(0, 16);
-            document.getElementById('new-calendar-modal').classList.remove('hidden'); 
-        }
-        function closeNewCalendarModal() { document.getElementById('new-calendar-modal').classList.add('hidden'); }
-
-        function openExpenseModal() { document.getElementById('expense-modal').classList.remove('hidden'); }
-        function closeExpenseModal() { document.getElementById('expense-modal').classList.add('hidden'); }
-
-        function openNewSampleModal() { 
-            const d = new Date().toISOString().split('T')[0];
+        function openNewSampleModal() {
+            const now = new Date().toISOString().split('T')[0];
             const dateIn = document.getElementById('sample-date');
-            if (dateIn) dateIn.value = d;
-            document.getElementById('new-sample-modal').classList.remove('hidden'); 
-        }
-        function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
-
-        function openNewAgentModal() { document.getElementById('new-agent-modal').classList.remove('hidden'); }
-        function closeNewAgentModal() { document.getElementById('new-agent-modal').classList.add('hidden'); }
-
-        function openEditAgentModal(id, name, category, schedule, channel, promptBase64) {
-            document.getElementById('edit-agent-id').value = id;
-            document.getElementById('edit-agent-name').value = unescape(name);
-            document.getElementById('edit-agent-category').value = category || 'ADVISORY';
-            document.getElementById('edit-agent-schedule').value = schedule || 'DAILY_MORNING';
-            document.getElementById('edit-agent-target-channel').value = unescape(channel || '');
-            try {
-                document.getElementById('edit-agent-prompt').value = decodeURIComponent(escape(atob(promptBase64)));
-            } catch(e) {
-                document.getElementById('edit-agent-prompt').value = promptBase64;
-            }
-            document.getElementById('edit-agent-modal').classList.remove('hidden');
-        }
-        function closeEditAgentModal() { document.getElementById('edit-agent-modal').classList.add('hidden'); }
-
-        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
-        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
-
-        function toggleEditTargetInput(checked) {
-            const el = document.getElementById('edit-rep-target-box');
-            if (el) el.classList.toggle('hidden', !checked);
+            if (dateIn) dateIn.value = now;
+            openModal('new-sample-modal');
         }
 
-        function downloadProductsTemplate() {
-            const csvContent = "\uFEFF" + 
-                "اسم المنتج بالعربي,Product Name EN,كود الصنف SKU,الوزن الحجم,التغليف الداخلي,مواصفة وسعة الكرتون الخارجي\n" +
-                "خبز برجر بريوش 4 إنش,Brioche Burger Bun 4 inch,SKU-BUN-01,75g,كيس مفرغ 6 حبات,8 أكياس (48 حبة)\n" +
-                "كرواسون زبدة سادة ميني,Mini Butter Croissant,SKU-CRO-02,35g,كيس نايلون مخصص,120 حبة بالكرتون مجمد\n" +
-                "خبز توست أبيض فاخر,White Sandwich Bread,SKU-TST-03,600g,كيس مع قفل سلكي,12 كيس بالكرتون\n";
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "نموذج_كتالوج_منتجات_المصنع.csv";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+        function openNewCalendarModal() {
+            const now = new Date();
+            const sched = document.getElementById('cal-scheduled-at');
+            if (sched) sched.value = now.toISOString().slice(0, 16);
+            openModal('new-calendar-modal');
         }
 
-        // 4. الصفوف الديناميكية (+) للعينات المتعددة
+        function openReportModal() { openModal('report-modal'); }
+        function previewReportOfficial() { closeModal('report-modal'); window.print(); }
+
         function addSampleItemRow() {
             const container = document.getElementById('sample-items-rows-container');
             const row = document.createElement('div');
@@ -1326,7 +1009,7 @@
             if (rows.length > 1) {
                 btn.closest('.sample-item-row').remove();
             } else {
-                alert("يجب إبقاء صنف واحد على الأقل في القائمة.");
+                alert("يجب إبقاء صنف واحد على الأقل.");
             }
         }
 
@@ -1355,18 +1038,16 @@
             });
 
             if (res.ok) {
-                closeNewSampleModal();
+                closeModal('new-sample-modal');
                 await loadAllData();
                 alert(`✅ تم بنجاح تسجيل ${items.length} أصناف عينات وإرسال إشعار موحد للموظف عبر الواتساب ✓`);
             }
         }
 
-        // 5. الصفوف الديناميكية (+) للزيارات المشتركة
         function addCalendarRepRow() {
             const container = document.getElementById('calendar-reps-container');
             const row = document.createElement('div');
             row.className = "cal-rep-row flex items-center gap-2";
-            
             const repOptionsHTML = allRepsCache.map(r => `<option value="${r.name}">${r.name} (${r.region})</option>`).join('');
             row.innerHTML = `
                 <select class="cal-rep-select-item w-full p-2 border rounded-lg bg-white font-bold">${repOptionsHTML}</select>
@@ -1416,194 +1097,23 @@
             });
 
             if (res.ok) {
-                closeNewCalendarModal();
+                closeModal('new-calendar-modal');
                 await loadAllData();
                 alert(`✅ تم بنجاح جدولة المهمة وإرسال إشعار WhatsApp فوري لكافة الموظفين المكلفين (${repNames.join(" ، ")}) ✓`);
             }
         }
 
-        // 6. العمليات الأساسية (Targets, Reps, Customers, Expenses)
-        async function submitNewTarget() {
-            const title = document.getElementById('tgt-title').value.trim();
-            const customer_id = parseInt(document.getElementById('tgt-customer-select').value);
-            const rep_id = parseInt(document.getElementById('tgt-rep-select').value);
-            const target_value = parseFloat(document.getElementById('tgt-value').value) || 0;
-            const pipeline_stage = document.getElementById('tgt-stage-select').value;
-            const initial_note = document.getElementById('tgt-note').value.trim();
-
-            if (!title) return alert("يرجى كتابة عنوان الهدف البيعي");
-
-            const res = await fetch('/api/targets', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, customer_id, rep_id, target_value, pipeline_stage, initial_note })
-            });
-            if (res.ok) {
-                closeNewTargetModal();
-                await loadAllData();
-                alert("تم إنشاء الفرصة البيعية وإرسال تنبيه WhatsApp فوري للموظف المكلف ✓");
-            }
+        function openSampleFeedbackModal(id, notes) {
+            document.getElementById('feedback-sample-id').value = id;
+            document.getElementById('feedback-notes-input').value = unescape(notes || '');
+            openModal('sample-feedback-modal');
         }
 
-        async function submitTargetStageUpdate() {
-            const id = document.getElementById('stage-target-id').value;
-            const stage = document.getElementById('stage-select-input').value;
-            const note = document.getElementById('stage-note-input').value.trim();
-
-            const res = await fetch(`/api/targets/${id}/stage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pipeline_stage: stage, note })
-            });
-            if (res.ok) {
-                closeTargetStageModal();
-                await loadAllData();
-                alert("تم تحديث مرحلة الهدف بنجاح ✓");
-            }
-        }
-
-        async function submitCloseTarget() {
-            const id = document.getElementById('close-target-id').value;
-            const po_number = document.getElementById('close-po-number').value.trim();
-            const po_value = parseFloat(document.getElementById('close-po-value').value) || 0;
-            const po_attachment_url = document.getElementById('close-po-url').value.trim();
-
-            if (!po_number || po_value <= 0) return alert("يرجى إدخال رقم وقيمة أمر الشراء");
-
-            const res = await fetch(`/api/targets/${id}/close`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ po_number, po_value, po_attachment_url })
-            });
-            if (res.ok) {
-                closeTargetCloseModal();
-                await loadAllData();
-                alert("تهانينا! تم إغلاق الهدف بنجاح وترحيل المبيعات للمندوب ✓");
-            }
-        }
-
-        async function deleteTarget(id, title) {
-            if (!confirm(`هل أنت متأكد من حذف الهدف "${title}"؟`)) return;
-            const res = await fetch(`/api/targets/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
-        }
-
-        async function submitNewRep() {
-            const name = document.getElementById('rep-name-input').value.trim();
-            const code = document.getElementById('rep-code-input').value.trim();
-            const region = document.getElementById('rep-region-input').value.trim();
-            const phone = document.getElementById('rep-phone-input').value.trim();
-            const lang = document.getElementById('rep-language-select').value;
-            const hasT = document.getElementById('rep-has-target-toggle')?.checked || false;
-            const targetVal = parseFloat(document.getElementById('rep-target-input')?.value) || 0;
-
-            if (!name || !phone) return alert("يرجى ملء الاسم ورقم الهاتف");
-
-            const res = await fetch('/api/reps', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name, employee_code: code || "SE-" + Math.floor(100 + Math.random() * 900),
-                    region: region || "مسقط", phone_number: phone, has_target: hasT,
-                    monthly_target: targetVal, preferred_language: lang || "AR"
-                })
-            });
-            if (res.ok) {
-                closeNewRepModal();
-                await loadAllData();
-                alert("تم حفظ عضو فريق المبيعات بنجاح ✓");
-            }
-        }
-
-        async function submitUpdateRep() {
-            const id = document.getElementById('edit-rep-id').value;
-            const name = document.getElementById('edit-rep-name-input').value.trim();
-            const code = document.getElementById('edit-rep-code-input').value.trim();
-            const region = document.getElementById('edit-rep-region-input').value.trim();
-            const phone = document.getElementById('edit-rep-phone-input').value.trim();
-            const lang = document.getElementById('edit-rep-language-select').value;
-            const hasT = document.getElementById('edit-rep-has-target-toggle').checked;
-            const targetVal = parseFloat(document.getElementById('edit-rep-target-input').value) || 0;
-
-            const res = await fetch(`/api/reps/${id}/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name, employee_code: code, region, phone_number: phone,
-                    has_target: hasT, monthly_target: targetVal, preferred_language: lang || "AR"
-                })
-            });
-            if (res.ok) {
-                closeEditRepModal();
-                await loadAllData();
-                alert("تم تحديث بيانات عضو الفريق بنجاح ✓");
-            }
-        }
-
-        async function deleteRep(id, name) {
-            if (!confirm(`هل أنت متأكد من حذف المندوب "${name}"؟`)) return;
-            const res = await fetch(`/api/reps/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
-        }
-
-        async function submitNewCustomer() {
-            const company_name = document.getElementById('cust-company-name').value.trim();
-            const brand_name = document.getElementById('cust-brand-name').value.trim();
-            const region = document.getElementById('cust-region').value.trim();
-            const sector = document.getElementById('cust-sector').value.trim();
-            const contact_person = document.getElementById('cust-contact-person').value.trim();
-            const phone = document.getElementById('cust-phone').value.trim();
-            const repSelect = document.getElementById('cust-rep-select');
-            const notes = document.getElementById('cust-notes').value.trim();
-
-            if (!company_name || !phone) return alert("يرجى ملء اسم الشركة ورقم الهاتف");
-
-            const res = await fetch('/api/customers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    company_name, brand_name, sector: sector || "عام",
-                    region: region || "مسقط", contact_person: contact_person || "المسؤول",
-                    phone, assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null, notes
-                })
-            });
-            if (res.ok) {
-                closeNewCustomerModal();
-                await loadAllData();
-                alert("تمت إضافة حساب العميل بنجاح ✓");
-            }
-        }
-
-        async function submitUpdateCustomer() {
-            const id = document.getElementById('edit-cust-id').value;
-            const company_name = document.getElementById('edit-cust-company-name').value.trim();
-            const brand_name = document.getElementById('edit-cust-brand-name').value.trim();
-            const sector = document.getElementById('edit-cust-sector').value.trim();
-            const region = document.getElementById('edit-cust-region').value.trim();
-            const contact_person = document.getElementById('edit-cust-contact-person').value.trim();
-            const phone = document.getElementById('edit-cust-phone').value.trim();
-            const repSelect = document.getElementById('edit-cust-rep-select');
-            const notes = document.getElementById('edit-cust-notes').value.trim();
-
-            const res = await fetch(`/api/customers/${id}/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    company_name, brand_name, sector, region, contact_person,
-                    phone, assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null, notes
-                })
-            });
-            if (res.ok) {
-                closeEditCustomerModal();
-                await loadAllData();
-                alert("تم تحديث بيانات العميل بنجاح ✓");
-            }
-        }
-
-        async function deleteCustomer(id, name) {
-            if (!confirm(`هل أنت متأكد من حذف العميل "${name}"؟`)) return;
-            const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
+        function openConvertSampleModal(id) {
+            document.getElementById('convert-sample-id').value = id;
+            document.getElementById('convert-sample-po-number').value = '';
+            document.getElementById('convert-sample-po-value').value = '';
+            openModal('convert-sample-modal');
         }
 
         async function submitSampleFeedback() {
@@ -1619,7 +1129,7 @@
                 body: JSON.stringify({ feedback_notes: notes, status })
             });
             if (res.ok) {
-                closeSampleFeedbackModal();
+                closeModal('sample-feedback-modal');
                 await loadAllData();
                 alert("تم رصد تقييم الشيف الفني بنجاح ✓");
             }
@@ -1638,43 +1148,13 @@
                 body: JSON.stringify({ po_number, po_value })
             });
             if (res.ok) {
-                closeConvertSampleModal();
+                closeModal('convert-sample-modal');
                 await loadAllData();
                 alert("تهانينا! تم تحويل العينة لأمر شراء وترحيل القيمة للمبيعات ✓");
             }
         }
 
-        async function deleteSample(id) {
-            if (!confirm("هل أنت متأكد من حذف هذا السجل؟")) return;
-            const res = await fetch(`/api/samples/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
-        }
-
-        async function submitUpdateCalendarEvent() {
-            const id = document.getElementById('edit-cal-id').value;
-            const cust = document.getElementById('edit-cal-customer-input').value.trim();
-            const rep = document.getElementById('edit-cal-rep-select').value;
-            const task = document.getElementById('edit-cal-task-type').value.trim();
-            const sched = document.getElementById('edit-cal-scheduled-at').value.trim();
-            const loc = document.getElementById('edit-cal-location').value.trim();
-            const notes = document.getElementById('edit-cal-notes').value.trim();
-
-            const res = await fetch(`/api/calendar/${id}/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    customer_name: cust, rep_name: rep, task_type: task,
-                    scheduled_at: sched.replace("T", " "),
-                    reminder_at: "", location: loc || "مقر العميل", change_notes: notes
-                })
-            });
-            if (res.ok) {
-                closeEditCalendarModal();
-                await loadAllData();
-                alert("تم تحديث المهمة بنجاح ✓");
-            }
-        }
-
+        // إتمام الزيارة بشكل سلس
         async function updateCalendarStatus(id, newStatus) {
             try {
                 const res = await fetch(`/api/calendar/${id}/status`, {
@@ -1694,10 +1174,26 @@
             }
         }
 
-        async function deleteCalendarEvent(id) {
-            if (!confirm("هل أنت متأكد من حذف هذه الزيارة؟")) return;
-            const res = await fetch(`/api/calendar/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
+        async function submitNewTarget() {
+            const title = document.getElementById('tgt-title').value.trim();
+            const customer_id = parseInt(document.getElementById('tgt-customer-select').value);
+            const rep_id = parseInt(document.getElementById('tgt-rep-select').value);
+            const target_value = parseFloat(document.getElementById('tgt-value').value) || 0;
+            const pipeline_stage = document.getElementById('tgt-stage-select').value;
+            const initial_note = document.getElementById('tgt-note').value.trim();
+
+            if (!title || !customer_id || !rep_id) return alert("يرجى تعبئة الحقول المطلوبة");
+
+            const res = await fetch('/api/targets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, customer_id, rep_id, target_value, pipeline_stage, initial_note })
+            });
+            if (res.ok) {
+                closeModal('new-target-modal');
+                await loadAllData();
+                alert("تم إنشاء الفرصة البيعية وإرسال تنبيه WhatsApp فوري للموظف المكلف ✓");
+            }
         }
 
         async function submitNewProduct() {
@@ -1705,27 +1201,109 @@
             const name_en = document.getElementById('prod-name-en').value.trim();
             const sku = document.getElementById('prod-sku').value.trim();
             const weight = document.getElementById('prod-weight').value.trim();
-            const primary_pack = document.getElementById('prod-primary-pack').value.trim();
-            const carton_pack = document.getElementById('prod-carton-pack').value.trim();
 
             if (!name_ar) return alert("يرجى إدخال اسم الصنف بالعربي");
 
             const res = await fetch('/api/products', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name_ar, name_en, sku, weight_spec: weight, primary_packaging: primary_pack, carton_pack_spec: carton_pack })
+                body: JSON.stringify({ name_ar, name_en, sku, weight_spec: weight })
             });
             if (res.ok) {
-                closeNewProductModal();
+                closeModal('new-product-modal');
                 await loadAllData();
                 alert("تمت إضافة المنتج بنجاح ✓");
             }
         }
 
-        async function deleteProduct(id) {
-            if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
-            const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+        async function submitNewRep() {
+            const name = document.getElementById('rep-name-input').value.trim();
+            const phone = document.getElementById('rep-phone-input').value.trim();
+            const region = document.getElementById('rep-region-input').value.trim();
+
+            if (!name || !phone) return alert("يرجى ملء الاسم ورقم الهاتف");
+
+            const res = await fetch('/api/reps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name, employee_code: "SE-" + Math.floor(100 + Math.random() * 900),
+                    region: region || "مسقط", phone_number: phone, has_target: false, monthly_target: 0
+                })
+            });
+            if (res.ok) {
+                closeModal('new-rep-modal');
+                await loadAllData();
+                alert("تم حفظ عضو فريق المبيعات بنجاح ✓");
+            }
+        }
+
+        async function submitNewCustomer() {
+            const company_name = document.getElementById('cust-company-name').value.trim();
+            const brand_name = document.getElementById('cust-brand-name').value.trim();
+            const contact_person = document.getElementById('cust-contact-person').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const repSelect = document.getElementById('cust-rep-select');
+
+            if (!company_name || !phone) return alert("يرجى ملء اسم الشركة ورقم الهاتف");
+
+            const res = await fetch('/api/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    company_name, brand_name, sector: "عام",
+                    region: "مسقط", contact_person: contact_person || "المسؤول",
+                    phone, assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null
+                })
+            });
+            if (res.ok) {
+                closeModal('new-customer-modal');
+                await loadAllData();
+                alert("تمت إضافة حساب العميل بنجاح ✓");
+            }
+        }
+
+        async function submitExpense() {
+            const rep_id = parseInt(document.getElementById('exp-rep-select').value);
+            const expense_type = document.getElementById('exp-type-select').value;
+            const amount = parseFloat(document.getElementById('exp-amount').value) || 0;
+            const notes = document.getElementById('exp-notes').value.trim();
+
+            if (amount <= 0) return alert("يرجى إدخال مبلغ صحيح للمصروف");
+
+            const res = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rep_id, expense_type, amount, notes })
+            });
+            if (res.ok) {
+                closeModal('expense-modal');
+                await loadAllData();
+                alert("تم قيد سند المصروف بنجاح ✓");
+            }
+        }
+
+        async function deleteItem(url) {
+            if (!confirm("هل أنت متأكد من الحذف؟")) return;
+            const res = await fetch(url, { method: 'DELETE' });
             if (res.ok) await loadAllData();
+        }
+
+        function downloadProductsTemplate() {
+            const csvContent = "\uFEFF" + 
+                "اسم المنتج بالعربي,Product Name EN,كود الصنف SKU,الوزن الحجم,التغليف الداخلي,مواصفة وسعة الكرتون الخارجي\n" +
+                "خبز برجر بريوش 4 إنش,Brioche Burger Bun 4 inch,SKU-BUN-01,75g,كيس مفرغ 6 حبات,8 أكياس (48 حبة)\n" +
+                "كرواسون زبدة سادة ميني,Mini Butter Croissant,SKU-CRO-02,35g,كيس نايلون مخصص,120 حبة بالكرتون مجمد\n" +
+                "خبز توست أبيض فاخر,White Sandwich Bread,SKU-TST-03,600g,كيس مع قفل سلكي,12 كيس بالكرتون\n";
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "نموذج_كتالوج_منتجات_المصنع.csv";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         async function uploadProductsExcel(input) {
@@ -1750,158 +1328,80 @@
             }
         }
 
-        async function submitExpense() {
-            const rep_id = parseInt(document.getElementById('exp-rep-select').value);
-            const expense_type = document.getElementById('exp-type-select').value;
-            const amount = parseFloat(document.getElementById('exp-amount').value) || 0;
-            const notes = document.getElementById('exp-notes').value.trim();
-
-            if (amount <= 0) return alert("يرجى إدخال مبلغ صحيح للمصروف");
-
-            const res = await fetch('/api/expenses', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rep_id, expense_type, amount, notes })
-            });
-            if (res.ok) {
-                closeExpenseModal();
-                await loadAllData();
-                alert("تم قيد سند المصروف بنجاح ✓");
-            }
+        // دوال الوكلاء
+        function renderAgentCard(a) {
+            return `
+            <div class="p-4 rounded-xl border ${a.is_active ? 'brand-border bg-white shadow-xs' : 'border-gray-200 bg-gray-50 opacity-75'} space-y-3 flex flex-col justify-between">
+                <div class="space-y-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="font-bold text-sm text-gray-900">${a.name}</span>
+                            <div class="text-[10px] text-purple-700 font-mono font-bold mt-1">${a.role_type}</div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'}">
+                            ${a.is_active ? 'نشط ומفعّل ✓' : 'متوقف'}
+                        </span>
+                    </div>
+                    <div class="p-2.5 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-28 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
+                        ${a.system_prompt}
+                    </div>
+                </div>
+                <div class="pt-2 border-t flex justify-between items-center no-print">
+                    <button onclick="testAgentNowGlobal(${a.id})" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px]">إرسال تجربة</button>
+                    <button onclick="deleteItem('/api/agents/${a.id}')" class="text-red-600 font-bold text-xs">حذف</button>
+                </div>
+            </div>`;
         }
 
-        async function deleteExpense(id) {
-            if (!confirm("هل أنت متأكد من حذف هذا المصروف؟")) return;
-            const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
+        async function loadAgentsData() {
+            try {
+                const res = await fetch('/api/agents');
+                const agents = await res.json();
+                const adv = document.getElementById('advisory-agents-grid');
+                const fld = document.getElementById('field-agents-grid');
+
+                const advisoryAgents = agents.filter(a => (a.category || 'ADVISORY') === 'ADVISORY');
+                const fieldAgents = agents.filter(a => a.category === 'FIELD_OPERATIONS');
+
+                if (adv) adv.innerHTML = advisoryAgents.map(a => renderAgentCard(a)).join('') || '<div class="col-span-3 p-3 text-center text-gray-400">لا يوجد وكلاء</div>';
+                if (fld) fld.innerHTML = fieldAgents.map(a => renderAgentCard(a)).join('') || '<div class="col-span-3 p-3 text-center text-gray-400">لا يوجد وكلاء ميدانيين</div>';
+            } catch (e) {}
         }
 
         async function submitNewAgent() {
             const name = document.getElementById('agent-name-input').value.trim();
             const category = document.getElementById('agent-category-select').value;
-            const role_type = document.getElementById('agent-role-input').value.trim();
-            const trigger_schedule = document.getElementById('agent-schedule-select').value;
-            const target_channel = document.getElementById('agent-target-channel-input').value.trim();
             const system_prompt = document.getElementById('agent-prompt-input').value.trim();
 
-            if (!name || !system_prompt) return alert("يرجى إدخال اسم الوكيل والبرومبت التوجيهي");
+            if (!name || !system_prompt) return alert("يرجى إدخال اسم الوكيل والبرومبت");
 
             const res = await fetch('/api/agents', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name, category, role_type: role_type || "CUSTOM_AGENT",
-                    trigger_schedule, target_channel, system_prompt
-                })
+                body: JSON.stringify({ name, category, role_type: "CUSTOM", system_prompt })
             });
             if (res.ok) {
-                closeNewAgentModal();
-                await loadAgentsData();
+                closeModal('new-agent-modal');
+                await loadAllData();
                 alert("تم إنشاء الوكيل بنجاح ✓");
             }
         }
 
-        async function submitUpdateAgent() {
-            const id = document.getElementById('edit-agent-id').value;
-            const name = document.getElementById('edit-agent-name').value.trim();
-            const category = document.getElementById('edit-agent-category').value;
-            const trigger_schedule = document.getElementById('edit-agent-schedule').value;
-            const target_channel = document.getElementById('edit-agent-target-channel').value.trim();
-            const system_prompt = document.getElementById('edit-agent-prompt').value.trim();
-
-            const res = await fetch(`/api/agents/${id}/update`, {
+        async function testAgentNowGlobal(id) {
+            const phone = document.getElementById('global-test-phone').value.trim();
+            const res = await fetch('/api/agents/test-global', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, category, trigger_schedule, target_channel, system_prompt })
+                body: JSON.stringify({ agent_id: id, test_phone: phone })
             });
-            if (res.ok) {
-                closeEditAgentModal();
-                await loadAgentsData();
-                alert("تم تحديث بيانات الوكيل بنجاح ✓");
-            }
+            if (res.ok) alert("تم إرسال رسالة تجربة الوكيل للواتساب بنجاح ✓");
+            else alert("فشل الإرسال");
         }
 
-        async function deleteAgent(id, name) {
-            if (!confirm(`هل أنت متأكد من حذف الوكيل "${name}"؟`)) return;
-            const res = await fetch(`/api/agents/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAgentsData();
-        }
-
-        async function cleanDuplicateAgents() {
-            if (!confirm("هل تريد إزالة الوكلاء المكررين؟")) return;
-            const res = await fetch('/api/agents/clean-duplicates', { method: 'POST' });
-            if (res.ok) {
-                await loadAgentsData();
-                alert("تم تنظيف المكررات بنجاح ✓");
-            }
-        }
-
-        async function toggleAgentStatus(id, newStatus) {
-            await fetch(`/api/agents/${id}/toggle`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_active: newStatus })
-            });
-            await loadAgentsData();
-        }
-
-        async function testAgentNowGlobal(id, agentName) {
-            const globalPhone = document.getElementById('global-test-phone').value.trim();
-            try {
-                const res = await fetch(`/api/agents/test-global`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ agent_id: id, test_phone: globalPhone })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    alert(`✅ تم إرسال التجربة بنجاح إلى: ${data.to}\n\nالنص المرسل:\n${data.message_preview}`);
-                } else {
-                    alert(`❌ تعذر الإرسال: ${data.detail}`);
-                }
-            } catch (e) {
-                alert("خطأ في الاتصال بالسيرفر");
-            }
-        }
-
-        async function fetchDiscoveredGroups() {
-            const container = document.getElementById('discovered-groups-container');
-            const list = document.getElementById('discovered-groups-list');
-            if (container) container.classList.remove('hidden');
-            if (list) list.innerHTML = '<div class="text-xs text-gray-500 p-2">جاري قراءة المجموعات...</div>';
-
-            try {
-                const res = await fetch('/api/whatsapp/discovered-groups');
-                const groups = await res.json();
-                if (list) {
-                    if (!groups || groups.length === 0) {
-                        list.innerHTML = '<div class="text-xs text-amber-700 p-2 bg-amber-50 rounded">لم يتم العثور على مجموعات أو الجلسة بانتظار المزامنة.</div>';
-                        return;
-                    }
-                    list.innerHTML = groups.map(g => `
-                        <div class="flex justify-between items-center bg-white p-2.5 rounded-lg border text-xs shadow-2xs">
-                            <div>
-                                <span class="font-bold text-gray-800">${g.subject}</span>
-                                <span class="text-[10px] text-gray-400 block font-mono">${g.id}</span>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-            } catch (e) {
-                if (list) list.innerHTML = '<div class="text-xs text-red-600 p-2">تعذر قراءة المجموعات حالياً.</div>';
-            }
-        }
-
-        async function saveSpecialGroupsConfig() {
-            const logistics_group_id = document.getElementById('conf-logistics-group').value.trim();
-            const management_group_id = document.getElementById('conf-management-group').value.trim();
-
-            const res = await fetch('/api/system/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ logistics_group_id, management_group_id })
-            });
-            if (res.ok) alert("تم حفظ معرّفات المجموعات بنجاح ✓");
+        function saveGlobalTestPhone(show = false) {
+            const val = document.getElementById('global-test-phone').value.trim();
+            localStorage.setItem('fdc_global_test_phone', val);
+            if (show) alert("تم الحفظ ✓");
         }
 
         async function checkWhatsAppLiveStatus() {
@@ -1929,447 +1429,303 @@
         }
 
         async function openWhatsAppModal() {
-            document.getElementById('whatsapp-modal').classList.remove('hidden');
+            openModal('whatsapp-modal');
             const isConn = await checkWhatsAppLiveStatus();
-            if (!isConn) {
+            const card = document.getElementById('whatsapp-connected-card');
+            const qrWrapper = document.getElementById('whatsapp-qr-wrapper');
+            const phoneDisplay = document.getElementById('connected-phone-display');
+
+            if (isConn) {
+                card.classList.remove('hidden');
+                qrWrapper.classList.add('hidden');
+                const res = await fetch('/api/whatsapp/status');
+                const data = await res.json();
+                if (phoneDisplay) phoneDisplay.innerText = data.phone || 'متصل';
+            } else {
+                card.classList.add('hidden');
+                qrWrapper.classList.remove('hidden');
                 try {
                     const res = await fetch('/api/whatsapp/qr?t=' + new Date().getTime());
-                    const contentType = res.headers.get("content-type");
-                    if (res.status === 200 && contentType && contentType.includes("image")) {
-                        const blob = await res.blob();
-                        const img = document.getElementById('whatsapp-qr-image');
-                        if (img) img.src = URL.createObjectURL(blob);
-                        const loader = document.getElementById('whatsapp-qr-loader');
-                        if (loader) loader.classList.add('hidden');
-                    }
+                    const blob = await res.blob();
+                    const img = document.getElementById('whatsapp-qr-image');
+                    if (img) img.src = URL.createObjectURL(blob);
+                    document.getElementById('whatsapp-qr-loader')?.classList.add('hidden');
                 } catch(e) {}
             }
         }
 
-        function closeWhatsAppModal() { document.getElementById('whatsapp-modal').classList.add('hidden'); }
-
         async function disconnectWhatsAppSession() {
-            if (!confirm("هل أنت متأكد من فك ارتباط الواتساب؟")) return;
+            if (!confirm("هل أنت متأكد من فك الارتباط؟")) return;
+            await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+            location.reload();
+        }
+
+        async function fetchDiscoveredGroups() {
+            const container = document.getElementById('discovered-groups-container');
+            const list = document.getElementById('discovered-groups-list');
+            container.classList.remove('hidden');
+            list.innerHTML = '<div class="text-xs text-gray-500 p-2">جاري قراءة المجموعات...</div>';
+
             try {
-                const res = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
-                if (res.ok) {
-                    alert("تم فك الارتباط بنجاح.");
-                    await checkWhatsAppLiveStatus();
-                    openWhatsAppModal();
-                }
-            } catch(e) {}
-        }
-
-        function previewReportOfficial() {
-            closeReportModal();
-            window.print();
-        }
-
-        function loadSavedTestPhone() {
-            const savedPhone = localStorage.getItem('fdc_global_test_phone');
-            const input = document.getElementById('global-test-phone');
-            if (input) input.value = savedPhone ? savedPhone : '+96893904404';
-        }
-
-        function saveGlobalTestPhone(showAlert = false) {
-            const input = document.getElementById('global-test-phone');
-            if (!input) return;
-            const phone = input.value.trim();
-            if (!phone) return alert("يرجى إدخال رقم هاتف صالح");
-            localStorage.setItem('fdc_global_test_phone', phone);
-            if (showAlert) alert("تم حفظ رقم هاتف الاختبار بنجاح ✓");
-        }
-
-        function renderSamplesTable(samplesList) {
-            const tbody = document.getElementById('samples-table-body');
-            if (!tbody) return;
-            tbody.innerHTML = samplesList.map(s => {
-                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">قيد التجربة</span>`;
-                if (s.status === 'DELIVERED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">تم التسليم ✓</span>`;
-                if (s.status === 'CONVERTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">أمر شراء معتمد ✓</span>`;
-                if (s.status === 'REJECTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">مرفوض</span>`;
-
-                return `
-                <tr>
-                    <td class="p-3 font-bold">${s.customer_name || '—'}</td>
-                    <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name || '—'}</td>
-                    <td class="p-3 font-bold text-gray-800">${s.product_name || '—'}</td>
-                    <td class="p-3">${s.qty_free} وحدة</td>
-                    <td class="p-3 text-gray-500">${s.delivery_date}</td>
-                    <td class="p-3">${statusBadge}</td>
-                    <td class="p-3 text-gray-700 max-w-xs text-[11px]">${s.feedback_notes || '—'}</td>
-                    <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id + ' (' + (s.po_value || 0) + ' ر.ع)' : '—'}</td>
-                    <td class="p-3 no-print">
-                        <div class="flex gap-1.5 flex-wrap">
-                            <button onclick="openSampleFeedbackModal(${s.id}, '${escape(s.feedback_notes || '')}')" class="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded text-[10px]">تقييم الشيف</button>
-                            ${s.status !== 'CONVERTED' ? `
-                            <button onclick="openConvertSampleModal(${s.id})" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px]">تحويل لـ PO</button>
-                            ` : ''}
-                            <button onclick="deleteSample(${s.id})" class="text-red-600 hover:text-red-800 font-bold text-[10px] px-1">حذف</button>
+                const res = await fetch('/api/whatsapp/discovered-groups');
+                const groups = await res.json();
+                if (groups && groups.length > 0) {
+                    list.innerHTML = groups.map(g => `
+                        <div class="flex justify-between items-center bg-white p-2.5 rounded-lg border text-xs">
+                            <span class="font-bold">${g.subject}</span>
+                            <span class="font-mono text-gray-400 text-[10px]">${g.id}</span>
                         </div>
-                    </td>
-                </tr>`;
-            }).join('');
-        }
-
-        function applySamplesFilter() {
-            const productTerm = (document.getElementById('filter-sample-product')?.value || '').trim().toLowerCase();
-            const customerTerm = (document.getElementById('filter-sample-customer')?.value || '').trim().toLowerCase();
-            const fromDate = document.getElementById('filter-sample-from-date')?.value || '';
-            const toDate = document.getElementById('filter-sample-to-date')?.value || '';
-
-            const filtered = allSamplesCache.filter(s => {
-                const matchProduct = !productTerm || (s.product_name && s.product_name.toLowerCase().includes(productTerm));
-                const matchCustomer = !customerTerm || (s.customer_name && s.customer_name.toLowerCase().includes(customerTerm));
-                let matchDate = true;
-                if (fromDate && s.delivery_date < fromDate) matchDate = false;
-                if (toDate && s.delivery_date > toDate) matchDate = false;
-                return matchProduct && matchCustomer && matchDate;
-            });
-            renderSamplesTable(filtered);
-        }
-
-        async function loadExpenseCategories() {
-            try {
-                const res = await fetch('/api/expense-categories');
-                const categories = await res.json();
-                const selectEl = document.getElementById('exp-type-select');
-                if (selectEl) {
-                    selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
+                    `).join('');
+                } else {
+                    list.innerHTML = '<div class="text-xs text-amber-700 p-2">لم يتم العثور على مجموعات أو الحساب غير متصل.</div>';
                 }
-            } catch (e) {}
+            } catch (e) {
+                list.innerHTML = '<div class="text-xs text-red-600 p-2">تعذر قراءة المجموعات.</div>';
+            }
+        }
+
+        async function saveSpecialGroupsConfig() {
+            const logistics_group_id = document.getElementById('conf-logistics-group').value.trim();
+            const management_group_id = document.getElementById('conf-management-group').value.trim();
+            await fetch('/api/system/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logistics_group_id, management_group_id })
+            });
+            alert("تم حفظ المجموعات بنجاح ✓");
         }
 
         async function loadWhatsAppLogs() {
             try {
-                const wRes = await fetch('/api/whatsapp/logs');
-                const wLogs = await wRes.json();
-                const feedList = document.getElementById('whatsapp-feed-list');
-                if (feedList) {
-                    if (!wLogs || wLogs.length === 0) {
-                        feedList.innerHTML = `
-                        <div class="p-8 text-center bg-gray-50 border border-dashed border-gray-200 rounded-xl space-y-2">
-                            <span class="text-3xl block">📡</span>
-                            <div class="font-bold text-gray-700 text-sm">رادار المحادثات في وضع الاستماع النشط</div>
-                            <p class="text-xs text-gray-500 max-w-md mx-auto">
-                                لا توجد رسائل ملتقطة حتى الآن. يبدأ الرادار بالتسجيل اللحظي فور كتابة رسالة في مجموعات العملاء المعتمدة أو عند مراسلة الوكيل في شاتك الخاص.
-                            </p>
-                        </div>`;
-                    } else {
-                        feedList.innerHTML = wLogs.map(l => `
-                            <div class="p-3 rounded-xl border brand-border bg-white space-y-1 shadow-2xs">
-                                <div class="flex justify-between items-center text-[10px]">
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="font-bold brand-primary-text text-xs">${l.sender_name}</span>
-                                        <span class="px-2 py-0.5 rounded bg-purple-50 text-[#3A056A] font-semibold border border-purple-200">${l.channel_name || 'محادثة'}</span>
-                                    </div>
-                                    <span class="text-gray-400 font-mono">${l.created_at}</span>
-                                </div>
-                                <p class="text-gray-800 text-xs mt-1 leading-relaxed">${l.message_body}</p>
+                const res = await fetch('/api/whatsapp/logs');
+                const logs = await res.json();
+                const feed = document.getElementById('whatsapp-feed-list');
+                if (feed) {
+                    feed.innerHTML = logs.map(l => `
+                        <div class="p-3 bg-white rounded-xl border brand-border text-xs space-y-1">
+                            <div class="flex justify-between font-bold text-[#3A056A]">
+                                <span>${l.sender_name}</span>
+                                <span class="text-gray-400 font-mono">${l.created_at}</span>
                             </div>
-                        `).join('');
-                    }
+                            <p class="text-gray-800">${l.message_body}</p>
+                        </div>
+                    `).join('') || '<div class="p-4 text-center text-gray-400">لا توجد رسائل ملتقطة حتى الآن</div>';
                 }
             } catch(e) {}
         }
 
-        // 7. الدالة المركزية الشاملة لجلب البيانات
+        // الدالة المركزية لجلب البيانات
         async function loadAllData() {
-            try { loadSavedTestPhone(); } catch(e) {}
-            try { checkWhatsAppLiveStatus(); } catch(e) {}
-            try { await loadAgentsData(); } catch(e) {}
+            const savedPhone = localStorage.getItem('fdc_global_test_phone');
+            if (savedPhone) document.getElementById('global-test-phone').value = savedPhone;
+
+            checkWhatsAppLiveStatus();
+            loadAgentsData();
+            loadWhatsAppLogs();
 
             // المندوبين
             try {
-                const repsRes = await fetch('/api/reps');
-                const reps = await repsRes.json();
-                allRepsCache = reps;
-                let totalSales = 0;
-                let totalExp = 0;
-
-                const overviewTbody = document.getElementById('overview-reps-tbody');
-                if (overviewTbody) {
-                    overviewTbody.innerHTML = reps.map(r => {
-                        totalSales += (r.achieved_sales || 0);
-                        totalExp += (r.total_expenses || 0);
+                const rRes = await fetch('/api/reps');
+                allRepsCache = await rRes.json();
+                let sales = 0, exp = 0;
+                const tbody = document.getElementById('overview-reps-tbody');
+                if (tbody) {
+                    tbody.innerHTML = allRepsCache.map(r => {
+                        sales += (r.achieved_sales || 0);
+                        exp += (r.total_expenses || 0);
                         return `
                         <tr>
                             <td class="p-3 font-bold">${r.name}</td>
-                            <td class="p-3 text-gray-600">${r.region}</td>
-                            <td class="p-3 font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</td>
-                            <td class="p-3">${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع' : 'قياس مفتوح'}</td>
-                            <td class="p-3 font-semibold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</td>
-                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span></td>
+                            <td class="p-3">${r.region}</td>
+                            <td class="p-3 font-bold text-emerald-700">${(r.achieved_sales||0).toLocaleString()} ر.ع</td>
+                            <td class="p-3">${(r.monthly_target||0).toLocaleString()} ر.ع</td>
+                            <td class="p-3 font-bold text-amber-700">${(r.total_expenses||0).toLocaleString()} ر.ع</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">${r.status}</span></td>
                         </tr>`;
                     }).join('');
                 }
+                document.getElementById('kpi-total-sales').innerText = sales.toLocaleString() + ' ر.ع';
+                document.getElementById('kpi-total-expenses').innerText = exp.toLocaleString() + ' ر.ع';
 
-                document.getElementById('kpi-total-sales').innerText = `${totalSales.toLocaleString()} ر.ع`;
-                document.getElementById('kpi-total-expenses').innerText = `${totalExp.toLocaleString()} ر.ع`;
-
-                const repsGrid = document.getElementById('reps-grid-cards');
-                if (repsGrid) {
-                    repsGrid.innerHTML = reps.map(r => `
-                        <div class="p-4 rounded-xl border brand-border brand-tint space-y-2 flex flex-col justify-between">
-                            <div class="space-y-2">
-                                <div class="flex justify-between items-center">
-                                    <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
-                                    <div class="flex items-center gap-1">
-                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-100 text-[#3A056A]">${r.preferred_language || 'AR'}</span>
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
-                                    </div>
-                                </div>
-                                <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
-                                <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
+                const grid = document.getElementById('reps-grid-cards');
+                if (grid) {
+                    grid.innerHTML = allRepsCache.map(r => `
+                        <div class="p-4 bg-white border brand-border rounded-xl space-y-2">
+                            <div class="flex justify-between items-center font-bold text-sm text-[#3A056A]">
+                                <span>${r.name}</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">${r.status}</span>
                             </div>
-                            <div class="pt-2 border-t flex justify-end gap-1.5">
-                                <button onclick="openEditRepModal(${r.id}, '${escape(r.name)}', '${escape(r.employee_code)}', '${escape(r.region)}', '${r.phone_number}', ${r.has_target}, ${r.monthly_target || 0}, '${r.preferred_language || 'AR'}')" class="px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-xs">تعديل</button>
-                                <button onclick="deleteRep(${r.id}, '${r.name}')" class="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-xs">حذف</button>
+                            <div class="text-xs text-gray-500">${r.region} | ${r.phone_number}</div>
+                            <div class="pt-2 border-t flex justify-end">
+                                <button onclick="deleteItem('/api/reps/${r.id}')" class="text-xs text-red-600 font-bold">حذف</button>
                             </div>
                         </div>
                     `).join('');
                 }
 
-                const repOptionsHTML = reps.map(r => `<option value="${r.id}">${r.name} (${r.region})</option>`).join('');
-                ['cust-rep-select', 'edit-cust-rep-select', 'tgt-rep-select', 'exp-rep-select'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.innerHTML = (id.includes('cust-rep') ? '<option value="">-- بدون تعيين --</option>' : '') + repOptionsHTML;
-                });
-                
-                const repNamesHTML = reps.map(r => `<option value="${r.name}">${r.name} (${r.region})</option>`).join('');
-                const sRep = document.getElementById('sample-rep-select');
-                if (sRep) sRep.innerHTML = repNamesHTML;
-
-                const firstCalRep = document.querySelector('.cal-rep-select-item');
-                if (firstCalRep) firstCalRep.innerHTML = repNamesHTML;
-
-                const editCalRep = document.getElementById('edit-cal-rep-select');
-                if (editCalRep) editCalRep.innerHTML = repNamesHTML;
-
-                const repsWhitelist = document.getElementById('settings-reps-whitelist-list');
-                if (repsWhitelist) {
-                    repsWhitelist.innerHTML = reps.map(r => `
-                        <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-xl flex justify-between items-center text-xs">
-                            <div>
-                                <div class="font-bold text-[#3A056A]">${r.name}</div>
-                                <div class="text-[10px] text-gray-500">${r.region}</div>
-                            </div>
-                            <span class="font-mono font-bold text-purple-900 bg-white px-2 py-1 rounded border">${r.phone_number}</span>
-                        </div>
-                    `).join('');
-                }
-            } catch(e) { console.error("Reps error:", e); }
+                const repOpts = allRepsCache.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+                const repNamesOpts = allRepsCache.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+                document.getElementById('tgt-rep-select').innerHTML = repOpts;
+                document.getElementById('cust-rep-select').innerHTML = '<option value="">بدون تعيين</option>' + repOpts;
+                document.getElementById('exp-rep-select').innerHTML = repOpts;
+                document.getElementById('sample-rep-select').innerHTML = repNamesOpts;
+                document.querySelectorAll('.cal-rep-select-item').forEach(s => s.innerHTML = repNamesOpts);
+            } catch(e) {}
 
             // العملاء
             try {
-                const custRes = await fetch('/api/customers');
-                const custs = await custRes.json();
-                const custTableBody = document.getElementById('customers-table-body');
-                if (custTableBody) {
-                    custTableBody.innerHTML = custs.map(c => `
+                const cRes = await fetch('/api/customers');
+                const custs = await cRes.json();
+                const tbody = document.getElementById('customers-table-body');
+                if (tbody) {
+                    tbody.innerHTML = custs.map(c => `
                         <tr>
-                            <td class="p-3 font-bold">${c.company_name || '—'}</td>
-                            <td class="p-3 font-semibold text-purple-900">${c.brand_name || '—'}</td>
-                            <td class="p-3 text-gray-600">${c.region || 'مسقط'} | ${c.sector || 'عام'}</td>
-                            <td class="p-3"><div>${c.contact_person || '—'}</div><div class="font-mono text-gray-500 text-[10px]">${c.phone || '—'}</div></td>
+                            <td class="p-3 font-bold">${c.company_name}</td>
+                            <td class="p-3">${c.brand_name || '—'}</td>
+                            <td class="p-3">${c.region} | ${c.sector}</td>
+                            <td class="p-3 font-mono">${c.phone}</td>
                             <td class="p-3 font-bold text-[#3A056A]">${c.assigned_rep_name || '—'}</td>
-                            <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id ? '✓ ' + c.whatsapp_group_id : '<span class="text-gray-400">غير مربوط</span>'}</td>
-                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status || 'نشط'}</span></td>
-                            <td class="p-3 no-print">
-                                <div class="flex gap-2">
-                                    <button onclick="openEditCustomerModal(${c.id}, '${escape(c.company_name || '')}', '${escape(c.brand_name || '')}', '${escape(c.sector || '')}', '${escape(c.region || '')}', '${escape(c.contact_person || '')}', '${escape(c.phone || '')}', ${c.assigned_rep_id || 'null'}, '${escape(c.notes || '')}')" class="text-blue-600 hover:text-blue-800 font-bold">تعديل</button>
-                                    <span class="text-gray-300">|</span>
-                                    <button onclick="deleteCustomer(${c.id}, '${c.company_name}')" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
-                                </div>
-                            </td>
+                            <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id || 'غير مربوط'}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">${c.status}</span></td>
+                            <td class="p-3"><button onclick="deleteItem('/api/customers/${c.id}')" class="text-red-600 font-bold">حذف</button></td>
                         </tr>
                     `).join('');
                 }
-
-                const custOptionsHTML = custs.map(c => `<option value="${c.id}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
-                const setWaSelect = document.getElementById('settings-wa-customer-select');
-                if (setWaSelect) setWaSelect.innerHTML = custOptionsHTML;
-                const tgtCustSelect = document.getElementById('tgt-customer-select');
-                if (tgtCustSelect) tgtCustSelect.innerHTML = custOptionsHTML;
-                const sampleDList = document.getElementById('sample-customers-datalist');
-                if (sampleDList) sampleDList.innerHTML = custs.map(c => `<option value="${c.company_name}">`).join('');
-                const calDList = document.getElementById('cal-customers-datalist');
-                if (calDList) calDList.innerHTML = custs.map(c => `<option value="${c.company_name}">`).join('');
-
-                const monitoredCusts = custs.filter(c => c.whatsapp_group_id && c.whatsapp_group_id.trim() !== '');
-                const monTbody = document.getElementById('settings-monitored-groups-tbody');
-                if (monTbody) {
-                    monTbody.innerHTML = monitoredCusts.length > 0 ? monitoredCusts.map(c => `
-                        <tr>
-                            <td class="p-2.5 font-bold">${c.company_name}</td>
-                            <td class="p-2.5 font-semibold text-purple-900">${c.brand_name || '—'}</td>
-                            <td class="p-2.5 font-mono text-purple-800">${c.whatsapp_group_id}</td>
-                            <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">مراقبة حصرية نشطة ✓</span></td>
-                            <td class="p-2.5 no-print"><button onclick="unassignGroup(${c.id})" class="text-red-600 hover:text-red-800 underline text-[11px]">فك الربط</button></td>
-                        </tr>
-                    `).join('') : '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد مجموعات مربوطة حالياً. استخدم الأداة أعلاه لربط المجموعات بنقرة واحدة.</td></tr>';
-                }
-            } catch(e) { console.error("Customers error:", e); }
+                const custOpts = custs.map(c => `<option value="${c.id}">${c.company_name}</option>`).join('');
+                document.getElementById('tgt-customer-select').innerHTML = custOpts;
+                document.getElementById('sample-customers-datalist').innerHTML = custs.map(c => `<option value="${c.company_name}">`).join('');
+                document.getElementById('cal-customers-datalist').innerHTML = custs.map(c => `<option value="${c.company_name}">`).join('');
+            } catch(e) {}
 
             // المنتجات
             try {
                 const pRes = await fetch('/api/products');
                 allProductsCache = await pRes.json();
-                const pTbody = document.getElementById('products-catalog-tbody');
-                if (pTbody) {
-                    pTbody.innerHTML = allProductsCache.length > 0 ? allProductsCache.map(p => `
+                const tbody = document.getElementById('products-catalog-tbody');
+                if (tbody) {
+                    tbody.innerHTML = allProductsCache.map(p => `
                         <tr>
-                            <td class="p-3 font-mono font-bold text-gray-600">${p.sku}</td>
+                            <td class="p-3 font-mono font-bold">${p.sku}</td>
                             <td class="p-3 font-bold text-[#3A056A]">${p.name_ar}</td>
-                            <td class="p-3 text-gray-700">${p.name_en || '—'}</td>
-                            <td class="p-3 font-semibold">${p.weight_spec || '—'}</td>
-                            <td class="p-3 text-gray-600">${p.primary_packaging || '—'}</td>
-                            <td class="p-3 text-gray-600">${p.carton_pack_spec || '—'}</td>
-                            <td class="p-3 no-print">
-                                <button onclick="deleteProduct(${p.id})" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
-                            </td>
+                            <td class="p-3">${p.name_en || '—'}</td>
+                            <td class="p-3">${p.weight_spec || '—'}</td>
+                            <td class="p-3">${p.primary_packaging || '—'}</td>
+                            <td class="p-3">${p.carton_pack_spec || '—'}</td>
+                            <td class="p-3"><button onclick="deleteItem('/api/products/${p.id}')" class="text-red-600 font-bold">حذف</button></td>
                         </tr>
-                    `).join('') : '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا توجد منتجات مسجلة. حمل نموذج الإكسل من الأعلى أو أضف صنفاً يدوياً.</td></tr>';
+                    `).join('');
                 }
-                const prodDList = document.getElementById('sample-products-datalist');
-                if (prodDList) {
-                    prodDList.innerHTML = allProductsCache.map(p => `<option value="${p.name_ar}">${p.name_en ? p.name_en + ' - ' : ''}${p.weight_spec}</option>`).join('');
-                }
-            } catch(e) { console.error("Products error:", e); }
+                document.getElementById('sample-products-datalist').innerHTML = allProductsCache.map(p => `<option value="${p.name_ar}">`).join('');
+            } catch(e) {}
 
-            // الأهداف (Pipeline)
+            // الأهداف
             try {
-                const tgtRes = await fetch('/api/targets');
-                const targets = await tgtRes.json();
-                const activeTargets = targets.filter(t => t.status === 'IN_PROGRESS');
-                document.getElementById('kpi-active-targets').innerText = activeTargets.length;
-                const tgtContainer = document.getElementById('targets-cards-container');
-                if (tgtContainer) {
-                    tgtContainer.innerHTML = targets.map(t => {
-                        const stageInfo = STAGES_MAP[t.pipeline_stage] || { text: t.pipeline_stage, color: 'bg-purple-100 text-[#3A056A]' };
+                const tRes = await fetch('/api/targets');
+                const targets = await tRes.json();
+                document.getElementById('kpi-active-targets').innerText = targets.filter(t => t.status === 'IN_PROGRESS').length;
+                const container = document.getElementById('targets-cards-container');
+                if (container) {
+                    container.innerHTML = targets.map(t => {
+                        const stage = STAGES_MAP[t.pipeline_stage] || { text: t.pipeline_stage, color: 'bg-purple-100 text-[#3A056A]' };
                         return `
-                        <div class="p-4 rounded-xl border ${t.status === 'CLOSED' ? 'border-emerald-300 bg-emerald-50/40' : 'brand-border bg-white'} shadow-xs space-y-3 flex flex-col justify-between">
-                            <div class="space-y-2">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <span class="font-bold text-sm text-gray-900">${t.title}</span>
-                                        <div class="text-xs text-[#3A056A] font-semibold mt-0.5">🏢 العميل: ${t.customer_name}</div>
-                                        <div class="text-xs text-gray-500">👤 المتابع: <strong>${t.rep_name}</strong></div>
-                                    </div>
-                                    <span class="px-2.5 py-1 rounded text-[10px] font-bold ${stageInfo.color}">${stageInfo.text}</span>
-                                </div>
-                                <div class="p-2 bg-purple-50/50 rounded-lg text-xs flex justify-between">
-                                    <span>القيمة المتوقعة:</span>
-                                    <span class="font-bold text-[#3A056A]">${(t.target_value || 0).toLocaleString()} ر.ع</span>
-                                </div>
-                                <div class="text-[11px] text-gray-500 flex justify-between">
-                                    <span>المدة في المسار: ${t.duration_text || '—'}</span>
-                                    <span>آخر تحديث: ${t.last_note_at_str || '—'}</span>
-                                </div>
-                                ${t.last_note ? `<div class="p-1.5 bg-gray-50 rounded text-xs text-gray-700 border">ملاحظة: ${t.last_note}</div>` : ''}
-                                ${t.status === 'CLOSED' ? `
-                                <div class="p-2 bg-emerald-100/60 rounded text-xs font-bold text-emerald-900 border border-emerald-300">
-                                    أمر الشراء: ${t.po_number} (${(t.po_value || 0).toLocaleString()} ر.ع)
-                                </div>` : ''}
+                        <div class="p-4 bg-white border brand-border rounded-xl space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sm">${t.title}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${stage.color}">${stage.text}</span>
                             </div>
-                            
-                            <div class="pt-2 border-t flex justify-between items-center gap-1 no-print">
-                                ${t.status !== 'CLOSED' ? `
-                                <div class="flex gap-1.5">
-                                    <button onclick="openTargetStageModal(${t.id}, '${t.pipeline_stage}', '${escape(t.last_note || '')}')" class="px-2.5 py-1.5 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded-lg text-xs">
-                                        ترقية المرحلة ↗
-                                    </button>
-                                    <button onclick="openTargetCloseModal(${t.id})" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs">
-                                        إغلاق بـ PO ✓
-                                    </button>
-                                </div>
-                                ` : '<span class="text-xs text-emerald-700 font-bold">مكتمل ومعتمد</span>'}
-                                <button onclick="deleteTarget(${t.id}, '${t.title}')" class="text-red-600 hover:text-red-800 font-bold text-xs">حذف</button>
+                            <div class="text-xs text-gray-600">العميل: <strong>${t.customer_name}</strong> | المندوب: <strong>${t.rep_name}</strong></div>
+                            <div class="text-xs font-bold text-[#3A056A]">القيمة: ${(t.target_value||0).toLocaleString()} ر.ع</div>
+                            <div class="pt-2 border-t flex justify-end">
+                                <button onclick="deleteItem('/api/targets/${t.id}')" class="text-xs text-red-600 font-bold">حذف</button>
                             </div>
                         </div>`;
                     }).join('');
                 }
-            } catch(e) { console.error("Targets error:", e); }
-
-            // المصاريف
-            try {
-                const expRes = await fetch('/api/expenses');
-                const expenses = await expRes.json();
-                const expTbody = document.getElementById('expenses-log-table-body');
-                if (expTbody) {
-                    expTbody.innerHTML = expenses.length > 0 ? expenses.map(x => `
-                        <tr>
-                            <td class="p-3 font-mono font-bold text-gray-500">#EXP-${x.id}</td>
-                            <td class="p-3 font-bold text-[#3A056A]">${x.rep_name}</td>
-                            <td class="p-3"><span class="px-2 py-0.5 rounded bg-purple-50 text-purple-900 font-bold border border-purple-200">${x.expense_type}</span></td>
-                            <td class="p-3 font-black text-amber-800">${x.amount.toLocaleString()} ر.ع</td>
-                            <td class="p-3 text-gray-600">${x.notes || '—'}</td>
-                            <td class="p-3 text-gray-400 font-mono text-[11px]">${x.created_at_str}</td>
-                            <td class="p-3 no-print">
-                                <button onclick="deleteExpense(${x.id})" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
-                            </td>
-                        </tr>
-                    `).join('') : '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا توجد سندات مصاريف مسجلة حتى الآن</td></tr>';
-                }
-            } catch(e) { console.error("Expenses error:", e); }
-
-            // التقويم
-            try {
-                const cRes = await fetch('/api/calendar');
-                const cal = await cRes.json();
-                const calList = document.getElementById('calendar-events-list');
-                if (calList) {
-                    calList.innerHTML = cal.map(e => {
-                        const isCompleted = e.execution_status === 'COMPLETED' || e.execution_status === 'DONE';
-                        return `
-                        <div class="p-3.5 rounded-xl border ${isCompleted ? 'border-emerald-300 bg-emerald-50/40' : 'brand-border brand-tint'} flex justify-between items-center text-xs">
-                            <div>
-                                <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
-                                <div class="text-gray-600 mt-0.5">العميل: <strong>${e.customer_name}</strong> | المكلّفون: <strong class="text-[#3A056A]">${e.rep_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span> | الموقع: ${e.location}</div>
-                                ${e.change_notes ? `<div class="text-amber-800 bg-amber-50 p-1 rounded mt-1 border text-[11px]">ملاحظة: ${e.change_notes}</div>` : ''}
-                            </div>
-                            <div class="flex items-center gap-2 no-print">
-                                <span class="px-2.5 py-1 rounded text-xs font-bold ${isCompleted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
-                                    ${isCompleted ? 'مكتملة ✓' : 'مجدولة'}
-                                </span>
-                                ${!isCompleted ? `
-                                <button onclick="updateCalendarStatus(${e.id}, 'COMPLETED')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px]">إتمام ✓</button>
-                                <button onclick="openEditCalendarModal(${e.id}, '${escape(e.customer_name || '')}', '${escape(e.rep_name || '')}', '${escape(e.task_type || '')}', '${e.scheduled_at || ''}', '', '${escape(e.location || '')}', '${escape(e.change_notes || '')}')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[11px]">تعديل</button>
-                                ` : ''}
-                                <button onclick="deleteCalendarEvent(${e.id})" class="text-red-600 hover:text-red-800 font-bold text-[11px]">حذف</button>
-                            </div>
-                        </div>`;
-                    }).join('');
-                }
-            } catch(e) { console.error("Calendar error:", e); }
+            } catch(e) {}
 
             // العينات
             try {
                 const sRes = await fetch('/api/samples');
                 allSamplesCache = await sRes.json();
-                renderSamplesTable(allSamplesCache);
-            } catch(e) { console.error("Samples error:", e); }
-
-            // إعدادات المجموعات
-            try {
-                const confRes = await fetch('/api/system/config');
-                const conf = await confRes.json();
-                const logInput = document.getElementById('conf-logistics-group');
-                const mgmtInput = document.getElementById('conf-management-group');
-                if (logInput) logInput.value = conf.logistics_group_id || '';
-                if (mgmtInput) mgmtInput.value = conf.management_group_id || '';
+                const tbody = document.getElementById('samples-table-body');
+                if (tbody) {
+                    tbody.innerHTML = allSamplesCache.map(s => `
+                        <tr>
+                            <td class="p-3 font-bold">${s.customer_name}</td>
+                            <td class="p-3 text-[#3A056A] font-bold">${s.rep_name}</td>
+                            <td class="p-3">${s.product_name}</td>
+                            <td class="p-3">${s.qty_free} وحدة</td>
+                            <td class="p-3 text-gray-500">${s.delivery_date}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-bold">${s.status}</span></td>
+                            <td class="p-3 text-[11px]">${s.feedback_notes || '—'}</td>
+                            <td class="p-3 font-mono font-bold">${s.converted_po_id !== '—' ? s.converted_po_id : '—'}</td>
+                            <td class="p-3">
+                                <div class="flex gap-1">
+                                    <button onclick="openSampleFeedbackModal(${s.id}, '${escape(s.feedback_notes||'')}')" class="px-2 py-1 bg-amber-500 text-white font-bold rounded text-[10px]">تقييم</button>
+                                    ${s.status !== 'CONVERTED' ? `<button onclick="openConvertSampleModal(${s.id})" class="px-2 py-1 bg-emerald-600 text-white font-bold rounded text-[10px]">تحويل لـ PO</button>` : ''}
+                                    <button onclick="deleteItem('/api/samples/${s.id}')" class="text-red-600 font-bold text-xs px-1">حذف</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
             } catch(e) {}
 
-            try { await loadExpenseCategories(); } catch(e) {}
-            try { await loadWhatsAppLogs(); } catch(e) {}
+            // التقويم
+            try {
+                const cRes = await fetch('/api/calendar');
+                const cal = await cRes.json();
+                const list = document.getElementById('calendar-events-list');
+                if (list) {
+                    list.innerHTML = cal.map(e => {
+                        const isDone = e.execution_status === 'COMPLETED';
+                        return `
+                        <div class="p-3.5 bg-white border brand-border rounded-xl flex justify-between items-center text-xs">
+                            <div>
+                                <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
+                                <div class="text-gray-600 mt-0.5">العميل: <strong>${e.customer_name}</strong> | المكلّفون: <strong class="text-[#3A056A]">${e.rep_name}</strong> | الموعد: ${e.scheduled_at}</div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded text-xs font-bold ${isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${isDone ? 'مكتملة ✓' : 'مجدولة'}</span>
+                                ${!isDone ? `<button onclick="updateCalendarStatus(${e.id}, 'COMPLETED')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded">إتمام ✓</button>` : ''}
+                                <button onclick="deleteItem('/api/calendar/${e.id}')" class="text-red-600 font-bold px-1">حذف</button>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            } catch(e) {}
+
+            // المصاريف
+            try {
+                const expRes = await fetch('/api/expenses');
+                const expenses = await expRes.json();
+                const tbody = document.getElementById('expenses-log-table-body');
+                if (tbody) {
+                    tbody.innerHTML = expenses.map(x => `
+                        <tr>
+                            <td class="p-3 font-mono">#EXP-${x.id}</td>
+                            <td class="p-3 font-bold">${x.rep_name}</td>
+                            <td class="p-3">${x.expense_type}</td>
+                            <td class="p-3 font-bold text-amber-800">${x.amount.toLocaleString()} ر.ع</td>
+                            <td class="p-3">${x.notes || '—'}</td>
+                            <td class="p-3 text-gray-400 font-mono">${x.created_at_str}</td>
+                            <td class="p-3"><button onclick="deleteItem('/api/expenses/${x.id}')" class="text-red-600 font-bold">حذف</button></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch(e) {}
+
+            // فئات المصاريف
+            try {
+                const catRes = await fetch('/api/expense-categories');
+                const cats = await catRes.json();
+                document.getElementById('exp-type-select').innerHTML = cats.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
+            } catch(e) {}
         }
 
-        // 8. بدء التشغيل التلقائي عند تحميل الصفحة
         window.addEventListener('DOMContentLoaded', () => {
-            try { loadSavedTestPhone(); } catch(e) {}
             if (checkSessionPersisted()) {
-                const overlay = document.getElementById('auth-overlay');
-                if (overlay) overlay.classList.add('hidden');
+                document.getElementById('auth-overlay').classList.add('hidden');
                 loadAllData();
             }
         });
