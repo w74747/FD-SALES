@@ -301,7 +301,7 @@
                 </div>
             </div>
 
-            <!-- 6. العينات (مع دعم الأصناف المتعددة) -->
+            <!-- 6. العينات -->
             <div id="tab-samples" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
@@ -311,7 +311,7 @@
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
-                                + تسليم عينة جديدة (أصناف متعددة)
+                                + تسليم عينة جديدة
                             </button>
                             <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">
                                 طباعة السجل
@@ -357,17 +357,17 @@
                 </div>
             </div>
 
-            <!-- 7. التقويم (مع دعم تعيين أكثر من موظف) -->
+            <!-- 7. التقويم -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">تقويم العمليات والزيارات الميدانية</h3>
-                            <div class="text-xs text-gray-500">جدولة وتكليف المهام مع إشعار WhatsApp فوري لكل موظف مكلّف (دعم مهام مشتركة)</div>
+                            <div class="text-xs text-gray-500">جدولة وتكليف المهام مع إشعار WhatsApp فوري لكل موظف مكلّف</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openNewCalendarModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
-                                + جدولة مهمة جديدة (فريق متعدد)
+                                + جدولة مهمة جديدة
                             </button>
                             <button onclick="window.print()" class="px-3 py-1.5 border brand-border text-[#3A056A] text-xs font-bold rounded-lg hover:bg-purple-50">طباعة التقويم</button>
                         </div>
@@ -564,26 +564,22 @@
         </div>
     </main>
 
-    <!-- ==================== النوافذ المنبثقة التفاعلية المحدثة ==================== -->
+    <!-- ==================== النوافذ المنبثقة ==================== -->
 
-    <!-- نافذة تسجيل تسليم عينات جديدة (تدعم عدة أصناف مع زر +) -->
+    <!-- نافذة تسجيل تسليم عينات جديدة (أصناف متعددة مع زر +) -->
     <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[560px] space-y-3 text-xs max-h-[90vh] flex flex-col justify-between">
             <div class="space-y-3 overflow-y-auto pr-1">
                 <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تسليم عينات جديدة (أصناف متعددة)</h3>
-                
                 <div>
                     <label class="block font-bold mb-1">العميل المستلم:</label>
                     <input type="text" id="sample-customer-input" list="sample-customers-datalist" class="w-full p-2 border rounded-lg bg-white" placeholder="اكتب أو اختر اسم العميل...">
                     <datalist id="sample-customers-datalist"></datalist>
                 </div>
-
                 <div>
                     <label class="block font-bold mb-1">عضو الفريق المسلّم:</label>
                     <select id="sample-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
                 </div>
-
-                <!-- حاوية الأصناف الديناميكية -->
                 <div class="p-3 bg-purple-50/60 border border-purple-200 rounded-xl space-y-2">
                     <div class="flex justify-between items-center">
                         <span class="font-bold text-[#3A056A] text-xs">قائمة الأصناف والكميات المجانية:</span>
@@ -591,9 +587,7 @@
                             <span>+</span> <span>إضافة صنف آخر</span>
                         </button>
                     </div>
-                    
                     <div id="sample-items-rows-container" class="space-y-2 max-h-44 overflow-y-auto pr-1">
-                        <!-- الصف الافتراضي الأول -->
                         <div class="sample-item-row grid grid-cols-12 gap-2 items-center bg-white p-2 rounded-lg border">
                             <div class="col-span-8">
                                 <label class="block text-[10px] text-gray-500 mb-0.5">الصنف / المنتج:</label>
@@ -604,12 +598,11 @@
                                 <input type="number" class="sample-qty-input w-full p-1.5 border rounded text-xs font-bold text-center" value="10">
                             </div>
                             <div class="col-span-1 pt-4 text-center">
-                                <button type="button" onclick="removeSampleItemRow(this)" class="text-red-500 hover:text-red-700 font-bold text-sm" title="حذف">✕</button>
+                                <button type="button" onclick="removeSampleItemRow(this)" class="text-red-500 hover:text-red-700 font-bold text-sm">✕</button>
                             </div>
                         </div>
                     </div>
                 </div>
-
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block font-bold mb-1">تاريخ التسليم:</label>
@@ -621,29 +614,23 @@
                     </div>
                 </div>
             </div>
-
             <div class="flex justify-end gap-2 pt-3 border-t mt-2">
                 <button onclick="closeNewSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewMultiSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow">
-                    حفظ وإرسال إشعار للموظف
-                </button>
+                <button onclick="submitNewMultiSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow">حفظ وإرسال إشعار للموظف</button>
             </div>
         </div>
     </div>
 
-    <!-- نافذة جدولة مهمة ميدانية (تدعم اختيار أكثر من موظف مع زر +) -->
+    <!-- نافذة جدولة مهمة ميدانية (فريق متعدد مع زر +) -->
     <div id="new-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[540px] space-y-3 text-xs max-h-[90vh] flex flex-col justify-between">
             <div class="space-y-3 overflow-y-auto pr-1">
                 <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة زيارة أو مهمة ميدانية (فريق متعدد)</h3>
-                
                 <div>
                     <label class="block font-bold mb-1">العميل المستهدف:</label>
                     <input type="text" id="cal-customer-input" list="cal-customers-datalist" class="w-full p-2 border rounded-lg bg-white" placeholder="اكتب أو اختر اسم العميل...">
                     <datalist id="cal-customers-datalist"></datalist>
                 </div>
-
-                <!-- حاوية الموظفين المكلفين المتعددين -->
                 <div class="p-3 bg-purple-50/60 border border-purple-200 rounded-xl space-y-2">
                     <div class="flex justify-between items-center">
                         <span class="font-bold text-[#3A056A] text-xs">أعضاء الفريق المكلّفون بالمهمة:</span>
@@ -651,21 +638,17 @@
                             <span>+</span> <span>إضافة عضو فريق آخر</span>
                         </button>
                     </div>
-
                     <div id="calendar-reps-container" class="space-y-2">
-                        <!-- الصف الافتراضي الأول -->
                         <div class="cal-rep-row flex items-center gap-2">
                             <select class="cal-rep-select-item w-full p-2 border rounded-lg bg-white font-bold"></select>
-                            <button type="button" onclick="removeCalendarRepRow(this)" class="px-2 py-1 text-red-500 hover:text-red-700 font-bold" title="إزالة">✕</button>
+                            <button type="button" onclick="removeCalendarRepRow(this)" class="px-2 py-1 text-red-500 hover:text-red-700 font-bold">✕</button>
                         </div>
                     </div>
                 </div>
-
                 <div>
                     <label class="block font-bold mb-1">نوع المهمة:</label>
                     <input type="text" id="cal-task-type" class="w-full p-2 border rounded-lg" placeholder="مثال: زيارة فحص جودة وتقديم عينات مخصصة">
                 </div>
-
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block font-bold mb-1">موعد المهمة:</label>
@@ -676,18 +659,14 @@
                         <input type="text" id="cal-location" class="w-full p-2 border rounded-lg" placeholder="مقر العميل">
                     </div>
                 </div>
-
                 <div>
                     <label class="block font-bold mb-1 text-purple-900">موعد إرسال رسالة التذكير:</label>
                     <input type="datetime-local" id="cal-reminder-at" class="w-full p-2 border rounded-lg bg-purple-50/50">
                 </div>
             </div>
-
             <div class="flex justify-end gap-2 pt-3 border-t mt-2">
                 <button onclick="closeNewCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitNewMultiCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow">
-                    تأكيد الجدولة وإرسال التنبيهات
-                </button>
+                <button onclick="submitNewMultiCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow">تأكيد الجدولة وإرسال التنبيهات</button>
             </div>
         </div>
     </div>
@@ -2412,7 +2391,7 @@
                 }
             } catch(e) {}
 
-            // 6. التقويم (مع كامل خيارات التحكم والمهام المشتركة)
+            // 6. التقويم
             try {
                 const cRes = await fetch('/api/calendar');
                 const cal = await cRes.json();
