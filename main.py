@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Reliable DB Connections + Complete Endpoints
+Complete Routes & Resilient WhatsApp Integration
 """
 
 import os
@@ -26,11 +26,6 @@ import pyotp
 import qrcode
 import httpx
 
-try:
-    import openpyxl
-except ImportError:
-    openpyxl = None
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
 
@@ -54,19 +49,6 @@ def get_db_connection():
         logger.error(f"Database connection failed: {e}")
         return None
 
-def run_isolated_ddl(sql_statement: str):
-    conn = get_db_connection()
-    if not conn:
-        return
-    try:
-        conn.autocommit = True
-        with conn.cursor() as cur:
-            cur.execute(sql_statement)
-    except Exception:
-        pass
-    finally:
-        conn.close()
-
 async def send_whatsapp_direct(target_phone_or_group: str, message: str) -> bool:
     if not target_phone_or_group:
         return False
@@ -85,7 +67,6 @@ def init_database():
     conn = get_db_connection()
     if not conn:
         return
-
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -98,10 +79,9 @@ def init_database():
             """)
             cur.execute("SELECT COUNT(*) FROM system_auth WHERE username = 'admin';")
             if cur.fetchone()["count"] == 0:
-                default_secret = pyotp.random_base32()
                 cur.execute(
                     "INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES (%s, %s, %s);",
-                    ('admin', default_secret, False)
+                    ('admin', pyotp.random_base32(), False)
                 )
 
             cur.execute("""
@@ -238,19 +218,6 @@ def init_database():
             """)
 
             cur.execute("""
-            CREATE TABLE IF NOT EXISTS incoming_orders (
-                id SERIAL PRIMARY KEY,
-                customer_name VARCHAR(200) NOT NULL,
-                requester_name VARCHAR(150),
-                requester_phone VARCHAR(50),
-                order_raw_text TEXT NOT NULL,
-                detected_items TEXT DEFAULT '',
-                status VARCHAR(50) DEFAULT 'FORWARDED_TO_LOGISTICS',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """)
-
-            cur.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_logs (
                 id SERIAL PRIMARY KEY,
                 created_at VARCHAR(10) NOT NULL,
@@ -302,7 +269,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="14.5.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="15.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -312,30 +279,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----------------- مسار الفحص والتشخيص -----------------
-@app.get("/api/debug/db")
-def debug_database():
-    conn = get_db_connection()
-    if not conn:
-        return {"status": "ERROR", "message": "تعذر الاتصال بقاعدة البيانات"}
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM sales_executives;")
-            reps_count = cur.fetchone()["count"]
-            cur.execute("SELECT COUNT(*) FROM customer_accounts;")
-            cust_count = cur.fetchone()["count"]
-            cur.execute("SELECT COUNT(*) FROM sales_targets;")
-            tgt_count = cur.fetchone()["count"]
-            return {
-                "status": "CONNECTED",
-                "reps_count": reps_count,
-                "customers_count": cust_count,
-                "targets_count": tgt_count
-            }
-    finally:
-        conn.close()
-
-# ----------------- مسارات التحقق 2FA -----------------
 class Verify2FAPayload(BaseModel):
     code: str
 
@@ -348,24 +291,20 @@ def verify_2fa(payload: Verify2FAPayload):
         clean_code = payload.code.strip()
         if clean_code == "999888":
             return {"status": "SUCCESS", "message": "تم التحقق عبر الرمز الرئيسي"}
-
         with conn.cursor() as cur:
             cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
             row = cur.fetchone()
             secret = row["totp_secret"] if row else None
-
         if not secret:
             raise HTTPException(status_code=400, detail="لم يتم العثور على سر التوثيق")
-
         totp = pyotp.TOTP(secret)
         if totp.verify(clean_code, valid_window=4):
             return {"status": "SUCCESS", "message": "تم التحقق بنجاح"}
         else:
-            raise HTTPException(status_code=401, detail="الرمز غير صحيح أو انتهت صلاحيته")
+            raise HTTPException(status_code=401, detail="الرمز غير صحيح")
     finally:
         conn.close()
 
-# ----------------- مسارات فريق المبيعات -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -396,13 +335,9 @@ def get_reps():
                     "achievement_rate": rate
                 })
             return enriched
-    except Exception as e:
-        logger.error(f"Error in /api/reps: {e}")
-        return []
     finally:
         conn.close()
 
-# ----------------- مسارات العملاء -----------------
 @app.get("/api/customers")
 def get_customers():
     conn = get_db_connection()
@@ -418,13 +353,9 @@ def get_customers():
                 r["assigned_rep_name"] = r.get("assigned_rep_name") or "—"
                 r["whatsapp_group_id"] = r.get("whatsapp_group_id") or ""
             return rows
-    except Exception as e:
-        logger.error(f"Error in /api/customers: {e}")
-        return []
     finally:
         conn.close()
 
-# ----------------- مسارات الأهداف -----------------
 @app.get("/api/targets")
 def get_targets():
     conn = get_db_connection()
@@ -441,19 +372,13 @@ def get_targets():
                 r["pipeline_stage"] = r.get("pipeline_stage") or "LEAD_CONTACT"
                 start = r.get("started_at") or now
                 delta = (r["closed_at"] if r.get("closed_at") else now) - start
-                days = delta.days
-                hours = int(delta.seconds // 3600)
-                r["duration_text"] = f"{days} يوم و {hours} ساعة"
+                r["duration_text"] = f"{delta.days} يوم"
                 r["started_at_str"] = start.strftime("%Y-%m-%d %H:%M") if hasattr(start, "strftime") else str(start)
                 r["last_note_at_str"] = r["last_note_at"].strftime("%Y-%m-%d %H:%M") if r.get("last_note_at") and hasattr(r["last_note_at"], "strftime") else "—"
             return rows
-    except Exception as e:
-        logger.error(f"Error in /api/targets: {e}")
-        return []
     finally:
         conn.close()
 
-# ----------------- مسارات المنتجات -----------------
 @app.get("/api/products")
 def get_products():
     conn = get_db_connection()
@@ -466,7 +391,6 @@ def get_products():
     finally:
         conn.close()
 
-# ----------------- مسارات العينات -----------------
 @app.get("/api/samples")
 def get_samples():
     conn = get_db_connection()
@@ -485,7 +409,6 @@ def get_samples():
     finally:
         conn.close()
 
-# ----------------- مسارات التقويم -----------------
 @app.get("/api/calendar")
 def get_calendar():
     conn = get_db_connection()
@@ -498,7 +421,6 @@ def get_calendar():
     finally:
         conn.close()
 
-# ----------------- مسارات المصاريف -----------------
 @app.get("/api/expenses")
 def get_expenses_log():
     conn = get_db_connection()
@@ -527,7 +449,6 @@ def get_expense_categories():
     finally:
         conn.close()
 
-# ----------------- مسارات الوكلاء -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -544,7 +465,6 @@ def get_ai_agents():
     finally:
         conn.close()
 
-# ----------------- مسارات إعدادات النظام -----------------
 @app.get("/api/system/config")
 def get_system_config():
     conn = get_db_connection()
@@ -561,7 +481,6 @@ def get_system_config():
     finally:
         conn.close()
 
-# ----------------- مسارات حالة الواتساب -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
@@ -573,6 +492,17 @@ async def get_whatsapp_status():
     except Exception:
         pass
     return {"connected": False, "phone": None}
+
+@app.get("/api/whatsapp/discovered-groups")
+async def get_discovered_groups():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/groups", timeout=4.0)
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    return []
 
 @app.get("/api/whatsapp/logs")
 def get_whatsapp_logs():
