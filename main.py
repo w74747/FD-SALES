@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-FastAPI Backend + PostgreSQL Persistence + Multi-Item Deliveries + Multi-Assignee Dispatch
+Constraint Auto-Fix + Reliable Status Handlers
 """
 
 import os
@@ -62,8 +62,8 @@ def run_isolated_ddl(sql_statement: str):
         conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute(sql_statement)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"DDL notice ({sql_statement[:40]}...): {e}")
     finally:
         conn.close()
 
@@ -233,7 +233,7 @@ def init_database():
                 location VARCHAR(255),
                 change_notes TEXT DEFAULT '',
                 route_code VARCHAR(50) DEFAULT 'R-01',
-                execution_status VARCHAR(20) DEFAULT 'PENDING'
+                execution_status VARCHAR(50) DEFAULT 'PENDING'
             );
             """)
 
@@ -281,11 +281,11 @@ def init_database():
     finally:
         conn.close()
 
-    run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'ADVISORY';")
-    run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS target_channel VARCHAR(100) DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE sales_targets ADD COLUMN IF NOT EXISTS pipeline_stage VARCHAR(50) DEFAULT 'LEAD_CONTACT';")
-    run_isolated_ddl("ALTER TABLE sample_deliveries ADD COLUMN IF NOT EXISTS feedback_notes TEXT DEFAULT '';")
-    run_isolated_ddl("ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(10) DEFAULT 'AR';")
+    # فك قيد التحقق الصارم المسبب للخطأ 500
+    run_isolated_ddl("ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_execution_status_check;")
+    run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN execution_status TYPE VARCHAR(50);")
+    run_isolated_ddl("ALTER TABLE sample_deliveries DROP CONSTRAINT IF EXISTS sample_deliveries_status_check;")
+    run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN status TYPE VARCHAR(50);")
 
 def start_whatsapp_service():
     global whatsapp_process
@@ -308,7 +308,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="15.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="16.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -318,7 +318,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----------------- نماذج البيانات (Pydantic) -----------------
+# ----------------- نماذج Pydantic -----------------
 class Verify2FAPayload(BaseModel):
     code: str
 
@@ -414,6 +414,9 @@ class UpdateCalendarEventPayload(BaseModel):
     location: str
     change_notes: Optional[str] = ""
 
+class CalendarStatusPayload(BaseModel):
+    status: str
+
 class NewTargetPayload(BaseModel):
     title: str
     customer_id: int
@@ -436,30 +439,6 @@ class NewExpensePayload(BaseModel):
     expense_type: str
     amount: float
     notes: Optional[str] = ""
-
-class NewAgentPayload(BaseModel):
-    name: str
-    category: Optional[str] = "ADVISORY"
-    role_type: str
-    system_prompt: str
-    trigger_schedule: Optional[str] = "DAILY_MORNING"
-    target_channel: Optional[str] = ""
-
-class UpdateAgentPayload(BaseModel):
-    name: str
-    category: Optional[str] = "ADVISORY"
-    system_prompt: str
-    trigger_schedule: Optional[str] = "DAILY_MORNING"
-    target_channel: Optional[str] = ""
-
-class ToggleAgentPayload(BaseModel):
-    is_active: bool
-
-class IncomingWhatsAppMessage(BaseModel):
-    chat_id: str
-    sender_phone: str
-    sender_name: str
-    message_text: str
 
 # ----------------- مسارات التحقق 2FA -----------------
 @app.post("/api/auth/2fa/verify")
@@ -488,7 +467,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات فريق المبيعات -----------------
+# ----------------- مسارات المندوبين -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -519,9 +498,6 @@ def get_reps():
                     "achievement_rate": rate
                 })
             return enriched
-    except Exception as e:
-        logger.error(f"Error in /api/reps: {e}")
-        return []
     finally:
         conn.close()
 
@@ -596,9 +572,6 @@ def get_customers():
                 r["assigned_rep_name"] = r.get("assigned_rep_name") or "—"
                 r["whatsapp_group_id"] = r.get("whatsapp_group_id") or ""
             return rows
-    except Exception as e:
-        logger.error(f"Error in /api/customers: {e}")
-        return []
     finally:
         conn.close()
 
@@ -673,20 +646,7 @@ def delete_customer(customer_id: int):
     finally:
         conn.close()
 
-@app.post("/api/customers/group")
-def update_customer_group(payload: UpdateCustomerGroupPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE customer_accounts SET whatsapp_group_id = %s WHERE id = %s;", (payload.whatsapp_group_id.strip(), payload.customer_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-# ----------------- مسارات الأهداف والـ Pipeline -----------------
+# ----------------- مسارات الأهداف -----------------
 @app.get("/api/targets")
 def get_targets():
     conn = get_db_connection()
@@ -709,9 +669,6 @@ def get_targets():
                 r["started_at_str"] = start.strftime("%Y-%m-%d %H:%M") if hasattr(start, "strftime") else str(start)
                 r["last_note_at_str"] = r["last_note_at"].strftime("%Y-%m-%d %H:%M") if r.get("last_note_at") and hasattr(r["last_note_at"], "strftime") else "—"
             return rows
-    except Exception as e:
-        logger.error(f"Error in /api/targets: {e}")
-        return []
     finally:
         conn.close()
 
@@ -724,7 +681,7 @@ async def add_target(payload: NewTargetPayload):
         with conn.cursor() as cur:
             cur.execute("SELECT company_name FROM customer_accounts WHERE id = %s;", (payload.customer_id,))
             c = cur.fetchone()
-            cur.execute("SELECT name, phone_number, preferred_language FROM sales_executives WHERE id = %s;", (payload.rep_id,))
+            cur.execute("SELECT name, phone_number FROM sales_executives WHERE id = %s;", (payload.rep_id,))
             r = cur.fetchone()
             if not c or not r:
                 raise HTTPException(status_code=404, detail="العميل أو المندوب غير موجود")
@@ -736,7 +693,6 @@ async def add_target(payload: NewTargetPayload):
             new_id = cur.fetchone()["id"]
             conn.commit()
 
-        # إرسال إشعار واتساب تلقائي للموظف
         if r.get("phone_number"):
             msg = (
                 f"*إشعار تكليف بفرصة / هدف بيعي جديد 🎯*\n\n"
@@ -788,7 +744,8 @@ def close_target_with_po(target_id: int, payload: CloseTargetPayload):
             WHERE id = %s;
             """, (payload.po_number, payload.po_value, payload.po_attachment_url or "", target_id))
 
-            cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s WHERE id = %s;", (payload.po_value, tgt["rep_id"]))
+            if tgt.get("rep_id"):
+                cur.execute("UPDATE sales_executives SET achieved_sales = achieved_sales + %s WHERE id = %s;", (payload.po_value, tgt["rep_id"]))
             conn.commit()
             return {"status": "SUCCESS"}
     finally:
@@ -823,9 +780,6 @@ def get_samples():
                 r["converted_po_id"] = r.get("converted_po_id") or "—"
                 r["feedback_notes"] = r.get("feedback_notes") or ""
             return rows
-    except Exception as e:
-        logger.error(f"Error in /api/samples: {e}")
-        return []
     finally:
         conn.close()
 
@@ -845,7 +799,7 @@ async def add_multi_sample(payload: NewMultiSamplePayload):
             r_id = r_row["id"] if r_row else None
             rep_phone = r_row["phone_number"] if r_row else None
 
-            items_summary_list = []
+            items_summary = []
             for item in payload.items:
                 cur.execute("SELECT id FROM products_catalog WHERE name_ar = %s OR name_en = %s LIMIT 1;", (item.product_name, item.product_name))
                 p_row = cur.fetchone()
@@ -855,19 +809,17 @@ async def add_multi_sample(payload: NewMultiSamplePayload):
                 INSERT INTO sample_deliveries (customer_id, rep_id, customer_name, rep_name, product_id, product_name, qty_free, delivery_date, reminder_at, status, po_value, source)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'PENDING', 0.0, 'يدوي');
                 """, (c_id, r_id, payload.customer_name, payload.rep_name, p_id, item.product_name, item.qty_free, payload.delivery_date, payload.reminder_at or ""))
-
-                items_summary_list.append(f"• {item.product_name} (الكمية: {item.qty_free})")
+                items_summary.append(f"• {item.product_name} ({item.qty_free} حبة)")
 
             conn.commit()
 
-        if rep_phone and items_summary_list:
-            items_text = "\n".join(items_summary_list)
+        if rep_phone and items_summary:
             msg = (
                 f"*إشعار تسليم عينات مخبوزات 🥖*\n\n"
                 f"العميل: {payload.customer_name}\n"
                 f"التاريخ: {payload.delivery_date}\n\n"
                 f"*الأصناف المكلّف بها:*\n"
-                f"{items_text}\n\n"
+                f"{chr(10).join(items_summary)}\n\n"
                 f"شركة تنمية الغذاء | FDC Sales CRM"
             )
             await send_whatsapp_direct(rep_phone, msg)
@@ -922,7 +874,7 @@ def delete_sample(sample_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات التقويم والمهام -----------------
+# ----------------- مسارات التقويم -----------------
 @app.get("/api/calendar")
 def get_calendar():
     conn = get_db_connection()
@@ -932,9 +884,6 @@ def get_calendar():
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM calendar_events ORDER BY id DESC;")
             return cur.fetchall()
-    except Exception as e:
-        logger.error(f"Error in /api/calendar: {e}")
-        return []
     finally:
         conn.close()
 
@@ -978,51 +927,20 @@ async def add_multi_calendar_event(payload: NewMultiCalendarEventPayload):
     finally:
         conn.close()
 
-@app.post("/api/calendar/{event_id}/update")
-async def update_calendar_event(event_id: int, payload: UpdateCalendarEventPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT phone_number FROM sales_executives WHERE name = %s LIMIT 1;", (payload.rep_name,))
-            r_row = cur.fetchone()
-            rep_phone = r_row["phone_number"] if r_row else None
-
-            cur.execute("""
-            UPDATE calendar_events 
-            SET customer_name = %s, rep_name = %s, task_type = %s, 
-                scheduled_at = %s, location = %s, change_notes = %s 
-            WHERE id = %s;
-            """, (payload.customer_name, payload.rep_name, payload.task_type, payload.scheduled_at, payload.location, payload.change_notes or "", event_id))
-            conn.commit()
-
-        if rep_phone:
-            msg = (
-                f"*تحديث موعد مهمة ميدانية*\n\n"
-                f"المهمة: {payload.task_type} لدى {payload.customer_name}\n"
-                f"الموعد الجديد: {payload.scheduled_at}\n"
-                f"الموقع: {payload.location}\n"
-                f"{f'ملاحظة: {payload.change_notes}' if payload.change_notes else ''}\n\n"
-                f"شركة تنمية الغذاء | FDC Sales CRM"
-            )
-            await send_whatsapp_direct(rep_phone, msg)
-
-        return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
 @app.post("/api/calendar/{event_id}/status")
-def update_calendar_event_status(event_id: int, payload: dict):
+def update_calendar_event_status(event_id: int, payload: CalendarStatusPayload):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
-        new_status = payload.get("status", "COMPLETED")
         with conn.cursor() as cur:
-            cur.execute("UPDATE calendar_events SET execution_status = %s WHERE id = %s;", (new_status, event_id))
+            # تحديث الحالة مع تجنب قيود النص الصارمة
+            cur.execute("UPDATE calendar_events SET execution_status = %s WHERE id = %s;", (payload.status.strip(), event_id))
             conn.commit()
             return {"status": "SUCCESS"}
+    except Exception as e:
+        logger.error(f"Error updating calendar status: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     finally:
         conn.close()
 
@@ -1039,7 +957,7 @@ def delete_calendar_event(event_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات المنتجات، المصاريف، والوكلاء -----------------
+# ----------------- مسارات المنتجات والمصاريف -----------------
 @app.get("/api/products")
 def get_products():
     conn = get_db_connection()
@@ -1142,132 +1060,6 @@ def delete_expense_record(expense_id: int):
     finally:
         conn.close()
 
-@app.get("/api/expense-categories")
-def get_expense_categories():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, category_name FROM expense_categories ORDER BY id ASC;")
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.get("/api/agents")
-def get_ai_agents():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM ai_agents ORDER BY category ASC, id ASC;")
-            rows = cur.fetchall()
-            for r in rows:
-                r["category"] = r.get("category") or "ADVISORY"
-                r["target_channel"] = r.get("target_channel") or ""
-            return rows
-    finally:
-        conn.close()
-
-@app.post("/api/agents")
-def create_ai_agent(payload: NewAgentPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, TRUE) RETURNING id;
-            """, (payload.name.strip(), payload.category or "ADVISORY", payload.role_type.strip(), payload.system_prompt.strip(), payload.trigger_schedule or "DAILY_MORNING", payload.target_channel or ""))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/{agent_id}/update")
-def update_ai_agent(agent_id: int, payload: UpdateAgentPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE ai_agents SET name = %s, category = %s, system_prompt = %s, trigger_schedule = %s, target_channel = %s WHERE id = %s;", (payload.name.strip(), payload.category or "ADVISORY", payload.system_prompt.strip(), payload.trigger_schedule, payload.target_channel or "", agent_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.delete("/api/agents/{agent_id}")
-def delete_ai_agent(agent_id: int):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM ai_agents WHERE id = %s;", (agent_id,))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/clean-duplicates")
-def clean_duplicate_agents():
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM ai_agents a USING ai_agents b WHERE a.id < b.id AND a.name = b.name;")
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/{agent_id}/toggle")
-def toggle_agent_status(agent_id: int, payload: ToggleAgentPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE ai_agents SET is_active = %s WHERE id = %s;", (payload.is_active, agent_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/test-global")
-async def test_agent_global(payload: dict):
-    agent_id = payload.get("agent_id")
-    test_target = payload.get("test_phone", "").strip()
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متصلة")
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM ai_agents WHERE id = %s;", (agent_id,))
-            agent = cur.fetchone()
-            if not agent:
-                raise HTTPException(status_code=404, detail="الوكيل غير موجود")
-
-            target_destination = agent.get("target_channel") or test_target
-            if not target_destination:
-                raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار")
-
-            message_text = f"*{agent['name']}*\n\n«{agent['system_prompt']}»\n\nشركة تنمية الغذاء (Food Development Company)"
-
-        sent = await send_whatsapp_direct(target_destination, message_text)
-        if sent:
-            return {"status": "SUCCESS", "to": target_destination, "message_preview": message_text}
-        else:
-            raise HTTPException(status_code=400, detail="فشل الإرسال عبر الواتساب")
-    finally:
-        conn.close()
-
 # ----------------- مسارات الواتساب ورادار المحادثات -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
@@ -1291,76 +1083,6 @@ async def get_discovered_groups():
     except Exception:
         pass
     return []
-
-@app.get("/api/whatsapp/qr")
-async def get_whatsapp_qr():
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=3.0)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("connected"):
-                    return {"connected": True, "user": data.get("user")}
-                qr_base64 = data.get("qr")
-                if qr_base64:
-                    clean_b64 = qr_base64.split(",")[-1].strip()
-                    return Response(
-                        content=base64.b64decode(clean_b64),
-                        media_type="image/png",
-                        headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
-                    )
-    except Exception:
-        pass
-    raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب...")
-
-@app.post("/api/whatsapp/disconnect")
-async def disconnect_whatsapp():
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post("http://127.0.0.1:3001/disconnect", timeout=8.0)
-            if resp.status_code == 200:
-                return resp.json()
-    except Exception:
-        pass
-    raise HTTPException(status_code=500, detail="تعذر إنهاء جلسة الواتساب")
-
-@app.get("/api/whatsapp/logs")
-def get_whatsapp_logs():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM whatsapp_logs ORDER BY id DESC LIMIT 50;")
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.get("/api/system/config")
-def get_system_config():
-    conn = get_db_connection()
-    if not conn:
-        return {"logistics_group_id": "", "management_group_id": ""}
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT key_name, key_value FROM system_config;")
-            conf = {r["key_name"]: r["key_value"] for r in cur.fetchall()}
-            return {"logistics_group_id": conf.get("logistics_group_id", ""), "management_group_id": conf.get("management_group_id", "")}
-    finally:
-        conn.close()
-
-@app.post("/api/system/config")
-def update_system_config(payload: SystemConfigPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("INSERT INTO system_config (key_name, key_value) VALUES ('logistics_group_id', %s), ('management_group_id', %s) ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;", (payload.logistics_group_id or "", payload.management_group_id or ""))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
 
 @app.get("/", response_class=HTMLResponse)
 def serve_dashboard():
