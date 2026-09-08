@@ -201,7 +201,7 @@
                     <div class="flex justify-between items-center no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة والتغليف (مصنع تنمية الغذاء)</h3>
-                            <div class="text-xs text-gray-500">حمل نموذج الإكسل الجاهز، املأ أصناف المصنع ثم ارفعه مباشرة، أو أضف الصنف يدوياً.</div>
+                            <div class="text-xs text-gray-500">حمل نموذج الإكسل الجاهز، املأ الأصناف ثم ارفعه مباشرة، أو أضف الصنف يدوياً.</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="downloadProductsTemplate()" class="px-3 py-2 bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 font-bold text-xs rounded-lg shadow-2xs flex items-center gap-1.5">
@@ -234,13 +234,13 @@
                 </div>
             </div>
 
-            <!-- 3. الاهداف -->
+            <!-- 3. الاهداف (مع أزرار الترقية، الإغلاق، والحذف) -->
             <div id="tab-targets" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
-                            <h3 class="font-bold text-sm brand-primary-text">الأهداف والفرص البيعية (Pipeline)</h3>
-                            <div class="text-xs text-gray-500">متابعة مسار الصفقات عبر مراحل التوريد والاعتماد</div>
+                            <h3 class="font-bold text-sm brand-primary-text">الأهداف والفرص البيعية (Pipeline Stages)</h3>
+                            <div class="text-xs text-gray-500">متابعة مسار الصفقات: التواصل -> حصر الاحتياج -> عينات -> تقييم الشيف -> تفاوض -> أمر شراء PO</div>
                         </div>
                         <button onclick="openNewTargetModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                             + إضافة فرصة جديدة
@@ -250,13 +250,13 @@
                 </div>
             </div>
 
-            <!-- 4. الفريق -->
+            <!-- 4. الفريق (مع أزرار التعديل والحذف) -->
             <div id="tab-reps" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
-                            <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج</div>
+                            <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج واللغة المفضلة</div>
                         </div>
                         <button onclick="openNewRepModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                             + إضافة عضو جديد
@@ -266,7 +266,7 @@
                 </div>
             </div>
 
-            <!-- 5. العملاء -->
+            <!-- 5. العملاء (مع أزرار التعديل والحذف) -->
             <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -301,13 +301,13 @@
                 </div>
             </div>
 
-            <!-- 6. العينات -->
+            <!-- 6. العينات (مع تقييم الشيف، تحويل لـ PO، والحذف) -->
             <div id="tab-samples" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">سجل جرد العينات المجانية وتقييمات الشيف</h3>
-                            <div class="text-xs text-gray-500">جرد الأصناف المسلمة ورصد الملاحظات الفنية</div>
+                            <div class="text-xs text-gray-500">جرد الأصناف المسلمة ورصد الملاحظات الفنية ومعدل التحويل لأوامر شراء</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openNewSampleModal()" class="px-3 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg">+ تسليم عينة جديدة</button>
@@ -353,13 +353,13 @@
                 </div>
             </div>
 
-            <!-- 7. التقويم -->
+            <!-- 7. التقويم (مع إتمام المهمة، التعديل، والحذف) -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">تقويم العمليات والزيارات الميدانية</h3>
-                            <div class="text-xs text-gray-500">جدولة وتكليف المهام مع إشعار WhatsApp فوري للموظف</div>
+                            <div class="text-xs text-gray-500">جدولة وتكليف المهام مع إشعار WhatsApp فوري للموظف المكلف وإمكانية تعديل الموعد</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="openNewCalendarModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
@@ -407,7 +407,6 @@
                     </div>
                 </div>
 
-                <!-- المجلس الاستشاري -->
                 <div class="space-y-3">
                     <div class="flex items-center gap-2 px-1">
                         <span class="text-lg">🏛️</span>
@@ -417,7 +416,6 @@
                     <div id="advisory-agents-grid" class="grid grid-cols-3 gap-4"></div>
                 </div>
 
-                <!-- العمليات الميدانية -->
                 <div class="space-y-3 pt-2">
                     <div class="flex items-center gap-2 px-1">
                         <span class="text-lg">🚚</span>
@@ -562,10 +560,12 @@
         </div>
     </main>
 
-    <!-- كافة النوافذ المنبثقة (MODALS) -->
+    <!-- ==================== كافة النوافذ المنبثقة التفاعلية (MODALS) ==================== -->
+
+    <!-- نافذة إضافة فرصة جديدة -->
     <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي / فرصة جديدة</h3>
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي / فرصة جديدة (إشعار واتساب تلقائي للموظف)</h3>
             <div><label class="block font-bold mb-1">مسمى الهدف البيعي:</label><input type="text" id="tgt-title" class="w-full p-2 border rounded-lg" placeholder="مثال: توريد خبز برجر أسبوعي لسلسلة مطاعم"></div>
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="block font-bold mb-1">العميل المستهدف:</label><select id="tgt-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
@@ -583,10 +583,171 @@
                 </div>
             </div>
             <div><label class="block font-bold mb-1">ملاحظة البداية:</label><textarea id="tgt-note" rows="2" class="w-full p-2 border rounded-lg" placeholder="تم التواصل وتحديد موعد الزيارة..."></textarea></div>
-            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewTargetModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewTarget()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ الهدف والبدء</button></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeNewTargetModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewTarget()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ وإرسال التنبيه</button></div>
         </div>
     </div>
 
+    <!-- نافذة ترقية مرحلة الهدف -->
+    <div id="target-stage-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديث مرحلة الهدف البيعي (Pipeline Stage)</h3>
+            <input type="hidden" id="stage-target-id">
+            <div>
+                <label class="block font-bold mb-1">المرحلة الحالية للفرصة:</label>
+                <select id="stage-select-input" class="w-full p-2.5 border rounded-lg bg-white font-bold text-[#3A056A]">
+                    <option value="LEAD_CONTACT">1. التواصل الأولي والتأهيل (Lead Contact)</option>
+                    <option value="MEETING_REQUIREMENTS">2. الاجتماع وحصر الاحتياج (Meeting & Needs)</option>
+                    <option value="SAMPLE_DELIVERY">3. تسليم وتجربة العينات (Sample Delivery)</option>
+                    <option value="SAMPLE_FEEDBACK">4. التقييم والملاحظات الفنية (Chef Feedback)</option>
+                    <option value="PRICE_NEGOTIATION">5. التفاوض وتقديم الأسعار (Price Negotiation)</option>
+                    <option value="PO_CLOSED_WON">6. أمر شراء رسمي معتمد (PO Won)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">ملاحظة الترقية والمستجدات الميدانية:</label>
+                <textarea id="stage-note-input" rows="3" class="w-full p-2 border rounded-lg" placeholder="ملخص ما تم إنجازه لنقل الفرصة لهذه المرحلة..."></textarea>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeTargetStageModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitTargetStageUpdate()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">ترقية المرحلة وحفظ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة إغلاق الهدف وتحويله لأمر شراء PO -->
+    <div id="close-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">إغلاق الهدف بنجاح وتحويله لأمر شراء (PO)</h3>
+            <input type="hidden" id="close-target-id">
+            <div><label class="block font-bold mb-1">رقم أمر الشراء (PO):</label><input type="text" id="close-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX"></div>
+            <div><label class="block font-bold mb-1">قيمة أمر الشراء المحققة (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0"></div>
+            <div><label class="block font-bold mb-1">رابط المستند المرفق:</label><input type="text" id="close-po-url" class="w-full p-2 border rounded-lg" placeholder="رابط درايف أو مرجع السند"></div>
+            <div class="flex justify-end gap-2 pt-2"><button onclick="closeTargetCloseModal()" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitCloseTarget()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الإغلاق والترحيل</button></div>
+        </div>
+    </div>
+
+    <!-- نافذة تعديل عضو فريق المبيعات -->
+    <div id="edit-rep-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[460px] space-y-4 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
+            <input type="hidden" id="edit-rep-id">
+            <div><label class="block font-bold mb-1">الاسم الكامل:</label><input type="text" id="edit-rep-name-input" class="w-full p-2 border rounded-lg"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">الكود الوظيفي:</label><input type="text" id="edit-rep-code-input" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">المنطقة البيعية:</label><input type="text" id="edit-rep-region-input" class="w-full p-2 border rounded-lg"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">رقم الهاتف المعتمد:</label><input type="text" id="edit-rep-phone-input" class="w-full p-2 border rounded-lg font-mono"></div>
+                <div>
+                    <label class="block font-bold mb-1">لغة استلام الرسائل:</label>
+                    <select id="edit-rep-language-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
+                        <option value="AR">العربية (Arabic)</option>
+                        <option value="EN">الإنجليزية (English)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-[#3A056A]">تحديد مستهدف شهري لهذا العضو؟</span>
+                    <input type="checkbox" id="edit-rep-has-target-toggle" onchange="toggleEditTargetInput(this.checked)" class="w-4 h-4 text-purple-600 rounded">
+                </div>
+                <div id="edit-rep-target-box" class="hidden">
+                    <label class="block mb-1 text-[11px] text-gray-600">المستهدف الشهري (ر.ع):</label>
+                    <input type="number" id="edit-rep-target-input" class="w-full p-1.5 border rounded bg-white" value="0">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeEditRepModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitUpdateRep()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تعديل العميل -->
+    <div id="edit-customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات حساب العميل</h3>
+            <input type="hidden" id="edit-cust-id">
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">اسم العميل (الشركة):</label><input type="text" id="edit-cust-company-name" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">اسم العلامة التجارية:</label><input type="text" id="edit-cust-brand-name" class="w-full p-2 border rounded-lg"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">المنطقة:</label><input type="text" id="edit-cust-region" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">القطاع:</label><input type="text" id="edit-cust-sector" class="w-full p-2 border rounded-lg"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">اسم المسؤول:</label><input type="text" id="edit-cust-contact-person" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">رقم التواصل:</label><input type="text" id="edit-cust-phone" class="w-full p-2 border rounded-lg font-mono"></div>
+            </div>
+            <div><label class="block font-bold mb-1">عضو الفريق المتابع:</label><select id="edit-cust-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select></div>
+            <div><label class="block font-bold mb-1">تعليمات وملاحظات العميل:</label><textarea id="edit-cust-notes" rows="2" class="w-full p-2 border rounded-lg"></textarea></div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeEditCustomerModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitUpdateCustomer()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تقييم الشيف للعينة -->
+    <div id="sample-feedback-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[450px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تقييم ورأي الشيف الفني</h3>
+            <input type="hidden" id="feedback-sample-id">
+            <div>
+                <label class="block font-bold mb-1">رأي وملاحظات الشيف الفنية:</label>
+                <textarea id="feedback-notes-input" rows="4" class="w-full p-2 border rounded-lg" placeholder="الطعم، القوام، نسبة الهدر، درجة التحمير، مدى ملائمته..."></textarea>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">تحديث الحالة الميدانية:</label>
+                <select id="feedback-status-select" class="w-full p-2 border rounded-lg bg-white font-bold text-[#3A056A]">
+                    <option value="DELIVERED">تم التسليم والتجربة (بانتظار القرار)</option>
+                    <option value="CONVERTED">تم الاعتماد بنجاح (جاهز لـ PO)</option>
+                    <option value="REJECTED">لم يتم الاعتماد (مرفوض)</option>
+                </select>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeSampleFeedbackModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitSampleFeedback()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التقييم</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تحويل العينة لأمر شراء PO -->
+    <div id="convert-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[440px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">تحويل العينة لأمر شراء رسمي (PO)</h3>
+            <input type="hidden" id="convert-sample-id">
+            <div><label class="block font-bold mb-1">رقم أمر الشراء (PO Number):</label><input type="text" id="convert-sample-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX"></div>
+            <div><label class="block font-bold mb-1">القيمة المالية المحققة (ر.ع):</label><input type="number" id="convert-sample-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0"></div>
+            <div class="flex justify-end gap-2 pt-3">
+                <button onclick="closeConvertSampleModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitConvertSample()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الاعتماد والترحيل</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تعديل المهمة المجدولة -->
+    <div id="edit-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-2xl p-6 w-[480px] space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل المهمة المجدولة</h3>
+            <input type="hidden" id="edit-cal-id">
+            <div><label class="block font-bold mb-1">العميل:</label><input type="text" id="edit-cal-customer-input" class="w-full p-2 border rounded-lg bg-gray-50"></div>
+            <div><label class="block font-bold mb-1 text-purple-900">الموظف المكلّف:</label><select id="edit-cal-rep-select" class="w-full p-2 border rounded-lg bg-white font-bold"></select></div>
+            <div><label class="block font-bold mb-1">نوع المهمة:</label><input type="text" id="edit-cal-task-type" class="w-full p-2 border rounded-lg"></div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="block font-bold mb-1">الموعد الجديد:</label><input type="datetime-local" id="edit-cal-scheduled-at" class="w-full p-2 border rounded-lg"></div>
+                <div><label class="block font-bold mb-1">الموقع:</label><input type="text" id="edit-cal-location" class="w-full p-2 border rounded-lg"></div>
+            </div>
+            <div><label class="block font-bold mb-1">سبب وملاحظة التعديل (تصل للموظف):</label><textarea id="edit-cal-notes" rows="2" class="w-full p-2 border rounded-lg"></textarea></div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeEditCalendarModal()" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitUpdateCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديل وإرسال تنبيه</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- باقي النوافذ الأساسية -->
     <div id="new-product-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة صنف جديد لكتالوج المنتجات</h3>
@@ -850,7 +1011,6 @@
 
     <!-- كود الـ JAVASCRIPT المحصن بالكامل -->
     <script>
-        // تعريف المتغيرات والمصفوفات في قمة الملف لضمان توافرها في كل مكان
         const tabs = ['overview', 'products-catalog', 'targets', 'reps', 'customers', 'samples', 'calendar', 'agents', 'expenses-log', 'whatsapp-feed', 'whatsapp-settings'];
         const titles = {
             overview: 'لوحة التحكم',
@@ -877,7 +1037,6 @@
 
         let allSamplesCache = [];
         let allProductsCache = [];
-        let waPollingTimer = null;
 
         // ----------------- دوال النوافذ والتبويبات -----------------
         function switchTab(id) {
@@ -903,6 +1062,75 @@
 
         function openNewTargetModal() { document.getElementById('new-target-modal').classList.remove('hidden'); }
         function closeNewTargetModal() { document.getElementById('new-target-modal').classList.add('hidden'); }
+
+        function openTargetStageModal(id, currentStage, currentNote) {
+            document.getElementById('stage-target-id').value = id;
+            document.getElementById('stage-select-input').value = currentStage || 'LEAD_CONTACT';
+            document.getElementById('stage-note-input').value = unescape(currentNote) || '';
+            document.getElementById('target-stage-modal').classList.remove('hidden');
+        }
+        function closeTargetStageModal() { document.getElementById('target-stage-modal').classList.add('hidden'); }
+
+        function openTargetCloseModal(id) {
+            document.getElementById('close-target-id').value = id;
+            document.getElementById('close-target-modal').classList.remove('hidden');
+        }
+        function closeTargetCloseModal() { document.getElementById('close-target-modal').classList.add('hidden'); }
+
+        function openEditRepModal(id, name, code, region, phone, hasTarget, target, lang) {
+            document.getElementById('edit-rep-id').value = id;
+            document.getElementById('edit-rep-name-input').value = unescape(name);
+            document.getElementById('edit-rep-code-input').value = unescape(code);
+            document.getElementById('edit-rep-region-input').value = unescape(region);
+            document.getElementById('edit-rep-phone-input').value = phone;
+            document.getElementById('edit-rep-language-select').value = lang || 'AR';
+            document.getElementById('edit-rep-has-target-toggle').checked = hasTarget;
+            document.getElementById('edit-rep-target-input').value = target || 0;
+            toggleEditTargetInput(hasTarget);
+            document.getElementById('edit-rep-modal').classList.remove('hidden');
+        }
+        function closeEditRepModal() { document.getElementById('edit-rep-modal').classList.add('hidden'); }
+
+        function openEditCustomerModal(id, comp, brand, sect, reg, pers, ph, repId, notes) {
+            document.getElementById('edit-cust-id').value = id;
+            document.getElementById('edit-cust-company-name').value = unescape(comp) || '';
+            document.getElementById('edit-cust-brand-name').value = unescape(brand) || '';
+            document.getElementById('edit-cust-sector').value = unescape(sect) || '';
+            document.getElementById('edit-cust-region').value = unescape(reg) || '';
+            document.getElementById('edit-cust-contact-person').value = unescape(pers) || '';
+            document.getElementById('edit-cust-phone').value = ph || '';
+            document.getElementById('edit-cust-rep-select').value = repId || '';
+            document.getElementById('edit-cust-notes').value = unescape(notes) || '';
+            document.getElementById('edit-customer-modal').classList.remove('hidden');
+        }
+        function closeEditCustomerModal() { document.getElementById('edit-customer-modal').classList.add('hidden'); }
+
+        function openSampleFeedbackModal(id, currentNotes) {
+            document.getElementById('feedback-sample-id').value = id;
+            document.getElementById('feedback-notes-input').value = unescape(currentNotes) || '';
+            document.getElementById('sample-feedback-modal').classList.remove('hidden');
+        }
+        function closeSampleFeedbackModal() { document.getElementById('sample-feedback-modal').classList.add('hidden'); }
+
+        function openConvertSampleModal(id) {
+            document.getElementById('convert-sample-id').value = id;
+            document.getElementById('convert-sample-po-number').value = '';
+            document.getElementById('convert-sample-po-value').value = '';
+            document.getElementById('convert-sample-modal').classList.remove('hidden');
+        }
+        function closeConvertSampleModal() { document.getElementById('convert-sample-modal').classList.add('hidden'); }
+
+        function openEditCalendarModal(id, cust, rep, task, sched, reminder, loc, notes) {
+            document.getElementById('edit-cal-id').value = id;
+            document.getElementById('edit-cal-customer-input').value = unescape(cust) || '';
+            document.getElementById('edit-cal-rep-select').value = unescape(rep) || '';
+            document.getElementById('edit-cal-task-type').value = unescape(task) || '';
+            document.getElementById('edit-cal-scheduled-at').value = sched ? sched.replace(" ", "T") : '';
+            document.getElementById('edit-cal-location').value = unescape(loc) || '';
+            document.getElementById('edit-cal-notes').value = unescape(notes) || '';
+            document.getElementById('edit-calendar-modal').classList.remove('hidden');
+        }
+        function closeEditCalendarModal() { document.getElementById('edit-calendar-modal').classList.add('hidden'); }
 
         function openNewProductModal() { document.getElementById('new-product-modal').classList.remove('hidden'); }
         function closeNewProductModal() { document.getElementById('new-product-modal').classList.add('hidden'); }
@@ -958,6 +1186,11 @@
             if (el) el.classList.toggle('hidden', !checked);
         }
 
+        function toggleEditTargetInput(checked) {
+            const el = document.getElementById('edit-rep-target-box');
+            if (el) el.classList.toggle('hidden', !checked);
+        }
+
         function downloadProductsTemplate() {
             const csvContent = "\uFEFF" + 
                 "اسم المنتج بالعربي,Product Name EN,كود الصنف SKU,الوزن الحجم,التغليف الداخلي,مواصفة وسعة الكرتون الخارجي\n" +
@@ -975,7 +1208,7 @@
             document.body.removeChild(a);
         }
 
-        // ----------------- دوال التوثيق والدخول -----------------
+        // ----------------- دوال التوثيق والجلسة -----------------
         function checkSessionPersisted() {
             return localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED' || document.cookie.includes('fdc_auth=AUTHENTICATED');
         }
@@ -1027,12 +1260,413 @@
             if (codeInput) codeInput.value = '';
         }
 
-        // ----------------- دوال الوكلاء (عرض، تعديل، حذف، تنظيف) -----------------
+        // ----------------- دوال الأهداف والعمليات -----------------
+        async function submitNewTarget() {
+            const title = document.getElementById('tgt-title').value.trim();
+            const customer_id = parseInt(document.getElementById('tgt-customer-select').value);
+            const rep_id = parseInt(document.getElementById('tgt-rep-select').value);
+            const target_value = parseFloat(document.getElementById('tgt-value').value) || 0;
+            const pipeline_stage = document.getElementById('tgt-stage-select').value;
+            const initial_note = document.getElementById('tgt-note').value.trim();
+
+            if (!title) return alert("يرجى كتابة عنوان الهدف البيعي");
+
+            const res = await fetch('/api/targets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, customer_id, rep_id, target_value, pipeline_stage, initial_note })
+            });
+            if (res.ok) {
+                closeNewTargetModal();
+                await loadAllData();
+                alert("تم إنشاء الفرصة البيعية وإرسال تنبيه WhatsApp فوري للموظف المكلف ✓");
+            }
+        }
+
+        async function submitTargetStageUpdate() {
+            const id = document.getElementById('stage-target-id').value;
+            const stage = document.getElementById('stage-select-input').value;
+            const note = document.getElementById('stage-note-input').value.trim();
+
+            const res = await fetch(`/api/targets/${id}/stage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pipeline_stage: stage, note })
+            });
+            if (res.ok) {
+                closeTargetStageModal();
+                await loadAllData();
+                alert("تم تحديث مرحلة الهدف بنجاح ✓");
+            }
+        }
+
+        async function submitCloseTarget() {
+            const id = document.getElementById('close-target-id').value;
+            const po_number = document.getElementById('close-po-number').value.trim();
+            const po_value = parseFloat(document.getElementById('close-po-value').value) || 0;
+            const po_attachment_url = document.getElementById('close-po-url').value.trim();
+
+            if (!po_number || po_value <= 0) return alert("يرجى إدخال رقم وقيمة أمر الشراء");
+
+            const res = await fetch(`/api/targets/${id}/close`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ po_number, po_value, po_attachment_url })
+            });
+            if (res.ok) {
+                closeTargetCloseModal();
+                await loadAllData();
+                alert("تهانينا! تم إغلاق الهدف بنجاح وترحيل المبيعات للمندوب ✓");
+            }
+        }
+
+        async function deleteTarget(id, title) {
+            if (!confirm(`هل أنت متأكد من حذف الهدف "${title}"؟`)) return;
+            const res = await fetch(`/api/targets/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        // ----------------- دوال فريق المبيعات -----------------
+        async function submitNewRep() {
+            const name = document.getElementById('rep-name-input').value.trim();
+            const code = document.getElementById('rep-code-input').value.trim();
+            const region = document.getElementById('rep-region-input').value.trim();
+            const phone = document.getElementById('rep-phone-input').value.trim();
+            const lang = document.getElementById('rep-language-select').value;
+            const hasT = document.getElementById('rep-has-target-toggle').checked;
+            const targetVal = parseFloat(document.getElementById('rep-target-input')?.value) || 0;
+
+            if (!name || !phone) return alert("يرجى ملء الاسم ورقم الهاتف");
+
+            const res = await fetch('/api/reps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name, employee_code: code || "SE-" + Math.floor(100 + Math.random() * 900),
+                    region: region || "مسقط", phone_number: phone, has_target: hasT,
+                    monthly_target: targetVal, preferred_language: lang || "AR"
+                })
+            });
+            if (res.ok) {
+                closeNewRepModal();
+                await loadAllData();
+                alert("تم حفظ عضو فريق المبيعات بنجاح ✓");
+            }
+        }
+
+        async function submitUpdateRep() {
+            const id = document.getElementById('edit-rep-id').value;
+            const name = document.getElementById('edit-rep-name-input').value.trim();
+            const code = document.getElementById('edit-rep-code-input').value.trim();
+            const region = document.getElementById('edit-rep-region-input').value.trim();
+            const phone = document.getElementById('edit-rep-phone-input').value.trim();
+            const lang = document.getElementById('edit-rep-language-select').value;
+            const hasT = document.getElementById('edit-rep-has-target-toggle').checked;
+            const targetVal = parseFloat(document.getElementById('edit-rep-target-input').value) || 0;
+
+            const res = await fetch(`/api/reps/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name, employee_code: code, region, phone_number: phone,
+                    has_target: hasT, monthly_target: targetVal, preferred_language: lang || "AR"
+                })
+            });
+            if (res.ok) {
+                closeEditRepModal();
+                await loadAllData();
+                alert("تم تحديث بيانات عضو الفريق بنجاح ✓");
+            }
+        }
+
+        async function deleteRep(id, name) {
+            if (!confirm(`هل أنت متأكد من حذف المندوب "${name}"؟`)) return;
+            const res = await fetch(`/api/reps/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        // ----------------- دوال العملاء -----------------
+        async function submitNewCustomer() {
+            const company_name = document.getElementById('cust-company-name').value.trim();
+            const brand_name = document.getElementById('cust-brand-name').value.trim();
+            const region = document.getElementById('cust-region').value.trim();
+            const sector = document.getElementById('cust-sector').value.trim();
+            const contact_person = document.getElementById('cust-contact-person').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const repSelect = document.getElementById('cust-rep-select');
+            const notes = document.getElementById('cust-notes').value.trim();
+
+            if (!company_name || !phone) return alert("يرجى ملء اسم الشركة ورقم الهاتف");
+
+            const res = await fetch('/api/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    company_name, brand_name, sector: sector || "عام",
+                    region: region || "مسقط", contact_person: contact_person || "المسؤول",
+                    phone, assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null, notes
+                })
+            });
+            if (res.ok) {
+                closeNewCustomerModal();
+                await loadAllData();
+                alert("تمت إضافة حساب العميل بنجاح ✓");
+            }
+        }
+
+        async function submitUpdateCustomer() {
+            const id = document.getElementById('edit-cust-id').value;
+            const company_name = document.getElementById('edit-cust-company-name').value.trim();
+            const brand_name = document.getElementById('edit-cust-brand-name').value.trim();
+            const sector = document.getElementById('edit-cust-sector').value.trim();
+            const region = document.getElementById('edit-cust-region').value.trim();
+            const contact_person = document.getElementById('edit-cust-contact-person').value.trim();
+            const phone = document.getElementById('edit-cust-phone').value.trim();
+            const repSelect = document.getElementById('edit-cust-rep-select');
+            const notes = document.getElementById('edit-cust-notes').value.trim();
+
+            const res = await fetch(`/api/customers/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    company_name, brand_name, sector, region, contact_person,
+                    phone, assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null, notes
+                })
+            });
+            if (res.ok) {
+                closeEditCustomerModal();
+                await loadAllData();
+                alert("تم تحديث بيانات العميل بنجاح ✓");
+            }
+        }
+
+        async function deleteCustomer(id, name) {
+            if (!confirm(`هل أنت متأكد من حذف العميل "${name}"؟`)) return;
+            const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        // ----------------- دوال العينات -----------------
+        async function submitNewSample() {
+            const custInput = document.getElementById('sample-customer-input');
+            const repSelect = document.getElementById('sample-rep-select');
+            const product = document.getElementById('sample-product-name').value.trim();
+            const qty = parseInt(document.getElementById('sample-qty').value) || 1;
+            const date = document.getElementById('sample-date').value;
+            const reminder = document.getElementById('sample-reminder-at').value;
+
+            if (!custInput.value.trim() || !product || !date) return alert("يرجى إكمال بيانات العينة");
+
+            const res = await fetch('/api/samples', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_name: custInput.value.trim(), rep_name: repSelect.value,
+                    product_name: product, qty_free: qty, delivery_date: date, reminder_at: reminder || ""
+                })
+            });
+            if (res.ok) {
+                closeNewSampleModal();
+                await loadAllData();
+                alert("تم تسجيل تسليم العينة بنجاح ✓");
+            }
+        }
+
+        async function submitSampleFeedback() {
+            const id = document.getElementById('feedback-sample-id').value;
+            const notes = document.getElementById('feedback-notes-input').value.trim();
+            const status = document.getElementById('feedback-status-select').value;
+
+            if (!notes) return alert("يرجى كتابة ملاحظات الشيف");
+
+            const res = await fetch(`/api/samples/${id}/feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ feedback_notes: notes, status })
+            });
+            if (res.ok) {
+                closeSampleFeedbackModal();
+                await loadAllData();
+                alert("تم رصد تقييم الشيف الفني بنجاح ✓");
+            }
+        }
+
+        async function submitConvertSample() {
+            const id = document.getElementById('convert-sample-id').value;
+            const po_number = document.getElementById('convert-sample-po-number').value.trim();
+            const po_value = parseFloat(document.getElementById('convert-sample-po-value').value) || 0;
+
+            if (!po_number || po_value <= 0) return alert("يرجى إدخال رقم وقيمة أمر الشراء");
+
+            const res = await fetch(`/api/samples/${id}/convert`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ po_number, po_value })
+            });
+            if (res.ok) {
+                closeConvertSampleModal();
+                await loadAllData();
+                alert("تهانينا! تم تحويل العينة لأمر شراء وترحيل القيمة للمبيعات ✓");
+            }
+        }
+
+        async function deleteSample(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا السجل؟")) return;
+            const res = await fetch(`/api/samples/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        // ----------------- دوال التقويم والمهام -----------------
+        async function submitNewCalendarEvent() {
+            const custInput = document.getElementById('cal-customer-input');
+            const repSelect = document.getElementById('cal-rep-select');
+            const task = document.getElementById('cal-task-type').value.trim();
+            const sched = document.getElementById('cal-scheduled-at').value.trim();
+            const reminder = document.getElementById('cal-reminder-at').value.trim();
+            const loc = document.getElementById('cal-location').value.trim();
+
+            if (!custInput.value.trim() || !task || !sched) return alert("يرجى إكمال بيانات المهمة");
+
+            const res = await fetch('/api/calendar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_name: custInput.value.trim(), rep_name: repSelect.value,
+                    task_type: task, scheduled_at: sched.replace("T", " "),
+                    reminder_at: reminder ? reminder.replace("T", " ") : "",
+                    location: loc || "مقر العميل", route_code: "R-01"
+                })
+            });
+            if (res.ok) {
+                closeNewCalendarModal();
+                await loadAllData();
+                alert("تمت جدولة المهمة وإرسال التنبيه بنجاح ✓");
+            }
+        }
+
+        async function submitUpdateCalendarEvent() {
+            const id = document.getElementById('edit-cal-id').value;
+            const cust = document.getElementById('edit-cal-customer-input').value.trim();
+            const rep = document.getElementById('edit-cal-rep-select').value;
+            const task = document.getElementById('edit-cal-task-type').value.trim();
+            const sched = document.getElementById('edit-cal-scheduled-at').value.trim();
+            const loc = document.getElementById('edit-cal-location').value.trim();
+            const notes = document.getElementById('edit-cal-notes').value.trim();
+
+            const res = await fetch(`/api/calendar/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_name: cust, rep_name: rep, task_type: task,
+                    scheduled_at: sched.replace("T", " "),
+                    reminder_at: "", location: loc || "مقر العميل", change_notes: notes
+                })
+            });
+            if (res.ok) {
+                closeEditCalendarModal();
+                await loadAllData();
+                alert("تم تحديث المهمة بنجاح ✓");
+            }
+        }
+
+        async function updateCalendarStatus(id, newStatus) {
+            const res = await fetch(`/api/calendar/${id}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            if (res.ok) await loadAllData();
+        }
+
+        async function deleteCalendarEvent(id) {
+            if (!confirm("هل أنت متأكد من حذف هذه الزيارة؟")) return;
+            const res = await fetch(`/api/calendar/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        // ----------------- دوال المنتجات والمصاريف -----------------
+        async function submitNewProduct() {
+            const name_ar = document.getElementById('prod-name-ar').value.trim();
+            const name_en = document.getElementById('prod-name-en').value.trim();
+            const sku = document.getElementById('prod-sku').value.trim();
+            const weight = document.getElementById('prod-weight').value.trim();
+            const primary_pack = document.getElementById('prod-primary-pack').value.trim();
+            const carton_pack = document.getElementById('prod-carton-pack').value.trim();
+
+            if (!name_ar) return alert("يرجى إدخال اسم الصنف بالعربي");
+
+            const res = await fetch('/api/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name_ar, name_en, sku, weight_spec: weight, primary_packaging: primary_pack, carton_pack_spec: carton_pack })
+            });
+            if (res.ok) {
+                closeNewProductModal();
+                await loadAllData();
+                alert("تمت إضافة المنتج بنجاح ✓");
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+            const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function uploadProductsExcel(input) {
+            if (!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/products/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✅ تم استيراد وتحديث ${data.imported_count} منتج بنجاح!`);
+                    await loadAllData();
+                } else {
+                    alert(`❌ فشل الرفع: ${data.detail}`);
+                }
+            } catch(e) {
+                alert("خطأ أثناء معالجة الملف");
+            } finally {
+                input.value = '';
+            }
+        }
+
+        async function submitExpense() {
+            const rep_id = parseInt(document.getElementById('exp-rep-select').value);
+            const expense_type = document.getElementById('exp-type-select').value;
+            const amount = parseFloat(document.getElementById('exp-amount').value) || 0;
+            const notes = document.getElementById('exp-notes').value.trim();
+
+            if (amount <= 0) return alert("يرجى إدخال مبلغ صحيح للمصروف");
+
+            const res = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rep_id, expense_type, amount, notes })
+            });
+            if (res.ok) {
+                closeExpenseModal();
+                await loadAllData();
+                alert("تم قيد سند المصروف بنجاح ✓");
+            }
+        }
+
+        async function deleteExpense(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا المصروف؟")) return;
+            const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        // ----------------- دوال الوكلاء -----------------
         function renderAgentCard(a) {
             const safePromptB64 = btoa(unescape(encodeURIComponent(a.system_prompt || '')));
             const channelBadge = a.target_channel 
-                ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-blue-50 text-blue-800 border border-blue-200" title="قناة الإرسال">🎯 ${a.target_channel}</span>` 
-                : `<span class="px-1.5 py-0.5 rounded text-[9px] bg-purple-50 text-purple-700 border border-purple-200" title="شاتك الخاص">📲 شاتك الخاص</span>`;
+                ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-blue-50 text-blue-800 border border-blue-200">🎯 ${a.target_channel}</span>` 
+                : `<span class="px-1.5 py-0.5 rounded text-[9px] bg-purple-50 text-purple-700 border border-purple-200">📲 شاتك الخاص</span>`;
 
             return `
             <div class="p-4 rounded-xl border ${a.is_active ? 'brand-border bg-white shadow-xs' : 'border-gray-200 bg-gray-50 opacity-75'} space-y-3 flex flex-col justify-between">
@@ -1050,7 +1684,7 @@
                         </span>
                     </div>
                     <div class="p-2.5 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-28 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
-                        <strong>البرومبت التوجيهي:</strong> ${a.system_prompt}
+                        <strong>البرومبت:</strong> ${a.system_prompt}
                     </div>
                 </div>
                 <div class="pt-2 border-t flex justify-between items-center gap-1 no-print">
@@ -1085,17 +1719,15 @@
                 if (advisoryContainer) {
                     advisoryContainer.innerHTML = advisoryAgents.length > 0 
                         ? advisoryAgents.map(a => renderAgentCard(a)).join('')
-                        : '<div class="col-span-3 p-4 bg-gray-50 border border-dashed rounded-xl text-center text-xs text-gray-400">لا يوجد وكلاء في المجلس الاستشاري حالياً. يمكنك إضافة وكيل جديد من الأعلى.</div>';
+                        : '<div class="col-span-3 p-4 bg-gray-50 border border-dashed rounded-xl text-center text-xs text-gray-400">لا يوجد وكلاء في المجلس الاستشاري.</div>';
                 }
 
                 if (fieldContainer) {
                     fieldContainer.innerHTML = fieldAgents.length > 0 
                         ? fieldAgents.map(a => renderAgentCard(a)).join('')
-                        : '<div class="col-span-3 p-4 bg-gray-50 border border-dashed rounded-xl text-center text-xs text-gray-400">لا يوجد وكلاء ميدانيين حالياً.</div>';
+                        : '<div class="col-span-3 p-4 bg-gray-50 border border-dashed rounded-xl text-center text-xs text-gray-400">لا يوجد وكلاء ميدانيين.</div>';
                 }
-            } catch (e) {
-                console.error("loadAgentsData error:", e);
-            }
+            } catch (e) {}
         }
 
         async function submitNewAgent() {
@@ -1184,224 +1816,6 @@
             } catch (e) {
                 alert("خطأ في الاتصال بالسيرفر");
             }
-        }
-
-        // ----------------- دوال حفظ البيانات (منتجات، عملاء، أهداف، مصاريف) -----------------
-        async function submitNewProduct() {
-            const name_ar = document.getElementById('prod-name-ar').value.trim();
-            const name_en = document.getElementById('prod-name-en').value.trim();
-            const sku = document.getElementById('prod-sku').value.trim();
-            const weight = document.getElementById('prod-weight').value.trim();
-            const primary_pack = document.getElementById('prod-primary-pack').value.trim();
-            const carton_pack = document.getElementById('prod-carton-pack').value.trim();
-
-            if (!name_ar) return alert("يرجى إدخال اسم الصنف بالعربي");
-
-            const res = await fetch('/api/products', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name_ar, name_en, sku, weight_spec: weight, primary_packaging: primary_pack, carton_pack_spec: carton_pack })
-            });
-            if (res.ok) {
-                closeNewProductModal();
-                await loadAllData();
-                alert("تمت إضافة المنتج بنجاح ✓");
-            }
-        }
-
-        async function uploadProductsExcel(input) {
-            if (!input.files || input.files.length === 0) return;
-            const file = input.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-
-            try {
-                const res = await fetch('/api/products/upload', { method: 'POST', body: formData });
-                const data = await res.json();
-                if (res.ok) {
-                    alert(`✅ تم استيراد وتحديث ${data.imported_count} منتج بنجاح!`);
-                    await loadAllData();
-                } else {
-                    alert(`❌ فشل الرفع: ${data.detail}`);
-                }
-            } catch(e) {
-                alert("خطأ أثناء معالجة الملف");
-            } finally {
-                input.value = '';
-            }
-        }
-
-        async function submitNewTarget() {
-            const title = document.getElementById('tgt-title').value.trim();
-            const customer_id = parseInt(document.getElementById('tgt-customer-select').value);
-            const rep_id = parseInt(document.getElementById('tgt-rep-select').value);
-            const target_value = parseFloat(document.getElementById('tgt-value').value) || 0;
-            const pipeline_stage = document.getElementById('tgt-stage-select').value;
-            const initial_note = document.getElementById('tgt-note').value.trim();
-
-            if (!title) return alert("يرجى كتابة عنوان الهدف البيعي");
-
-            const res = await fetch('/api/targets', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, customer_id, rep_id, target_value, pipeline_stage, initial_note })
-            });
-            if (res.ok) {
-                closeNewTargetModal();
-                await loadAllData();
-                alert("تم إنشاء الفرصة البيعية بنجاح ✓");
-            }
-        }
-
-        async function submitNewRep() {
-            const name = document.getElementById('rep-name-input').value.trim();
-            const code = document.getElementById('rep-code-input').value.trim();
-            const region = document.getElementById('rep-region-input').value.trim();
-            const phone = document.getElementById('rep-phone-input').value.trim();
-            const lang = document.getElementById('rep-language-select').value;
-            const hasT = document.getElementById('rep-has-target-toggle').checked;
-            const targetVal = parseFloat(document.getElementById('rep-target-input')?.value) || 0;
-
-            if (!name || !phone) return alert("يرجى ملء الاسم ورقم الهاتف");
-
-            const res = await fetch('/api/reps', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name, employee_code: code || "SE-" + Math.floor(100 + Math.random() * 900),
-                    region: region || "مسقط", phone_number: phone, has_target: hasT,
-                    monthly_target: targetVal, preferred_language: lang || "AR"
-                })
-            });
-            if (res.ok) {
-                closeNewRepModal();
-                await loadAllData();
-                alert("تم حفظ عضو فريق المبيعات بنجاح ✓");
-            }
-        }
-
-        async function submitNewCustomer() {
-            const company_name = document.getElementById('cust-company-name').value.trim();
-            const brand_name = document.getElementById('cust-brand-name').value.trim();
-            const region = document.getElementById('cust-region').value.trim();
-            const sector = document.getElementById('cust-sector').value.trim();
-            const contact_person = document.getElementById('cust-contact-person').value.trim();
-            const phone = document.getElementById('cust-phone').value.trim();
-            const repSelect = document.getElementById('cust-rep-select');
-            const notes = document.getElementById('cust-notes').value.trim();
-
-            if (!company_name || !phone) return alert("يرجى ملء اسم الشركة ورقم الهاتف");
-
-            const res = await fetch('/api/customers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    company_name, brand_name, sector: sector || "عام",
-                    region: region || "مسقط", contact_person: contact_person || "المسؤول",
-                    phone, assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null, notes
-                })
-            });
-            if (res.ok) {
-                closeNewCustomerModal();
-                await loadAllData();
-                alert("تمت إضافة حساب العميل بنجاح ✓");
-            }
-        }
-
-        async function submitNewCalendarEvent() {
-            const custInput = document.getElementById('cal-customer-input');
-            const repSelect = document.getElementById('cal-rep-select');
-            const task = document.getElementById('cal-task-type').value.trim();
-            const sched = document.getElementById('cal-scheduled-at').value.trim();
-            const reminder = document.getElementById('cal-reminder-at').value.trim();
-            const loc = document.getElementById('cal-location').value.trim();
-
-            if (!custInput.value.trim() || !task || !sched) return alert("يرجى إكمال بيانات المهمة");
-
-            const res = await fetch('/api/calendar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    customer_name: custInput.value.trim(), rep_name: repSelect.value,
-                    task_type: task, scheduled_at: sched.replace("T", " "),
-                    reminder_at: reminder ? reminder.replace("T", " ") : "",
-                    location: loc || "مقر العميل", route_code: "R-01"
-                })
-            });
-            if (res.ok) {
-                closeNewCalendarModal();
-                await loadAllData();
-                alert("تمت جدولة المهمة بنجاح ✓");
-            }
-        }
-
-        async function submitExpense() {
-            const rep_id = parseInt(document.getElementById('exp-rep-select').value);
-            const expense_type = document.getElementById('exp-type-select').value;
-            const amount = parseFloat(document.getElementById('exp-amount').value) || 0;
-            const notes = document.getElementById('exp-notes').value.trim();
-
-            if (amount <= 0) return alert("يرجى إدخال مبلغ صحيح للمصروف");
-
-            const res = await fetch('/api/expenses', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rep_id, expense_type, amount, notes })
-            });
-            if (res.ok) {
-                closeExpenseModal();
-                await loadAllData();
-                alert("تم قيد سند المصروف بنجاح ✓");
-            }
-        }
-
-        async function submitNewSample() {
-            const custInput = document.getElementById('sample-customer-input');
-            const repSelect = document.getElementById('sample-rep-select');
-            const product = document.getElementById('sample-product-name').value.trim();
-            const qty = parseInt(document.getElementById('sample-qty').value) || 1;
-            const date = document.getElementById('sample-date').value;
-            const reminder = document.getElementById('sample-reminder-at').value;
-
-            if (!custInput.value.trim() || !product || !date) return alert("يرجى إكمال بيانات العينة");
-
-            const res = await fetch('/api/samples', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    customer_name: custInput.value.trim(), rep_name: repSelect.value,
-                    product_name: product, qty_free: qty, delivery_date: date, reminder_at: reminder || ""
-                })
-            });
-            if (res.ok) {
-                closeNewSampleModal();
-                await loadAllData();
-                alert("تم تسجيل تسليم العينة بنجاح ✓");
-            }
-        }
-
-        async function deleteProduct(id) {
-            if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
-            const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
-        }
-
-        async function deleteCustomer(id, name) {
-            if (!confirm(`هل أنت متأكد من حذف العميل "${name}"؟`)) return;
-            const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
-        }
-
-        async function deleteRep(id, name) {
-            if (!confirm(`هل أنت متأكد من حذف المندوب "${name}"؟`)) return;
-            const res = await fetch(`/api/reps/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
-        }
-
-        async function deleteExpense(id) {
-            if (!confirm("هل أنت متأكد من حذف هذا المصروف؟")) return;
-            const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-            if (res.ok) await loadAllData();
         }
 
         // ----------------- دوال الواتساب والمجموعات -----------------
@@ -1587,6 +2001,7 @@
                 let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">قيد التجربة</span>`;
                 if (s.status === 'DELIVERED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">تم التسليم ✓</span>`;
                 if (s.status === 'CONVERTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">أمر شراء معتمد ✓</span>`;
+                if (s.status === 'REJECTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">مرفوض</span>`;
 
                 return `
                 <tr>
@@ -1597,9 +2012,15 @@
                     <td class="p-3 text-gray-500">${s.delivery_date}</td>
                     <td class="p-3">${statusBadge}</td>
                     <td class="p-3 text-gray-700 max-w-xs text-[11px]">${s.feedback_notes || '—'}</td>
-                    <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id : '—'}</td>
+                    <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id + ' (' + (s.po_value || 0) + ' ر.ع)' : '—'}</td>
                     <td class="p-3 no-print">
-                        <span class="text-gray-400 text-xs">—</span>
+                        <div class="flex gap-1.5 flex-wrap">
+                            <button onclick="openSampleFeedbackModal(${s.id}, '${escape(s.feedback_notes || '')}')" class="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded text-[10px]">تقييم الشيف</button>
+                            ${s.status !== 'CONVERTED' ? `
+                            <button onclick="openConvertSampleModal(${s.id})" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px]">تحويل لـ PO</button>
+                            ` : ''}
+                            <button onclick="deleteSample(${s.id})" class="text-red-600 hover:text-red-800 font-bold text-[10px] px-1">حذف</button>
+                        </div>
                     </td>
                 </tr>`;
             }).join('');
@@ -1706,12 +2127,16 @@
                             <div class="space-y-2">
                                 <div class="flex justify-between items-center">
                                     <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                                    <div class="flex items-center gap-1">
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-100 text-[#3A056A]">${r.preferred_language || 'AR'}</span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                                    </div>
                                 </div>
                                 <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
                                 <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
                             </div>
-                            <div class="pt-2 border-t flex justify-end">
+                            <div class="pt-2 border-t flex justify-end gap-1.5">
+                                <button onclick="openEditRepModal(${r.id}, '${escape(r.name)}', '${escape(r.employee_code)}', '${escape(r.region)}', '${r.phone_number}', ${r.has_target}, ${r.monthly_target || 0}, '${r.preferred_language || 'AR'}')" class="px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-xs">تعديل</button>
                                 <button onclick="deleteRep(${r.id}, '${r.name}')" class="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-xs">حذف</button>
                             </div>
                         </div>
@@ -1719,11 +2144,11 @@
                 }
 
                 const repOptionsHTML = reps.map(r => `<option value="${r.id}">${r.name} (${r.region})</option>`).join('');
-                ['cust-rep-select', 'tgt-rep-select', 'exp-rep-select'].forEach(id => {
+                ['cust-rep-select', 'edit-cust-rep-select', 'tgt-rep-select', 'exp-rep-select'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.innerHTML = (id.includes('cust-rep') ? '<option value="">-- بدون تعيين --</option>' : '') + repOptionsHTML;
                 });
-                ['sample-rep-select', 'cal-rep-select'].forEach(id => {
+                ['sample-rep-select', 'cal-rep-select', 'edit-cal-rep-select'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.innerHTML = reps.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
                 });
@@ -1758,7 +2183,11 @@
                             <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id ? '✓ ' + c.whatsapp_group_id : '<span class="text-gray-400">غير مربوط</span>'}</td>
                             <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status || 'نشط'}</span></td>
                             <td class="p-3 no-print">
-                                <button onclick="deleteCustomer(${c.id}, '${c.company_name}')" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                                <div class="flex gap-2">
+                                    <button onclick="openEditCustomerModal(${c.id}, '${escape(c.company_name || '')}', '${escape(c.brand_name || '')}', '${escape(c.sector || '')}', '${escape(c.region || '')}', '${escape(c.contact_person || '')}', '${escape(c.phone || '')}', ${c.assigned_rep_id || 'null'}, '${escape(c.notes || '')}')" class="text-blue-600 hover:text-blue-800 font-bold">تعديل</button>
+                                    <span class="text-gray-300">|</span>
+                                    <button onclick="deleteCustomer(${c.id}, '${c.company_name}')" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                                </div>
                             </td>
                         </tr>
                     `).join('');
@@ -1815,7 +2244,7 @@
                 }
             } catch(e) {}
 
-            // 4. الأهداف
+            // 4. الأهداف (بطاقات تفاعلية كاملة بالأزرار ومراحل الـ Pipeline)
             try {
                 const tgtRes = await fetch('/api/targets');
                 const targets = await tgtRes.json();
@@ -1840,6 +2269,29 @@
                                     <span>القيمة المتوقعة:</span>
                                     <span class="font-bold text-[#3A056A]">${(t.target_value || 0).toLocaleString()} ر.ع</span>
                                 </div>
+                                <div class="text-[11px] text-gray-500 flex justify-between">
+                                    <span>المدة في المسار: ${t.duration_text || '—'}</span>
+                                    <span>آخر تحديث: ${t.last_note_at_str || '—'}</span>
+                                </div>
+                                ${t.last_note ? `<div class="p-1.5 bg-gray-50 rounded text-xs text-gray-700 border">ملاحظة: ${t.last_note}</div>` : ''}
+                                ${t.status === 'CLOSED' ? `
+                                <div class="p-2 bg-emerald-100/60 rounded text-xs font-bold text-emerald-900 border border-emerald-300">
+                                    أمر الشراء: ${t.po_number} (${(t.po_value || 0).toLocaleString()} ر.ع)
+                                </div>` : ''}
+                            </div>
+                            
+                            <div class="pt-2 border-t flex justify-between items-center gap-1 no-print">
+                                ${t.status !== 'CLOSED' ? `
+                                <div class="flex gap-1.5">
+                                    <button onclick="openTargetStageModal(${t.id}, '${t.pipeline_stage}', '${escape(t.last_note || '')}')" class="px-2.5 py-1.5 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded-lg text-xs">
+                                        ترقية المرحلة ↗
+                                    </button>
+                                    <button onclick="openTargetCloseModal(${t.id})" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs">
+                                        إغلاق بـ PO ✓
+                                    </button>
+                                </div>
+                                ` : '<span class="text-xs text-emerald-700 font-bold">مكتمل ومعتمد</span>'}
+                                <button onclick="deleteTarget(${t.id}, '${t.title}')" class="text-red-600 hover:text-red-800 font-bold text-xs">حذف</button>
                             </div>
                         </div>`;
                     }).join('');
@@ -1868,21 +2320,33 @@
                 }
             } catch(e) {}
 
-            // 6. التقويم
+            // 6. التقويم (مع أزرار إتمام المهمة، التعديل، والحذف)
             try {
                 const cRes = await fetch('/api/calendar');
                 const cal = await cRes.json();
                 const calList = document.getElementById('calendar-events-list');
                 if (calList) {
-                    calList.innerHTML = cal.map(e => `
-                        <div class="p-3.5 rounded-xl border brand-border brand-tint flex justify-between items-center text-xs">
+                    calList.innerHTML = cal.map(e => {
+                        const isCompleted = e.execution_status === 'COMPLETED';
+                        return `
+                        <div class="p-3.5 rounded-xl border ${isCompleted ? 'border-emerald-300 bg-emerald-50/40' : 'brand-border brand-tint'} flex justify-between items-center text-xs">
                             <div>
                                 <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
-                                <div class="text-gray-600 mt-0.5">العميل: <strong>${e.customer_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span></div>
+                                <div class="text-gray-600 mt-0.5">العميل: <strong>${e.customer_name}</strong> | الموظف: <strong>${e.rep_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span></div>
+                                ${e.change_notes ? `<div class="text-amber-800 bg-amber-50 p-1 rounded mt-1 border text-[11px]">ملاحظة: ${e.change_notes}</div>` : ''}
                             </div>
-                            <span class="px-2.5 py-1 rounded text-xs font-bold bg-amber-100 text-amber-800">${e.execution_status}</span>
-                        </div>
-                    `).join('');
+                            <div class="flex items-center gap-2 no-print">
+                                <span class="px-2.5 py-1 rounded text-xs font-bold ${isCompleted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                                    ${isCompleted ? 'مكتملة ✓' : 'مجدولة'}
+                                </span>
+                                ${!isCompleted ? `
+                                <button onclick="updateCalendarStatus(${e.id}, 'COMPLETED')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px]">إتمام ✓</button>
+                                <button onclick="openEditCalendarModal(${e.id}, '${escape(e.customer_name || '')}', '${escape(e.rep_name || '')}', '${escape(e.task_type || '')}', '${e.scheduled_at || ''}', '', '${escape(e.location || '')}', '${escape(e.change_notes || '')}')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[11px]">تعديل</button>
+                                ` : ''}
+                                <button onclick="deleteCalendarEvent(${e.id})" class="text-red-600 hover:text-red-800 font-bold text-[11px]">حذف</button>
+                            </div>
+                        </div>`;
+                    }).join('');
                 }
             } catch(e) {}
 
@@ -1907,7 +2371,6 @@
             loadWhatsAppLogs();
         }
 
-        // بدء التشغيل المحصن
         window.addEventListener('DOMContentLoaded', () => {
             loadSavedTestPhone();
             if (checkSessionPersisted()) {
