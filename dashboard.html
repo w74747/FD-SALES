@@ -47,12 +47,11 @@
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- شاشة التحقق الأمني 2FA -->
+    <!-- 1. نافذة التحقق الأمني 2FA -->
     <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
                 <div class="flex items-center justify-center gap-3 p-3 bg-white rounded-2xl border border-purple-100 shadow-sm w-full">
-                    <img src="/logo.png?t=20260907" alt="Logo" class="h-12 w-auto object-contain block" onerror="this.style.display='none'">
                     <div class="text-right">
                         <div class="text-xl font-black text-[#3A056A] leading-tight">شركة تنمية الغذاء</div>
                         <div class="text-[10px] font-bold text-purple-700 tracking-wider uppercase">FOOD DEVELOPMENT COMPANY</div>
@@ -74,12 +73,11 @@
         </div>
     </div>
 
-    <!-- القائمة الجانبية -->
+    <!-- 2. القائمة الجانبية -->
     <aside class="w-64 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
                 <div class="flex items-center justify-center gap-2.5 w-full h-full px-2 bg-white rounded-xl shadow-sm">
-                    <img src="/logo.png?t=20260907" alt="Logo" class="h-10 w-auto object-contain block" onerror="this.style.display='none'">
                     <div class="text-right">
                         <div class="text-sm font-black text-[#3A056A] leading-tight">شركة تنمية الغذاء</div>
                         <div class="text-[8.5px] font-bold text-purple-700 tracking-wider uppercase">Food Development Co.</div>
@@ -131,6 +129,7 @@
         </div>
     </aside>
 
+    <!-- 3. منطقة المحتوى الرئيسي -->
     <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
         <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs no-print">
             <div class="flex items-center gap-3">
@@ -150,14 +149,14 @@
                 </button>
 
                 <button onclick="logoutSession()" title="تسجيل الخروج" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke_linecap="round" stroke_linejoin="round" stroke_width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                 </button>
             </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-6 space-y-6">
 
-            <!-- 1. لوحة التحكم -->
+            <!-- تبويب 1: لوحة التحكم -->
             <div id="tab-overview" class="tab-content space-y-6">
                 <div class="grid grid-cols-3 gap-4 no-print">
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
@@ -195,7 +194,7 @@
                 </div>
             </div>
 
-            <!-- 2. المنتجات -->
+            <!-- تبويب 2: المنتجات -->
             <div id="tab-products-catalog" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
@@ -234,7 +233,7 @@
                 </div>
             </div>
 
-            <!-- 3. الاهداف -->
+            <!-- تبويب 3: الأهداف -->
             <div id="tab-targets" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -250,13 +249,13 @@
                 </div>
             </div>
 
-            <!-- 4. الفريق -->
+            <!-- تبويب 4: الفريق -->
             <div id="tab-reps" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
-                            <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج واللغة المفضلة</div>
+                            <div class="text-xs text-gray-500">الأرقام المعتمدة والمناطق وقياس النتائج والمصاريف واللغة المفضلة</div>
                         </div>
                         <button onclick="openNewRepModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                             + إضافة عضو جديد
@@ -266,7 +265,7 @@
                 </div>
             </div>
 
-            <!-- 5. العملاء -->
+            <!-- تبويب 5: العملاء -->
             <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -301,7 +300,7 @@
                 </div>
             </div>
 
-            <!-- 6. العينات -->
+            <!-- تبويب 6: العينات -->
             <div id="tab-samples" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
@@ -357,7 +356,7 @@
                 </div>
             </div>
 
-            <!-- 7. التقويم -->
+            <!-- تبويب 7: التقويم -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -376,7 +375,7 @@
                 </div>
             </div>
 
-            <!-- 8. الوكلاء -->
+            <!-- تبويب 8: الوكلاء -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
@@ -430,7 +429,7 @@
                 </div>
             </div>
 
-            <!-- 9. المصاريف -->
+            <!-- تبويب 9: المصاريف -->
             <div id="tab-expenses-log" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -459,7 +458,7 @@
                 </div>
             </div>
 
-            <!-- 10. رادار المحادثات -->
+            <!-- تبويب 10: رادار المحادثات -->
             <div id="tab-whatsapp-feed" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
                     <div class="flex justify-between items-center no-print">
@@ -475,7 +474,7 @@
                 </div>
             </div>
 
-            <!-- 11. اعداد الواتساب -->
+            <!-- تبويب 11: اعداد الواتساب -->
             <div id="tab-whatsapp-settings" class="tab-content hidden space-y-6">
                 <div class="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-2 text-xs no-print">
                     <div class="flex items-center gap-2">
@@ -564,7 +563,7 @@
         </div>
     </main>
 
-    <!-- ==================== النوافذ المنبثقة ==================== -->
+    <!-- ==================== النوافذ المنبثقة التفاعلية ==================== -->
 
     <!-- نافذة تسجيل تسليم عينات جديدة (أصناف متعددة مع زر +) -->
     <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
@@ -987,9 +986,9 @@
         </div>
     </div>
 
-    <!-- ==================== كود الـ JAVASCRIPT المحصن بالكامل ==================== -->
+    <!-- ==================== كود الـ JAVASCRIPT المنقح والمكتمل بالكامل ==================== -->
     <script>
-        // المتغيرات والمصفوفات الأساسية
+        // 1. المتغيرات والمصفوفات العامة
         const tabs = ['overview', 'products-catalog', 'targets', 'reps', 'customers', 'samples', 'calendar', 'agents', 'expenses-log', 'whatsapp-feed', 'whatsapp-settings'];
         const titles = {
             overview: 'لوحة التحكم',
@@ -1018,7 +1017,7 @@
         let allProductsCache = [];
         let allRepsCache = [];
 
-        // ----------------- دوال التوثيق والجلسة -----------------
+        // 2. دوال التوثيق والدخول
         function checkSessionPersisted() {
             return localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED' || document.cookie.includes('fdc_auth=AUTHENTICATED');
         }
@@ -1070,7 +1069,7 @@
             if (codeInput) codeInput.value = '';
         }
 
-        // ----------------- دوال التبويبات -----------------
+        // 3. دوال التنقل بين التبويبات
         function switchTab(id) {
             try {
                 tabs.forEach(t => {
@@ -1090,156 +1089,369 @@
             } catch(e) {}
         }
 
-        // ----------------- دوال النوافذ المنبثقة (فتح/إغلاق) -----------------
-        function openNewTargetModal() { document.getElementById('new-target-modal').classList.remove('hidden'); }
-        function closeNewTargetModal() { document.getElementById('new-target-modal').classList.add('hidden'); }
+        // 4. دوال الوكلاء
+        function renderAgentCard(a) {
+            const safePromptB64 = btoa(unescape(encodeURIComponent(a.system_prompt || '')));
+            const channelBadge = a.target_channel 
+                ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-blue-50 text-blue-800 border border-blue-200">🎯 ${a.target_channel}</span>` 
+                : `<span class="px-1.5 py-0.5 rounded text-[9px] bg-purple-50 text-purple-700 border border-purple-200">📲 شاتك الخاص</span>`;
 
-        function openTargetStageModal(id, currentStage, currentNote) {
-            document.getElementById('stage-target-id').value = id;
-            document.getElementById('stage-select-input').value = currentStage || 'LEAD_CONTACT';
-            document.getElementById('stage-note-input').value = unescape(currentNote) || '';
-            document.getElementById('target-stage-modal').classList.remove('hidden');
+            return `
+            <div class="p-4 rounded-xl border ${a.is_active ? 'brand-border bg-white shadow-xs' : 'border-gray-200 bg-gray-50 opacity-75'} space-y-3 flex flex-col justify-between">
+                <div class="space-y-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="font-bold text-sm text-gray-900">${a.name}</span>
+                            <div class="flex items-center gap-1.5 mt-1">
+                                <span class="text-[10px] text-purple-700 font-mono font-bold">${a.role_type}</span>
+                                ${channelBadge}
+                            </div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'}">
+                            ${a.is_active ? 'نشط ومفعّل ✓' : 'متوقف'}
+                        </span>
+                    </div>
+                    <div class="p-2.5 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-28 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
+                        <strong>البرومبت:</strong> ${a.system_prompt}
+                    </div>
+                </div>
+                <div class="pt-2 border-t flex justify-between items-center gap-1 no-print">
+                    <button onclick="testAgentNowGlobal(${a.id}, '${a.name}')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10px] flex items-center gap-1 shadow-2xs">
+                        <span>🧪</span> <span>إرسال تجربة</span>
+                    </button>
+                    <div class="flex gap-1">
+                        <button onclick="openEditAgentModal(${a.id}, '${escape(a.name)}', '${a.category || 'ADVISORY'}', '${a.trigger_schedule}', '${escape(a.target_channel || '')}', '${safePromptB64}')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[10px]">
+                            ✏️ تعديل
+                        </button>
+                        <button onclick="toggleAgentStatus(${a.id}, ${!a.is_active})" class="px-2 py-1 border ${a.is_active ? 'border-amber-400 text-amber-800' : 'border-emerald-500 text-emerald-800'} font-bold rounded text-[10px]">
+                            ${a.is_active ? 'إيقاف' : 'تفعيل'}
+                        </button>
+                        <button onclick="deleteAgent(${a.id}, '${a.name}')" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-[10px]">
+                            حذف
+                        </button>
+                    </div>
+                </div>
+            </div>`;
         }
-        function closeTargetStageModal() { document.getElementById('target-stage-modal').classList.add('hidden'); }
 
-        function openTargetCloseModal(id) {
-            document.getElementById('close-target-id').value = id;
-            document.getElementById('close-target-modal').classList.remove('hidden');
-        }
-        function closeTargetCloseModal() { document.getElementById('close-target-modal').classList.add('hidden'); }
-
-        function openEditRepModal(id, name, code, region, phone, hasTarget, target, lang) {
-            document.getElementById('edit-rep-id').value = id;
-            document.getElementById('edit-rep-name-input').value = unescape(name);
-            document.getElementById('edit-rep-code-input').value = unescape(code);
-            document.getElementById('edit-rep-region-input').value = unescape(region);
-            document.getElementById('edit-rep-phone-input').value = phone;
-            document.getElementById('edit-rep-language-select').value = lang || 'AR';
-            document.getElementById('edit-rep-has-target-toggle').checked = hasTarget;
-            document.getElementById('edit-rep-target-input').value = target || 0;
-            toggleEditTargetInput(hasTarget);
-            document.getElementById('edit-rep-modal').classList.remove('hidden');
-        }
-        function closeEditRepModal() { document.getElementById('edit-rep-modal').classList.add('hidden'); }
-
-        function openEditCustomerModal(id, comp, brand, sect, reg, pers, ph, repId, notes) {
-            document.getElementById('edit-cust-id').value = id;
-            document.getElementById('edit-cust-company-name').value = unescape(comp) || '';
-            document.getElementById('edit-cust-brand-name').value = unescape(brand) || '';
-            document.getElementById('edit-cust-sector').value = unescape(sect) || '';
-            document.getElementById('edit-cust-region').value = unescape(reg) || '';
-            document.getElementById('edit-cust-contact-person').value = unescape(pers) || '';
-            document.getElementById('edit-cust-phone').value = ph || '';
-            document.getElementById('edit-cust-rep-select').value = repId || '';
-            document.getElementById('edit-cust-notes').value = unescape(notes) || '';
-            document.getElementById('edit-customer-modal').classList.remove('hidden');
-        }
-        function closeEditCustomerModal() { document.getElementById('edit-customer-modal').classList.add('hidden'); }
-
-        function openSampleFeedbackModal(id, currentNotes) {
-            document.getElementById('feedback-sample-id').value = id;
-            document.getElementById('feedback-notes-input').value = unescape(currentNotes) || '';
-            document.getElementById('sample-feedback-modal').classList.remove('hidden');
-        }
-        function closeSampleFeedbackModal() { document.getElementById('sample-feedback-modal').classList.add('hidden'); }
-
-        function openConvertSampleModal(id) {
-            document.getElementById('convert-sample-id').value = id;
-            document.getElementById('convert-sample-po-number').value = '';
-            document.getElementById('convert-sample-po-value').value = '';
-            document.getElementById('convert-sample-modal').classList.remove('hidden');
-        }
-        function closeConvertSampleModal() { document.getElementById('convert-sample-modal').classList.add('hidden'); }
-
-        function openEditCalendarModal(id, cust, rep, task, sched, reminder, loc, notes) {
-            document.getElementById('edit-cal-id').value = id;
-            document.getElementById('edit-cal-customer-input').value = unescape(cust) || '';
-            document.getElementById('edit-cal-rep-select').value = unescape(rep) || '';
-            document.getElementById('edit-cal-task-type').value = unescape(task) || '';
-            document.getElementById('edit-cal-scheduled-at').value = sched ? sched.replace(" ", "T") : '';
-            document.getElementById('edit-cal-location').value = unescape(loc) || '';
-            document.getElementById('edit-cal-notes').value = unescape(notes) || '';
-            document.getElementById('edit-calendar-modal').classList.remove('hidden');
-        }
-        function closeEditCalendarModal() { document.getElementById('edit-calendar-modal').classList.add('hidden'); }
-
-        function openNewProductModal() { document.getElementById('new-product-modal').classList.remove('hidden'); }
-        function closeNewProductModal() { document.getElementById('new-product-modal').classList.add('hidden'); }
-
-        function openNewRepModal() { document.getElementById('new-rep-modal').classList.remove('hidden'); }
-        function closeNewRepModal() { document.getElementById('new-rep-modal').classList.add('hidden'); }
-
-        function openNewCustomerModal() { document.getElementById('new-customer-modal').classList.remove('hidden'); }
-        function closeNewCustomerModal() { document.getElementById('new-customer-modal').classList.add('hidden'); }
-
-        function openNewCalendarModal() { 
-            const now = new Date();
-            const input = document.getElementById('cal-scheduled-at');
-            if (input) input.value = now.toISOString().slice(0, 16);
-            document.getElementById('new-calendar-modal').classList.remove('hidden'); 
-        }
-        function closeNewCalendarModal() { document.getElementById('new-calendar-modal').classList.add('hidden'); }
-
-        function openExpenseModal() { document.getElementById('expense-modal').classList.remove('hidden'); }
-        function closeExpenseModal() { document.getElementById('expense-modal').classList.add('hidden'); }
-
-        function openNewSampleModal() { 
-            const d = new Date().toISOString().split('T')[0];
-            const dateIn = document.getElementById('sample-date');
-            if (dateIn) dateIn.value = d;
-            document.getElementById('new-sample-modal').classList.remove('hidden'); 
-        }
-        function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
-
-        function openNewAgentModal() { document.getElementById('new-agent-modal').classList.remove('hidden'); }
-        function closeNewAgentModal() { document.getElementById('new-agent-modal').classList.add('hidden'); }
-
-        function openEditAgentModal(id, name, category, schedule, channel, promptBase64) {
-            document.getElementById('edit-agent-id').value = id;
-            document.getElementById('edit-agent-name').value = unescape(name);
-            document.getElementById('edit-agent-category').value = category || 'ADVISORY';
-            document.getElementById('edit-agent-schedule').value = schedule || 'DAILY_MORNING';
-            document.getElementById('edit-agent-target-channel').value = unescape(channel || '');
+        async function loadAgentsData() {
             try {
-                document.getElementById('edit-agent-prompt').value = decodeURIComponent(escape(atob(promptBase64)));
-            } catch(e) {
-                document.getElementById('edit-agent-prompt').value = promptBase64;
+                const res = await fetch('/api/agents');
+                const agents = await res.json();
+                const advisoryContainer = document.getElementById('advisory-agents-grid');
+                const fieldContainer = document.getElementById('field-agents-grid');
+
+                const advisoryAgents = agents.filter(a => (a.category || 'ADVISORY') === 'ADVISORY');
+                const fieldAgents = agents.filter(a => a.category === 'FIELD_OPERATIONS');
+
+                if (advisoryContainer) {
+                    advisoryContainer.innerHTML = advisoryAgents.length > 0 
+                        ? advisoryAgents.map(a => renderAgentCard(a)).join('')
+                        : '<div class="col-span-3 p-4 bg-gray-50 border border-dashed rounded-xl text-center text-xs text-gray-400">لا يوجد وكلاء في المجلس الاستشاري.</div>';
+                }
+
+                if (fieldContainer) {
+                    fieldContainer.innerHTML = fieldAgents.length > 0 
+                        ? fieldAgents.map(a => renderAgentCard(a)).join('')
+                        : '<div class="col-span-3 p-4 bg-gray-50 border border-dashed rounded-xl text-center text-xs text-gray-400">لا يوجد وكلاء ميدانيين.</div>';
+                }
+            } catch (e) {
+                console.warn("loadAgentsData:", e);
             }
-            document.getElementById('edit-agent-modal').classList.remove('hidden');
-        }
-        function closeEditAgentModal() { document.getElementById('edit-agent-modal').classList.add('hidden'); }
-
-        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
-        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
-
-        function toggleTargetInput(checked) {
-            const el = document.getElementById('rep-target-box');
-            if (el) el.classList.toggle('hidden', !checked);
         }
 
-        function toggleEditTargetInput(checked) {
-            const el = document.getElementById('edit-rep-target-box');
-            if (el) el.classList.toggle('hidden', !checked);
+        // 5. الدالة المركزية الشاملة لجلب البيانات (معزولة بالكامل بـ try / catch)
+        async function loadAllData() {
+            try { loadSavedTestPhone(); } catch(e) {}
+            try { checkWhatsAppLiveStatus(); } catch(e) {}
+            try { await loadAgentsData(); } catch(e) {}
+
+            // جلب المندوبين
+            try {
+                const repsRes = await fetch('/api/reps');
+                const reps = await repsRes.json();
+                allRepsCache = reps;
+                let totalSales = 0;
+                let totalExp = 0;
+
+                const overviewTbody = document.getElementById('overview-reps-tbody');
+                if (overviewTbody) {
+                    overviewTbody.innerHTML = reps.map(r => {
+                        totalSales += (r.achieved_sales || 0);
+                        totalExp += (r.total_expenses || 0);
+                        return `
+                        <tr>
+                            <td class="p-3 font-bold">${r.name}</td>
+                            <td class="p-3 text-gray-600">${r.region}</td>
+                            <td class="p-3 font-bold text-emerald-700">${(r.achieved_sales || 0).toLocaleString()} ر.ع</td>
+                            <td class="p-3">${r.has_target ? (r.monthly_target || 0).toLocaleString() + ' ر.ع' : 'قياس مفتوح'}</td>
+                            <td class="p-3 font-semibold text-amber-800">${(r.total_expenses || 0).toLocaleString()} ر.ع</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span></td>
+                        </tr>`;
+                    }).join('');
+                }
+
+                document.getElementById('kpi-total-sales').innerText = `${totalSales.toLocaleString()} ر.ع`;
+                document.getElementById('kpi-total-expenses').innerText = `${totalExp.toLocaleString()} ر.ع`;
+
+                const repsGrid = document.getElementById('reps-grid-cards');
+                if (repsGrid) {
+                    repsGrid.innerHTML = reps.map(r => `
+                        <div class="p-4 rounded-xl border brand-border brand-tint space-y-2 flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-sm text-[#3A056A]">${r.name}</span>
+                                    <div class="flex items-center gap-1">
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-100 text-[#3A056A]">${r.preferred_language || 'AR'}</span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${r.status}</span>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-600">${r.region} | الكود: <span class="font-mono">${r.employee_code}</span></div>
+                                <div class="text-xs font-mono font-bold text-[#3A056A]">الهاتف: ${r.phone_number}</div>
+                            </div>
+                            <div class="pt-2 border-t flex justify-end gap-1.5">
+                                <button onclick="openEditRepModal(${r.id}, '${escape(r.name)}', '${escape(r.employee_code)}', '${escape(r.region)}', '${r.phone_number}', ${r.has_target}, ${r.monthly_target || 0}, '${r.preferred_language || 'AR'}')" class="px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-xs">تعديل</button>
+                                <button onclick="deleteRep(${r.id}, '${r.name}')" class="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-xs">حذف</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                const repOptionsHTML = reps.map(r => `<option value="${r.id}">${r.name} (${r.region})</option>`).join('');
+                ['cust-rep-select', 'edit-cust-rep-select', 'tgt-rep-select', 'exp-rep-select'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = (id.includes('cust-rep') ? '<option value="">-- بدون تعيين --</option>' : '') + repOptionsHTML;
+                });
+                
+                const repNamesHTML = reps.map(r => `<option value="${r.name}">${r.name} (${r.region})</option>`).join('');
+                const sRep = document.getElementById('sample-rep-select');
+                if (sRep) sRep.innerHTML = repNamesHTML;
+
+                const firstCalRep = document.querySelector('.cal-rep-select-item');
+                if (firstCalRep) firstCalRep.innerHTML = repNamesHTML;
+
+                const editCalRep = document.getElementById('edit-cal-rep-select');
+                if (editCalRep) editCalRep.innerHTML = repNamesHTML;
+
+                const repsWhitelist = document.getElementById('settings-reps-whitelist-list');
+                if (repsWhitelist) {
+                    repsWhitelist.innerHTML = reps.map(r => `
+                        <div class="p-3 bg-purple-50/50 border border-purple-200 rounded-xl flex justify-between items-center text-xs">
+                            <div>
+                                <div class="font-bold text-[#3A056A]">${r.name}</div>
+                                <div class="text-[10px] text-gray-500">${r.region}</div>
+                            </div>
+                            <span class="font-mono font-bold text-purple-900 bg-white px-2 py-1 rounded border">${r.phone_number}</span>
+                        </div>
+                    `).join('');
+                }
+            } catch(e) { console.error("Reps load error:", e); }
+
+            // جلب العملاء
+            try {
+                const custRes = await fetch('/api/customers');
+                const custs = await custRes.json();
+                const custTableBody = document.getElementById('customers-table-body');
+                if (custTableBody) {
+                    custTableBody.innerHTML = custs.map(c => `
+                        <tr>
+                            <td class="p-3 font-bold">${c.company_name || '—'}</td>
+                            <td class="p-3 font-semibold text-purple-900">${c.brand_name || '—'}</td>
+                            <td class="p-3 text-gray-600">${c.region || 'مسقط'} | ${c.sector || 'عام'}</td>
+                            <td class="p-3"><div>${c.contact_person || '—'}</div><div class="font-mono text-gray-500 text-[10px]">${c.phone || '—'}</div></td>
+                            <td class="p-3 font-bold text-[#3A056A]">${c.assigned_rep_name || '—'}</td>
+                            <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id ? '✓ ' + c.whatsapp_group_id : '<span class="text-gray-400">غير مربوط</span>'}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${c.status || 'نشط'}</span></td>
+                            <td class="p-3 no-print">
+                                <div class="flex gap-2">
+                                    <button onclick="openEditCustomerModal(${c.id}, '${escape(c.company_name || '')}', '${escape(c.brand_name || '')}', '${escape(c.sector || '')}', '${escape(c.region || '')}', '${escape(c.contact_person || '')}', '${escape(c.phone || '')}', ${c.assigned_rep_id || 'null'}, '${escape(c.notes || '')}')" class="text-blue-600 hover:text-blue-800 font-bold">تعديل</button>
+                                    <span class="text-gray-300">|</span>
+                                    <button onclick="deleteCustomer(${c.id}, '${c.company_name}')" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+
+                const custOptionsHTML = custs.map(c => `<option value="${c.id}">${c.company_name} (${c.brand_name || c.region})</option>`).join('');
+                const setWaSelect = document.getElementById('settings-wa-customer-select');
+                if (setWaSelect) setWaSelect.innerHTML = custOptionsHTML;
+                const tgtCustSelect = document.getElementById('tgt-customer-select');
+                if (tgtCustSelect) tgtCustSelect.innerHTML = custOptionsHTML;
+                const sampleDList = document.getElementById('sample-customers-datalist');
+                if (sampleDList) sampleDList.innerHTML = custs.map(c => `<option value="${c.company_name}">`).join('');
+                const calDList = document.getElementById('cal-customers-datalist');
+                if (calDList) calDList.innerHTML = custs.map(c => `<option value="${c.company_name}">`).join('');
+
+                const monitoredCusts = custs.filter(c => c.whatsapp_group_id && c.whatsapp_group_id.trim() !== '');
+                const monTbody = document.getElementById('settings-monitored-groups-tbody');
+                if (monTbody) {
+                    monTbody.innerHTML = monitoredCusts.length > 0 ? monitoredCusts.map(c => `
+                        <tr>
+                            <td class="p-2.5 font-bold">${c.company_name}</td>
+                            <td class="p-2.5 font-semibold text-purple-900">${c.brand_name || '—'}</td>
+                            <td class="p-2.5 font-mono text-purple-800">${c.whatsapp_group_id}</td>
+                            <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">مراقبة حصرية نشطة ✓</span></td>
+                            <td class="p-2.5 no-print"><button onclick="unassignGroup(${c.id})" class="text-red-600 hover:text-red-800 underline text-[11px]">فك الربط</button></td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد مجموعات مربوطة حالياً. استخدم الأداة أعلاه لربط المجموعات بنقرة واحدة.</td></tr>';
+                }
+            } catch(e) { console.error("Customers load error:", e); }
+
+            // جلب المنتجات
+            try {
+                const pRes = await fetch('/api/products');
+                allProductsCache = await pRes.json();
+                const pTbody = document.getElementById('products-catalog-tbody');
+                if (pTbody) {
+                    pTbody.innerHTML = allProductsCache.length > 0 ? allProductsCache.map(p => `
+                        <tr>
+                            <td class="p-3 font-mono font-bold text-gray-600">${p.sku}</td>
+                            <td class="p-3 font-bold text-[#3A056A]">${p.name_ar}</td>
+                            <td class="p-3 text-gray-700">${p.name_en || '—'}</td>
+                            <td class="p-3 font-semibold">${p.weight_spec || '—'}</td>
+                            <td class="p-3 text-gray-600">${p.primary_packaging || '—'}</td>
+                            <td class="p-3 text-gray-600">${p.carton_pack_spec || '—'}</td>
+                            <td class="p-3 no-print">
+                                <button onclick="deleteProduct(${p.id})" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                            </td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا توجد منتجات مسجلة. حمل نموذج الإكسل من الأعلى أو أضف صنفاً يدوياً.</td></tr>';
+                }
+                const prodDList = document.getElementById('sample-products-datalist');
+                if (prodDList) {
+                    prodDList.innerHTML = allProductsCache.map(p => `<option value="${p.name_ar}">${p.name_en ? p.name_en + ' - ' : ''}${p.weight_spec}</option>`).join('');
+                }
+            } catch(e) { console.error("Products load error:", e); }
+
+            // جلب الأهداف (Pipeline)
+            try {
+                const tgtRes = await fetch('/api/targets');
+                const targets = await tgtRes.json();
+                const activeTargets = targets.filter(t => t.status === 'IN_PROGRESS');
+                document.getElementById('kpi-active-targets').innerText = activeTargets.length;
+                const tgtContainer = document.getElementById('targets-cards-container');
+                if (tgtContainer) {
+                    tgtContainer.innerHTML = targets.map(t => {
+                        const stageInfo = STAGES_MAP[t.pipeline_stage] || { text: t.pipeline_stage, color: 'bg-purple-100 text-[#3A056A]' };
+                        return `
+                        <div class="p-4 rounded-xl border ${t.status === 'CLOSED' ? 'border-emerald-300 bg-emerald-50/40' : 'brand-border bg-white'} shadow-xs space-y-3 flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <span class="font-bold text-sm text-gray-900">${t.title}</span>
+                                        <div class="text-xs text-[#3A056A] font-semibold mt-0.5">🏢 العميل: ${t.customer_name}</div>
+                                        <div class="text-xs text-gray-500">👤 المتابع: <strong>${t.rep_name}</strong></div>
+                                    </div>
+                                    <span class="px-2.5 py-1 rounded text-[10px] font-bold ${stageInfo.color}">${stageInfo.text}</span>
+                                </div>
+                                <div class="p-2 bg-purple-50/50 rounded-lg text-xs flex justify-between">
+                                    <span>القيمة المتوقعة:</span>
+                                    <span class="font-bold text-[#3A056A]">${(t.target_value || 0).toLocaleString()} ر.ع</span>
+                                </div>
+                                <div class="text-[11px] text-gray-500 flex justify-between">
+                                    <span>المدة في المسار: ${t.duration_text || '—'}</span>
+                                    <span>آخر تحديث: ${t.last_note_at_str || '—'}</span>
+                                </div>
+                                ${t.last_note ? `<div class="p-1.5 bg-gray-50 rounded text-xs text-gray-700 border">ملاحظة: ${t.last_note}</div>` : ''}
+                                ${t.status === 'CLOSED' ? `
+                                <div class="p-2 bg-emerald-100/60 rounded text-xs font-bold text-emerald-900 border border-emerald-300">
+                                    أمر الشراء: ${t.po_number} (${(t.po_value || 0).toLocaleString()} ر.ع)
+                                </div>` : ''}
+                            </div>
+                            
+                            <div class="pt-2 border-t flex justify-between items-center gap-1 no-print">
+                                ${t.status !== 'CLOSED' ? `
+                                <div class="flex gap-1.5">
+                                    <button onclick="openTargetStageModal(${t.id}, '${t.pipeline_stage}', '${escape(t.last_note || '')}')" class="px-2.5 py-1.5 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded-lg text-xs">
+                                        ترقية المرحلة ↗
+                                    </button>
+                                    <button onclick="openTargetCloseModal(${t.id})" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs">
+                                        إغلاق بـ PO ✓
+                                    </button>
+                                </div>
+                                ` : '<span class="text-xs text-emerald-700 font-bold">مكتمل ومعتمد</span>'}
+                                <button onclick="deleteTarget(${t.id}, '${t.title}')" class="text-red-600 hover:text-red-800 font-bold text-xs">حذف</button>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            } catch(e) { console.error("Targets load error:", e); }
+
+            // جلب المصاريف
+            try {
+                const expRes = await fetch('/api/expenses');
+                const expenses = await expRes.json();
+                const expTbody = document.getElementById('expenses-log-table-body');
+                if (expTbody) {
+                    expTbody.innerHTML = expenses.length > 0 ? expenses.map(x => `
+                        <tr>
+                            <td class="p-3 font-mono font-bold text-gray-500">#EXP-${x.id}</td>
+                            <td class="p-3 font-bold text-[#3A056A]">${x.rep_name}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded bg-purple-50 text-purple-900 font-bold border border-purple-200">${x.expense_type}</span></td>
+                            <td class="p-3 font-black text-amber-800">${x.amount.toLocaleString()} ر.ع</td>
+                            <td class="p-3 text-gray-600">${x.notes || '—'}</td>
+                            <td class="p-3 text-gray-400 font-mono text-[11px]">${x.created_at_str}</td>
+                            <td class="p-3 no-print">
+                                <button onclick="deleteExpense(${x.id})" class="text-red-600 hover:text-red-800 font-bold">حذف</button>
+                            </td>
+                        </tr>
+                    `).join('') : '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا توجد سندات مصاريف مسجلة حتى الآن</td></tr>';
+                }
+            } catch(e) { console.error("Expenses load error:", e); }
+
+            // جلب التقويم
+            try {
+                const cRes = await fetch('/api/calendar');
+                const cal = await cRes.json();
+                const calList = document.getElementById('calendar-events-list');
+                if (calList) {
+                    calList.innerHTML = cal.map(e => {
+                        const isCompleted = e.execution_status === 'COMPLETED';
+                        return `
+                        <div class="p-3.5 rounded-xl border ${isCompleted ? 'border-emerald-300 bg-emerald-50/40' : 'brand-border brand-tint'} flex justify-between items-center text-xs">
+                            <div>
+                                <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
+                                <div class="text-gray-600 mt-0.5">العميل: <strong>${e.customer_name}</strong> | المكلّفون: <strong class="text-[#3A056A]">${e.rep_name}</strong> | الموعد: <span class="font-mono font-bold text-purple-900">${e.scheduled_at}</span> | الموقع: ${e.location}</div>
+                                ${e.change_notes ? `<div class="text-amber-800 bg-amber-50 p-1 rounded mt-1 border text-[11px]">ملاحظة: ${e.change_notes}</div>` : ''}
+                            </div>
+                            <div class="flex items-center gap-2 no-print">
+                                <span class="px-2.5 py-1 rounded text-xs font-bold ${isCompleted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                                    ${isCompleted ? 'مكتملة ✓' : 'مجدولة'}
+                                </span>
+                                ${!isCompleted ? `
+                                <button onclick="updateCalendarStatus(${e.id}, 'COMPLETED')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px]">إتمام ✓</button>
+                                <button onclick="openEditCalendarModal(${e.id}, '${escape(e.customer_name || '')}', '${escape(e.rep_name || '')}', '${escape(e.task_type || '')}', '${e.scheduled_at || ''}', '', '${escape(e.location || '')}', '${escape(e.change_notes || '')}')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[11px]">تعديل</button>
+                                ` : ''}
+                                <button onclick="deleteCalendarEvent(${e.id})" class="text-red-600 hover:text-red-800 font-bold text-[11px]">حذف</button>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            } catch(e) { console.error("Calendar load error:", e); }
+
+            // جلب العينات
+            try {
+                const sRes = await fetch('/api/samples');
+                allSamplesCache = await sRes.json();
+                renderSamplesTable(allSamplesCache);
+            } catch(e) { console.error("Samples load error:", e); }
+
+            // جلب إعدادات المجموعات
+            try {
+                const confRes = await fetch('/api/system/config');
+                const conf = await confRes.json();
+                const logInput = document.getElementById('conf-logistics-group');
+                const mgmtInput = document.getElementById('conf-management-group');
+                if (logInput) logInput.value = conf.logistics_group_id || '';
+                if (mgmtInput) mgmtInput.value = conf.management_group_id || '';
+            } catch(e) {}
+
+            try { await loadExpenseCategories(); } catch(e) {}
+            try { await loadWhatsAppLogs(); } catch(e) {}
         }
 
-        function downloadProductsTemplate() {
-            const csvContent = "\uFEFF" + 
-                "اسم المنتج بالعربي,Product Name EN,كود الصنف SKU,الوزن الحجم,التغليف الداخلي,مواصفة وسعة الكرتون الخارجي\n" +
-                "خبز برجر بريوش 4 إنش,Brioche Burger Bun 4 inch,SKU-BUN-01,75g,كيس مفرغ 6 حبات,8 أكياس (48 حبة)\n" +
-                "كرواسون زبدة سادة ميني,Mini Butter Croissant,SKU-CRO-02,35g,كيس نايلون مخصص,120 حبة بالكرتون مجمد\n" +
-                "خبز توست أبيض فاخر,White Sandwich Bread,SKU-TST-03,600g,كيس مع قفل سلكي,12 كيس بالكرتون\n";
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "نموذج_كتالوج_منتجات_المصنع.csv";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        // ----------------- الصفوف الديناميكية (+) للعينات المتعددة -----------------
+        // 6. الصفوف الديناميكية (+) للعينات المتعددة
         function addSampleItemRow() {
             const container = document.getElementById('sample-items-rows-container');
             const row = document.createElement('div');
@@ -1300,7 +1512,7 @@
             }
         }
 
-        // ----------------- الصفوف الديناميكية (+) للزيارات المتعددة الموظفين -----------------
+        // 7. الصفوف الديناميكية (+) للزيارات المشتركة
         function addCalendarRepRow() {
             const container = document.getElementById('calendar-reps-container');
             const row = document.createElement('div');
@@ -1361,7 +1573,7 @@
             }
         }
 
-        // ----------------- دوال العمليات الأساسية -----------------
+        // 8. باقي دوال الـ CRUD الأساسية
         async function submitNewTarget() {
             const title = document.getElementById('tgt-title').value.trim();
             const customer_id = parseInt(document.getElementById('tgt-customer-select').value);
@@ -1793,7 +2005,7 @@
             }
         }
 
-        // ----------------- دوال الواتساب والمجموعات -----------------
+        // 9. دوال الواتساب والمجموعات
         async function fetchDiscoveredGroups() {
             const container = document.getElementById('discovered-groups-container');
             const list = document.getElementById('discovered-groups-list');
@@ -1968,7 +2180,7 @@
             if (showAlert) alert("تم حفظ رقم هاتف الاختبار بنجاح ✓");
         }
 
-        // ----------------- دوال تحميل واستعراض الجداول -----------------
+        // 10. دوال استعراض وتصفية الجداول
         function renderSamplesTable(samplesList) {
             const tbody = document.getElementById('samples-table-body');
             if (!tbody) return;
@@ -2062,7 +2274,7 @@
             } catch(e) {}
         }
 
-        // ----------------- بدء التشغيل عند تحميل الصفحة -----------------
+        // 11. بدء التشغيل التلقائي عند اكتمال تحميل الـ DOM
         window.addEventListener('DOMContentLoaded', () => {
             try { loadSavedTestPhone(); } catch(e) {}
             if (checkSessionPersisted()) {
