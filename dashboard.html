@@ -74,7 +74,7 @@
         </div>
     </div>
 
-    <!-- القائمة الجانبية المباشرة -->
+    <!-- القائمة الجانبية -->
     <aside class="w-64 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
@@ -150,7 +150,7 @@
                 </button>
 
                 <button onclick="logoutSession()" title="تسجيل الخروج" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke_linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                 </button>
             </div>
         </header>
@@ -201,7 +201,7 @@
                     <div class="flex justify-between items-center no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة والتغليف (مصنع تنمية الغذاء)</h3>
-                            <div class="text-xs text-gray-500">حمل نموذج الإكسل، املأ الأصناف ثم ارفعه مباشرة، أو أضف الصنف يدوياً.</div>
+                            <div class="text-xs text-gray-500">حمل نموذج الإكسل الجاهز، املأ أصناف المصنع ثم ارفعه مباشرة، أو أضف الصنف يدوياً.</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="downloadProductsTemplate()" class="px-3 py-2 bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 font-bold text-xs rounded-lg shadow-2xs flex items-center gap-1.5">
@@ -562,7 +562,7 @@
         </div>
     </main>
 
-    <!-- ==================== كافة النوافذ المنبثقة (MODALS) ==================== -->
+    <!-- كافة النوافذ المنبثقة (MODALS) -->
     <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-2xl p-6 w-[500px] space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي / فرصة جديدة</h3>
@@ -848,8 +848,134 @@
         </div>
     </div>
 
+    <!-- كود الـ JAVASCRIPT المحصن بالكامل -->
     <script>
-        // ----------------- دوال التوثيق والجلسة -----------------
+        // تعريف المتغيرات والمصفوفات في قمة الملف لضمان توافرها في كل مكان
+        const tabs = ['overview', 'products-catalog', 'targets', 'reps', 'customers', 'samples', 'calendar', 'agents', 'expenses-log', 'whatsapp-feed', 'whatsapp-settings'];
+        const titles = {
+            overview: 'لوحة التحكم',
+            'products-catalog': 'المنتجات',
+            targets: 'الاهداف',
+            reps: 'الفريق',
+            customers: 'العملاء',
+            samples: 'العينات',
+            calendar: 'التقويم',
+            agents: 'الوكلاء',
+            'expenses-log': 'المصاريف',
+            'whatsapp-feed': 'رادار المحادثات',
+            'whatsapp-settings': 'اعداد الواتساب'
+        };
+
+        const STAGES_MAP = {
+            LEAD_CONTACT: { text: '1. التواصل الأولي', color: 'bg-blue-100 text-blue-800' },
+            MEETING_REQUIREMENTS: { text: '2. حصر الاحتياج', color: 'bg-indigo-100 text-indigo-800' },
+            SAMPLE_DELIVERY: { text: '3. تجربة العينات', color: 'bg-purple-100 text-purple-800' },
+            SAMPLE_FEEDBACK: { text: '4. تقييم الشيف', color: 'bg-amber-100 text-amber-800' },
+            PRICE_NEGOTIATION: { text: '5. التفاوض والأسعار', color: 'bg-orange-100 text-orange-800' },
+            PO_CLOSED_WON: { text: '6. أمر شراء معتمد ✓', color: 'bg-emerald-100 text-emerald-800' }
+        };
+
+        let allSamplesCache = [];
+        let allProductsCache = [];
+        let waPollingTimer = null;
+
+        // ----------------- دوال النوافذ والتبويبات -----------------
+        function switchTab(id) {
+            try {
+                tabs.forEach(t => {
+                    const el = document.getElementById(`tab-${t}`);
+                    const nav = document.getElementById(`nav-${t}`);
+                    if (el) el.classList.add('hidden');
+                    if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
+                });
+                const activeTab = document.getElementById(`tab-${id}`);
+                const activeNav = document.getElementById(`nav-${id}`);
+                if (activeTab) activeTab.classList.remove('hidden');
+                if (activeNav) activeNav.className = "w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
+                const titleEl = document.getElementById('current-tab-title');
+                if (titleEl) titleEl.innerText = titles[id] || '';
+                
+                if (id === 'whatsapp-feed') loadWhatsAppLogs();
+            } catch(e) {
+                console.error("switchTab error:", e);
+            }
+        }
+
+        function openNewTargetModal() { document.getElementById('new-target-modal').classList.remove('hidden'); }
+        function closeNewTargetModal() { document.getElementById('new-target-modal').classList.add('hidden'); }
+
+        function openNewProductModal() { document.getElementById('new-product-modal').classList.remove('hidden'); }
+        function closeNewProductModal() { document.getElementById('new-product-modal').classList.add('hidden'); }
+
+        function openNewRepModal() { document.getElementById('new-rep-modal').classList.remove('hidden'); }
+        function closeNewRepModal() { document.getElementById('new-rep-modal').classList.add('hidden'); }
+
+        function openNewCustomerModal() { document.getElementById('new-customer-modal').classList.remove('hidden'); }
+        function closeNewCustomerModal() { document.getElementById('new-customer-modal').classList.add('hidden'); }
+
+        function openNewCalendarModal() { 
+            const now = new Date();
+            const input = document.getElementById('cal-scheduled-at');
+            if (input) input.value = now.toISOString().slice(0, 16);
+            document.getElementById('new-calendar-modal').classList.remove('hidden'); 
+        }
+        function closeNewCalendarModal() { document.getElementById('new-calendar-modal').classList.add('hidden'); }
+
+        function openExpenseModal() { document.getElementById('expense-modal').classList.remove('hidden'); }
+        function closeExpenseModal() { document.getElementById('expense-modal').classList.add('hidden'); }
+
+        function openNewSampleModal() { 
+            const d = new Date().toISOString().split('T')[0];
+            const dateIn = document.getElementById('sample-date');
+            if (dateIn) dateIn.value = d;
+            document.getElementById('new-sample-modal').classList.remove('hidden'); 
+        }
+        function closeNewSampleModal() { document.getElementById('new-sample-modal').classList.add('hidden'); }
+
+        function openNewAgentModal() { document.getElementById('new-agent-modal').classList.remove('hidden'); }
+        function closeNewAgentModal() { document.getElementById('new-agent-modal').classList.add('hidden'); }
+
+        function openEditAgentModal(id, name, category, schedule, channel, promptBase64) {
+            document.getElementById('edit-agent-id').value = id;
+            document.getElementById('edit-agent-name').value = unescape(name);
+            document.getElementById('edit-agent-category').value = category || 'ADVISORY';
+            document.getElementById('edit-agent-schedule').value = schedule || 'DAILY_MORNING';
+            document.getElementById('edit-agent-target-channel').value = unescape(channel || '');
+            try {
+                document.getElementById('edit-agent-prompt').value = decodeURIComponent(escape(atob(promptBase64)));
+            } catch(e) {
+                document.getElementById('edit-agent-prompt').value = promptBase64;
+            }
+            document.getElementById('edit-agent-modal').classList.remove('hidden');
+        }
+        function closeEditAgentModal() { document.getElementById('edit-agent-modal').classList.add('hidden'); }
+
+        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
+        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
+
+        function toggleTargetInput(checked) {
+            const el = document.getElementById('rep-target-box');
+            if (el) el.classList.toggle('hidden', !checked);
+        }
+
+        function downloadProductsTemplate() {
+            const csvContent = "\uFEFF" + 
+                "اسم المنتج بالعربي,Product Name EN,كود الصنف SKU,الوزن الحجم,التغليف الداخلي,مواصفة وسعة الكرتون الخارجي\n" +
+                "خبز برجر بريوش 4 إنش,Brioche Burger Bun 4 inch,SKU-BUN-01,75g,كيس مفرغ 6 حبات,8 أكياس (48 حبة)\n" +
+                "كرواسون زبدة سادة ميني,Mini Butter Croissant,SKU-CRO-02,35g,كيس نايلون مخصص,120 حبة بالكرتون مجمد\n" +
+                "خبز توست أبيض فاخر,White Sandwich Bread,SKU-TST-03,600g,كيس مع قفل سلكي,12 كيس بالكرتون\n";
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "نموذج_كتالوج_منتجات_المصنع.csv";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // ----------------- دوال التوثيق والدخول -----------------
         function checkSessionPersisted() {
             return localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED' || document.cookie.includes('fdc_auth=AUTHENTICATED');
         }
@@ -901,36 +1027,468 @@
             if (codeInput) codeInput.value = '';
         }
 
-        function switchTab(id) {
-            tabs.forEach(t => {
-                const el = document.getElementById(`tab-${t}`);
-                const nav = document.getElementById(`nav-${t}`);
-                if (el) el.classList.add('hidden');
-                if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
+        // ----------------- دوال الوكلاء (عرض، تعديل، حذف، تنظيف) -----------------
+        function renderAgentCard(a) {
+            const safePromptB64 = btoa(unescape(encodeURIComponent(a.system_prompt || '')));
+            const channelBadge = a.target_channel 
+                ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-blue-50 text-blue-800 border border-blue-200" title="قناة الإرسال">🎯 ${a.target_channel}</span>` 
+                : `<span class="px-1.5 py-0.5 rounded text-[9px] bg-purple-50 text-purple-700 border border-purple-200" title="شاتك الخاص">📲 شاتك الخاص</span>`;
+
+            return `
+            <div class="p-4 rounded-xl border ${a.is_active ? 'brand-border bg-white shadow-xs' : 'border-gray-200 bg-gray-50 opacity-75'} space-y-3 flex flex-col justify-between">
+                <div class="space-y-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="font-bold text-sm text-gray-900">${a.name}</span>
+                            <div class="flex items-center gap-1.5 mt-1">
+                                <span class="text-[10px] text-purple-700 font-mono font-bold">${a.role_type}</span>
+                                ${channelBadge}
+                            </div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'}">
+                            ${a.is_active ? 'نشط ومفعّل ✓' : 'متوقف'}
+                        </span>
+                    </div>
+                    <div class="p-2.5 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-28 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
+                        <strong>البرومبت التوجيهي:</strong> ${a.system_prompt}
+                    </div>
+                </div>
+                <div class="pt-2 border-t flex justify-between items-center gap-1 no-print">
+                    <button onclick="testAgentNowGlobal(${a.id}, '${a.name}')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10px] flex items-center gap-1 shadow-2xs">
+                        <span>🧪</span> <span>إرسال تجربة</span>
+                    </button>
+                    <div class="flex gap-1">
+                        <button onclick="openEditAgentModal(${a.id}, '${escape(a.name)}', '${a.category || 'ADVISORY'}', '${a.trigger_schedule}', '${escape(a.target_channel || '')}', '${safePromptB64}')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[10px]">
+                            ✏️ تعديل
+                        </button>
+                        <button onclick="toggleAgentStatus(${a.id}, ${!a.is_active})" class="px-2 py-1 border ${a.is_active ? 'border-amber-400 text-amber-800' : 'border-emerald-500 text-emerald-800'} font-bold rounded text-[10px]">
+                            ${a.is_active ? 'إيقاف' : 'تفعيل'}
+                        </button>
+                        <button onclick="deleteAgent(${a.id}, '${a.name}')" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded text-[10px]">
+                            حذف
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        async function loadAgentsData() {
+            try {
+                const res = await fetch('/api/agents');
+                const agents = await res.json();
+                const advisoryContainer = document.getElementById('advisory-agents-grid');
+                const fieldContainer = document.getElementById('field-agents-grid');
+
+                const advisoryAgents = agents.filter(a => (a.category || 'ADVISORY') === 'ADVISORY');
+                const fieldAgents = agents.filter(a => a.category === 'FIELD_OPERATIONS');
+
+                if (advisoryContainer) {
+                    advisoryContainer.innerHTML = advisoryAgents.length > 0 
+                        ? advisoryAgents.map(a => renderAgentCard(a)).join('')
+                        : '<div class="col-span-3 p-4 bg-gray-50 border border-dashed rounded-xl text-center text-xs text-gray-400">لا يوجد وكلاء في المجلس الاستشاري حالياً. يمكنك إضافة وكيل جديد من الأعلى.</div>';
+                }
+
+                if (fieldContainer) {
+                    fieldContainer.innerHTML = fieldAgents.length > 0 
+                        ? fieldAgents.map(a => renderAgentCard(a)).join('')
+                        : '<div class="col-span-3 p-4 bg-gray-50 border border-dashed rounded-xl text-center text-xs text-gray-400">لا يوجد وكلاء ميدانيين حالياً.</div>';
+                }
+            } catch (e) {
+                console.error("loadAgentsData error:", e);
+            }
+        }
+
+        async function submitNewAgent() {
+            const name = document.getElementById('agent-name-input').value.trim();
+            const category = document.getElementById('agent-category-select').value;
+            const role_type = document.getElementById('agent-role-input').value.trim();
+            const trigger_schedule = document.getElementById('agent-schedule-select').value;
+            const target_channel = document.getElementById('agent-target-channel-input').value.trim();
+            const system_prompt = document.getElementById('agent-prompt-input').value.trim();
+
+            if (!name || !system_prompt) return alert("يرجى إدخال اسم الوكيل والبرومبت التوجيهي");
+
+            const res = await fetch('/api/agents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name, category, role_type: role_type || "CUSTOM_AGENT",
+                    trigger_schedule, target_channel, system_prompt
+                })
             });
-            const activeTab = document.getElementById(`tab-${id}`);
-            const activeNav = document.getElementById(`nav-${id}`);
-            if (activeTab) activeTab.classList.remove('hidden');
-            if (activeNav) activeNav.className = "w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
-            const titleEl = document.getElementById('current-tab-title');
-            if (titleEl) titleEl.innerText = titles[id] || '';
-            
-            if (id === 'whatsapp-feed') loadWhatsAppLogs();
+            if (res.ok) {
+                closeNewAgentModal();
+                await loadAgentsData();
+                alert("تم إنشاء الوكيل بنجاح ✓");
+            }
         }
 
-        function loadSavedTestPhone() {
-            const savedPhone = localStorage.getItem('fdc_global_test_phone');
-            const input = document.getElementById('global-test-phone');
-            if (input) input.value = savedPhone ? savedPhone : '+96893904404';
+        async function submitUpdateAgent() {
+            const id = document.getElementById('edit-agent-id').value;
+            const name = document.getElementById('edit-agent-name').value.trim();
+            const category = document.getElementById('edit-agent-category').value;
+            const trigger_schedule = document.getElementById('edit-agent-schedule').value;
+            const target_channel = document.getElementById('edit-agent-target-channel').value.trim();
+            const system_prompt = document.getElementById('edit-agent-prompt').value.trim();
+
+            const res = await fetch(`/api/agents/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, category, trigger_schedule, target_channel, system_prompt })
+            });
+            if (res.ok) {
+                closeEditAgentModal();
+                await loadAgentsData();
+                alert("تم تحديث بيانات الوكيل بنجاح ✓");
+            }
         }
 
-        function saveGlobalTestPhone(showAlert = false) {
-            const input = document.getElementById('global-test-phone');
-            if (!input) return;
-            const phone = input.value.trim();
-            if (!phone) return alert("يرجى إدخال رقم هاتف صالح");
-            localStorage.setItem('fdc_global_test_phone', phone);
-            if (showAlert) alert("تم حفظ رقم هاتف الاختبار بنجاح ✓");
+        async function deleteAgent(id, name) {
+            if (!confirm(`هل أنت متأكد من حذف الوكيل "${name}"؟`)) return;
+            const res = await fetch(`/api/agents/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAgentsData();
+        }
+
+        async function cleanDuplicateAgents() {
+            if (!confirm("هل تريد إزالة الوكلاء المكررين؟")) return;
+            const res = await fetch('/api/agents/clean-duplicates', { method: 'POST' });
+            if (res.ok) {
+                await loadAgentsData();
+                alert("تم تنظيف المكررات بنجاح ✓");
+            }
+        }
+
+        async function toggleAgentStatus(id, newStatus) {
+            await fetch(`/api/agents/${id}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: newStatus })
+            });
+            await loadAgentsData();
+        }
+
+        async function testAgentNowGlobal(id, agentName) {
+            const globalPhone = document.getElementById('global-test-phone').value.trim();
+            try {
+                const res = await fetch(`/api/agents/test-global`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agent_id: id, test_phone: globalPhone })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✅ تم إرسال التجربة بنجاح إلى: ${data.to}\n\nالنص المرسل:\n${data.message_preview}`);
+                } else {
+                    alert(`❌ تعذر الإرسال: ${data.detail}`);
+                }
+            } catch (e) {
+                alert("خطأ في الاتصال بالسيرفر");
+            }
+        }
+
+        // ----------------- دوال حفظ البيانات (منتجات، عملاء، أهداف، مصاريف) -----------------
+        async function submitNewProduct() {
+            const name_ar = document.getElementById('prod-name-ar').value.trim();
+            const name_en = document.getElementById('prod-name-en').value.trim();
+            const sku = document.getElementById('prod-sku').value.trim();
+            const weight = document.getElementById('prod-weight').value.trim();
+            const primary_pack = document.getElementById('prod-primary-pack').value.trim();
+            const carton_pack = document.getElementById('prod-carton-pack').value.trim();
+
+            if (!name_ar) return alert("يرجى إدخال اسم الصنف بالعربي");
+
+            const res = await fetch('/api/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name_ar, name_en, sku, weight_spec: weight, primary_packaging: primary_pack, carton_pack_spec: carton_pack })
+            });
+            if (res.ok) {
+                closeNewProductModal();
+                await loadAllData();
+                alert("تمت إضافة المنتج بنجاح ✓");
+            }
+        }
+
+        async function uploadProductsExcel(input) {
+            if (!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/products/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✅ تم استيراد وتحديث ${data.imported_count} منتج بنجاح!`);
+                    await loadAllData();
+                } else {
+                    alert(`❌ فشل الرفع: ${data.detail}`);
+                }
+            } catch(e) {
+                alert("خطأ أثناء معالجة الملف");
+            } finally {
+                input.value = '';
+            }
+        }
+
+        async function submitNewTarget() {
+            const title = document.getElementById('tgt-title').value.trim();
+            const customer_id = parseInt(document.getElementById('tgt-customer-select').value);
+            const rep_id = parseInt(document.getElementById('tgt-rep-select').value);
+            const target_value = parseFloat(document.getElementById('tgt-value').value) || 0;
+            const pipeline_stage = document.getElementById('tgt-stage-select').value;
+            const initial_note = document.getElementById('tgt-note').value.trim();
+
+            if (!title) return alert("يرجى كتابة عنوان الهدف البيعي");
+
+            const res = await fetch('/api/targets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, customer_id, rep_id, target_value, pipeline_stage, initial_note })
+            });
+            if (res.ok) {
+                closeNewTargetModal();
+                await loadAllData();
+                alert("تم إنشاء الفرصة البيعية بنجاح ✓");
+            }
+        }
+
+        async function submitNewRep() {
+            const name = document.getElementById('rep-name-input').value.trim();
+            const code = document.getElementById('rep-code-input').value.trim();
+            const region = document.getElementById('rep-region-input').value.trim();
+            const phone = document.getElementById('rep-phone-input').value.trim();
+            const lang = document.getElementById('rep-language-select').value;
+            const hasT = document.getElementById('rep-has-target-toggle').checked;
+            const targetVal = parseFloat(document.getElementById('rep-target-input')?.value) || 0;
+
+            if (!name || !phone) return alert("يرجى ملء الاسم ورقم الهاتف");
+
+            const res = await fetch('/api/reps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name, employee_code: code || "SE-" + Math.floor(100 + Math.random() * 900),
+                    region: region || "مسقط", phone_number: phone, has_target: hasT,
+                    monthly_target: targetVal, preferred_language: lang || "AR"
+                })
+            });
+            if (res.ok) {
+                closeNewRepModal();
+                await loadAllData();
+                alert("تم حفظ عضو فريق المبيعات بنجاح ✓");
+            }
+        }
+
+        async function submitNewCustomer() {
+            const company_name = document.getElementById('cust-company-name').value.trim();
+            const brand_name = document.getElementById('cust-brand-name').value.trim();
+            const region = document.getElementById('cust-region').value.trim();
+            const sector = document.getElementById('cust-sector').value.trim();
+            const contact_person = document.getElementById('cust-contact-person').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+            const repSelect = document.getElementById('cust-rep-select');
+            const notes = document.getElementById('cust-notes').value.trim();
+
+            if (!company_name || !phone) return alert("يرجى ملء اسم الشركة ورقم الهاتف");
+
+            const res = await fetch('/api/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    company_name, brand_name, sector: sector || "عام",
+                    region: region || "مسقط", contact_person: contact_person || "المسؤول",
+                    phone, assigned_rep_id: repSelect.value ? parseInt(repSelect.value) : null, notes
+                })
+            });
+            if (res.ok) {
+                closeNewCustomerModal();
+                await loadAllData();
+                alert("تمت إضافة حساب العميل بنجاح ✓");
+            }
+        }
+
+        async function submitNewCalendarEvent() {
+            const custInput = document.getElementById('cal-customer-input');
+            const repSelect = document.getElementById('cal-rep-select');
+            const task = document.getElementById('cal-task-type').value.trim();
+            const sched = document.getElementById('cal-scheduled-at').value.trim();
+            const reminder = document.getElementById('cal-reminder-at').value.trim();
+            const loc = document.getElementById('cal-location').value.trim();
+
+            if (!custInput.value.trim() || !task || !sched) return alert("يرجى إكمال بيانات المهمة");
+
+            const res = await fetch('/api/calendar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_name: custInput.value.trim(), rep_name: repSelect.value,
+                    task_type: task, scheduled_at: sched.replace("T", " "),
+                    reminder_at: reminder ? reminder.replace("T", " ") : "",
+                    location: loc || "مقر العميل", route_code: "R-01"
+                })
+            });
+            if (res.ok) {
+                closeNewCalendarModal();
+                await loadAllData();
+                alert("تمت جدولة المهمة بنجاح ✓");
+            }
+        }
+
+        async function submitExpense() {
+            const rep_id = parseInt(document.getElementById('exp-rep-select').value);
+            const expense_type = document.getElementById('exp-type-select').value;
+            const amount = parseFloat(document.getElementById('exp-amount').value) || 0;
+            const notes = document.getElementById('exp-notes').value.trim();
+
+            if (amount <= 0) return alert("يرجى إدخال مبلغ صحيح للمصروف");
+
+            const res = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rep_id, expense_type, amount, notes })
+            });
+            if (res.ok) {
+                closeExpenseModal();
+                await loadAllData();
+                alert("تم قيد سند المصروف بنجاح ✓");
+            }
+        }
+
+        async function submitNewSample() {
+            const custInput = document.getElementById('sample-customer-input');
+            const repSelect = document.getElementById('sample-rep-select');
+            const product = document.getElementById('sample-product-name').value.trim();
+            const qty = parseInt(document.getElementById('sample-qty').value) || 1;
+            const date = document.getElementById('sample-date').value;
+            const reminder = document.getElementById('sample-reminder-at').value;
+
+            if (!custInput.value.trim() || !product || !date) return alert("يرجى إكمال بيانات العينة");
+
+            const res = await fetch('/api/samples', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_name: custInput.value.trim(), rep_name: repSelect.value,
+                    product_name: product, qty_free: qty, delivery_date: date, reminder_at: reminder || ""
+                })
+            });
+            if (res.ok) {
+                closeNewSampleModal();
+                await loadAllData();
+                alert("تم تسجيل تسليم العينة بنجاح ✓");
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا المنتج؟")) return;
+            const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function deleteCustomer(id, name) {
+            if (!confirm(`هل أنت متأكد من حذف العميل "${name}"؟`)) return;
+            const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function deleteRep(id, name) {
+            if (!confirm(`هل أنت متأكد من حذف المندوب "${name}"؟`)) return;
+            const res = await fetch(`/api/reps/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        async function deleteExpense(id) {
+            if (!confirm("هل أنت متأكد من حذف هذا المصروف؟")) return;
+            const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+            if (res.ok) await loadAllData();
+        }
+
+        // ----------------- دوال الواتساب والمجموعات -----------------
+        async function fetchDiscoveredGroups() {
+            const container = document.getElementById('discovered-groups-container');
+            const list = document.getElementById('discovered-groups-list');
+            if (container) container.classList.remove('hidden');
+            if (list) list.innerHTML = '<div class="text-xs text-gray-500 p-2">جاري قراءة المجموعات...</div>';
+
+            try {
+                const res = await fetch('/api/whatsapp/discovered-groups');
+                const groups = await res.json();
+                if (list) {
+                    if (!groups || groups.length === 0) {
+                        list.innerHTML = '<div class="text-xs text-amber-700 p-2 bg-amber-50 rounded">لم يتم العثور على مجموعات أو الجلسة بانتظار المزامنة.</div>';
+                        return;
+                    }
+                    list.innerHTML = groups.map(g => `
+                        <div class="flex justify-between items-center bg-white p-2.5 rounded-lg border text-xs shadow-2xs">
+                            <div>
+                                <span class="font-bold text-gray-800">${g.subject}</span>
+                                <span class="text-[10px] text-gray-400 block font-mono">${g.id}</span>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="useDiscoveredGroupId('${g.id}', 'customer')" class="px-2 py-1 bg-purple-100 text-[#3A056A] font-bold rounded text-[10px]">ربط لعميل</button>
+                                <button onclick="useDiscoveredGroupId('${g.id}', 'logistics')" class="px-2 py-1 bg-blue-100 text-blue-800 font-bold rounded text-[10px]">لوجستيك</button>
+                                <button onclick="useDiscoveredGroupId('${g.id}', 'management')" class="px-2 py-1 bg-amber-100 text-amber-800 font-bold rounded text-[10px]">إدارة</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                if (list) list.innerHTML = '<div class="text-xs text-red-600 p-2">تعذر قراءة المجموعات حالياً.</div>';
+            }
+        }
+
+        function useDiscoveredGroupId(gid, targetType) {
+            if (targetType === 'customer') {
+                const input = document.getElementById('settings-wa-group-id');
+                if (input) input.value = gid;
+            } else if (targetType === 'logistics') {
+                const input = document.getElementById('conf-logistics-group');
+                if (input) input.value = gid;
+            } else if (targetType === 'management') {
+                const input = document.getElementById('conf-management-group');
+                if (input) input.value = gid;
+            }
+            alert(`تم نسخ المعرف بنجاح إلى خانة [${targetType}]`);
+        }
+
+        async function submitSettingsAssignGroup() {
+            const custId = parseInt(document.getElementById('settings-wa-customer-select').value);
+            const gid = document.getElementById('settings-wa-group-id').value.trim();
+            if (!gid) return alert("يرجى تحديد رمز معرّف المجموعة");
+
+            const res = await fetch('/api/customers/group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: custId, whatsapp_group_id: gid })
+            });
+            if (res.ok) {
+                document.getElementById('settings-wa-group-id').value = '';
+                await loadAllData();
+                alert("تم ربط المجموعة بالعميل بنجاح ✓");
+            }
+        }
+
+        async function unassignGroup(custId) {
+            if (!confirm("هل أنت متأكد من فك ربط هذه المجموعة؟")) return;
+            const res = await fetch('/api/customers/group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: custId, whatsapp_group_id: "" })
+            });
+            if (res.ok) await loadAllData();
+        }
+
+        async function saveSpecialGroupsConfig() {
+            const logistics_group_id = document.getElementById('conf-logistics-group').value.trim();
+            const management_group_id = document.getElementById('conf-management-group').value.trim();
+
+            const res = await fetch('/api/system/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logistics_group_id, management_group_id })
+            });
+            if (res.ok) alert("تم حفظ معرّفات المجموعات بنجاح ✓");
         }
 
         async function checkWhatsAppLiveStatus() {
@@ -1006,7 +1564,109 @@
             window.print();
         }
 
-        // ----------------- الدالة المركزية الشاملة لتحميل البيانات -----------------
+        function loadSavedTestPhone() {
+            const savedPhone = localStorage.getItem('fdc_global_test_phone');
+            const input = document.getElementById('global-test-phone');
+            if (input) input.value = savedPhone ? savedPhone : '+96893904404';
+        }
+
+        function saveGlobalTestPhone(showAlert = false) {
+            const input = document.getElementById('global-test-phone');
+            if (!input) return;
+            const phone = input.value.trim();
+            if (!phone) return alert("يرجى إدخال رقم هاتف صالح");
+            localStorage.setItem('fdc_global_test_phone', phone);
+            if (showAlert) alert("تم حفظ رقم هاتف الاختبار بنجاح ✓");
+        }
+
+        // ----------------- دوال تحميل واستعراض الجداول -----------------
+        function renderSamplesTable(samplesList) {
+            const tbody = document.getElementById('samples-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = samplesList.map(s => {
+                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">قيد التجربة</span>`;
+                if (s.status === 'DELIVERED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">تم التسليم ✓</span>`;
+                if (s.status === 'CONVERTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">أمر شراء معتمد ✓</span>`;
+
+                return `
+                <tr>
+                    <td class="p-3 font-bold">${s.customer_name || '—'}</td>
+                    <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name || '—'}</td>
+                    <td class="p-3 font-bold text-gray-800">${s.product_name || '—'}</td>
+                    <td class="p-3">${s.qty_free} وحدة</td>
+                    <td class="p-3 text-gray-500">${s.delivery_date}</td>
+                    <td class="p-3">${statusBadge}</td>
+                    <td class="p-3 text-gray-700 max-w-xs text-[11px]">${s.feedback_notes || '—'}</td>
+                    <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id : '—'}</td>
+                    <td class="p-3 no-print">
+                        <span class="text-gray-400 text-xs">—</span>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function applySamplesFilter() {
+            const productTerm = (document.getElementById('filter-sample-product')?.value || '').trim().toLowerCase();
+            const customerTerm = (document.getElementById('filter-sample-customer')?.value || '').trim().toLowerCase();
+            const fromDate = document.getElementById('filter-sample-from-date')?.value || '';
+            const toDate = document.getElementById('filter-sample-to-date')?.value || '';
+
+            const filtered = allSamplesCache.filter(s => {
+                const matchProduct = !productTerm || (s.product_name && s.product_name.toLowerCase().includes(productTerm));
+                const matchCustomer = !customerTerm || (s.customer_name && s.customer_name.toLowerCase().includes(customerTerm));
+                let matchDate = true;
+                if (fromDate && s.delivery_date < fromDate) matchDate = false;
+                if (toDate && s.delivery_date > toDate) matchDate = false;
+                return matchProduct && matchCustomer && matchDate;
+            });
+            renderSamplesTable(filtered);
+        }
+
+        async function loadExpenseCategories() {
+            try {
+                const res = await fetch('/api/expense-categories');
+                const categories = await res.json();
+                const selectEl = document.getElementById('exp-type-select');
+                if (selectEl) {
+                    selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
+                }
+            } catch (e) {}
+        }
+
+        async function loadWhatsAppLogs() {
+            try {
+                const wRes = await fetch('/api/whatsapp/logs');
+                const wLogs = await wRes.json();
+                const feedList = document.getElementById('whatsapp-feed-list');
+                if (feedList) {
+                    if (!wLogs || wLogs.length === 0) {
+                        feedList.innerHTML = `
+                        <div class="p-8 text-center bg-gray-50 border border-dashed border-gray-200 rounded-xl space-y-2">
+                            <span class="text-3xl block">📡</span>
+                            <div class="font-bold text-gray-700 text-sm">رادار المحادثات في وضع الاستماع النشط</div>
+                            <p class="text-xs text-gray-500 max-w-md mx-auto">
+                                لا توجد رسائل ملتقطة حتى الآن. يبدأ الرادار بالتسجيل اللحظي فور كتابة رسالة في مجموعات العملاء المعتمدة أو عند مراسلة الوكيل في شاتك الخاص.
+                            </p>
+                        </div>`;
+                    } else {
+                        feedList.innerHTML = wLogs.map(l => `
+                            <div class="p-3 rounded-xl border brand-border bg-white space-y-1 shadow-2xs">
+                                <div class="flex justify-between items-center text-[10px]">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-bold brand-primary-text text-xs">${l.sender_name}</span>
+                                        <span class="px-2 py-0.5 rounded bg-purple-50 text-[#3A056A] font-semibold border border-purple-200">${l.channel_name || 'محادثة'}</span>
+                                    </div>
+                                    <span class="text-gray-400 font-mono">${l.created_at}</span>
+                                </div>
+                                <p class="text-gray-800 text-xs mt-1 leading-relaxed">${l.message_body}</p>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // الدالة المركزية الشاملة
         async function loadAllData() {
             loadSavedTestPhone();
             checkWhatsAppLiveStatus();
@@ -1245,92 +1905,6 @@
 
             loadExpenseCategories();
             loadWhatsAppLogs();
-        }
-
-        function renderSamplesTable(samplesList) {
-            const tbody = document.getElementById('samples-table-body');
-            if (!tbody) return;
-            tbody.innerHTML = samplesList.map(s => {
-                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">قيد التجربة</span>`;
-                if (s.status === 'DELIVERED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">تم التسليم ✓</span>`;
-                if (s.status === 'CONVERTED') statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">أمر شراء معتمد ✓</span>`;
-
-                return `
-                <tr>
-                    <td class="p-3 font-bold">${s.customer_name || '—'}</td>
-                    <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name || '—'}</td>
-                    <td class="p-3 font-bold text-gray-800">${s.product_name || '—'}</td>
-                    <td class="p-3">${s.qty_free} وحدة</td>
-                    <td class="p-3 text-gray-500">${s.delivery_date}</td>
-                    <td class="p-3">${statusBadge}</td>
-                    <td class="p-3 text-gray-700 max-w-xs text-[11px]">${s.feedback_notes || '—'}</td>
-                    <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id : '—'}</td>
-                    <td class="p-3 no-print">
-                        <span class="text-gray-400 text-xs">—</span>
-                    </td>
-                </tr>`;
-            }).join('');
-        }
-
-        function applySamplesFilter() {
-            const productTerm = (document.getElementById('filter-sample-product')?.value || '').trim().toLowerCase();
-            const customerTerm = (document.getElementById('filter-sample-customer')?.value || '').trim().toLowerCase();
-            const fromDate = document.getElementById('filter-sample-from-date')?.value || '';
-            const toDate = document.getElementById('filter-sample-to-date')?.value || '';
-
-            const filtered = allSamplesCache.filter(s => {
-                const matchProduct = !productTerm || (s.product_name && s.product_name.toLowerCase().includes(productTerm));
-                const matchCustomer = !customerTerm || (s.customer_name && s.customer_name.toLowerCase().includes(customerTerm));
-                let matchDate = true;
-                if (fromDate && s.delivery_date < fromDate) matchDate = false;
-                if (toDate && s.delivery_date > toDate) matchDate = false;
-                return matchProduct && matchCustomer && matchDate;
-            });
-            renderSamplesTable(filtered);
-        }
-
-        async function loadExpenseCategories() {
-            try {
-                const res = await fetch('/api/expense-categories');
-                const categories = await res.json();
-                const selectEl = document.getElementById('exp-type-select');
-                if (selectEl) {
-                    selectEl.innerHTML = categories.map(c => `<option value="${c.category_name}">${c.category_name}</option>`).join('');
-                }
-            } catch (e) {}
-        }
-
-        async function loadWhatsAppLogs() {
-            try {
-                const wRes = await fetch('/api/whatsapp/logs');
-                const wLogs = await wRes.json();
-                const feedList = document.getElementById('whatsapp-feed-list');
-                if (feedList) {
-                    if (!wLogs || wLogs.length === 0) {
-                        feedList.innerHTML = `
-                        <div class="p-8 text-center bg-gray-50 border border-dashed border-gray-200 rounded-xl space-y-2">
-                            <span class="text-3xl block">📡</span>
-                            <div class="font-bold text-gray-700 text-sm">رادار المحادثات في وضع الاستماع النشط</div>
-                            <p class="text-xs text-gray-500 max-w-md mx-auto">
-                                لا توجد رسائل ملتقطة حتى الآن. يبدأ الرادار بالتسجيل اللحظي فور كتابة رسالة في مجموعات العملاء المعتمدة أو عند مراسلة الوكيل في شاتك الخاص.
-                            </p>
-                        </div>`;
-                    } else {
-                        feedList.innerHTML = wLogs.map(l => `
-                            <div class="p-3 rounded-xl border brand-border bg-white space-y-1 shadow-2xs">
-                                <div class="flex justify-between items-center text-[10px]">
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="font-bold brand-primary-text text-xs">${l.sender_name}</span>
-                                        <span class="px-2 py-0.5 rounded bg-purple-50 text-[#3A056A] font-semibold border border-purple-200">${l.channel_name || 'محادثة'}</span>
-                                    </div>
-                                    <span class="text-gray-400 font-mono">${l.created_at}</span>
-                                </div>
-                                <p class="text-gray-800 text-xs mt-1 leading-relaxed">${l.message_body}</p>
-                            </div>
-                        `).join('');
-                    }
-                }
-            } catch(e) {}
         }
 
         // بدء التشغيل المحصن
