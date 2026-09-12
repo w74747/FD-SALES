@@ -52,10 +52,7 @@
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
                 <div class="flex items-center justify-center gap-3 p-3 bg-white rounded-2xl border border-purple-100 shadow-sm w-full">
-                    <div class="text-right">
-                        <div class="text-xl font-black text-[#3A056A] leading-tight">شركة تنمية الغذاء</div>
-                        <div class="text-[10px] font-bold text-purple-700 tracking-wider uppercase">FOOD DEVELOPMENT COMPANY</div>
-                    </div>
+                    <img src="/logo.png" alt="Food Development Company" class="max-h-12 w-auto object-contain block mx-auto" />
                 </div>
             </div>
             <h2 class="text-base font-bold text-gray-800">التحقق الأمني لتسجيل الدخول</h2>
@@ -146,7 +143,7 @@
                 </button>
 
                 <button onclick="logoutSession()" title="تسجيل الخروج" class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke_linecap="round" stroke_linejoin="round" stroke_width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                 </button>
             </div>
         </header>
@@ -544,7 +541,7 @@
         </div>
     </main>
 
-        <!-- 13. مودال تحديث ملاحظة الهدف -->
+    <!-- 13. مودال تحديث ملاحظة الهدف -->
     <div id="target-note-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديث ملاحظات الهدف</h3>
@@ -904,7 +901,75 @@
 
     <!-- ==================== كود الـ JAVASCRIPT الشامل والموثق ==================== -->
     <script>
-                const STAGES_MAP = {
+        // ==========================================
+        // دالة التنقل الرئيسية بين أقسام القائمة الجانبية
+        // ==========================================
+        function switchTab(tabId) {
+            console.log('Navigating to tab:', tabId);
+            
+            // 1. تنظيف اسم التبويب
+            let cleanId = tabId.replace(/^tab-/, '');
+            
+            // خريطة الربط للأقسام
+            const tabMapping = {
+                'expenses': 'tab-expenses-log',
+                'expenses-log': 'tab-expenses-log',
+                'products': 'tab-products-catalog',
+                'products-catalog': 'tab-products-catalog'
+            };
+            
+            let targetId = tabMapping[cleanId] || ('tab-' + cleanId);
+            let targetElem = document.getElementById(targetId) || document.getElementById(cleanId);
+
+            // 2. إخفاء جميع التبويبات
+            const allTabs = document.querySelectorAll('.tab-content');
+            allTabs.forEach(t => t.classList.add('hidden'));
+
+            // 3. إظهار القسم المطلوب
+            if (targetElem) {
+                targetElem.classList.remove('hidden');
+            } else {
+                console.error('Target tab element not found:', targetId);
+            }
+
+            // 4. تحديث التظليل واللون النشط لأزرار القائمة الجانبية
+            const navButtons = document.querySelectorAll('aside button');
+            navButtons.forEach(btn => {
+                if (btn.id && btn.id.startsWith('nav-')) {
+                    btn.classList.remove('bg-[#52128e]', 'font-semibold', 'text-white');
+                    btn.classList.add('font-medium', 'text-purple-200');
+                }
+            });
+
+            // تظليل الزر النشط حالياً
+            const activeBtn = document.getElementById('nav-' + cleanId) || document.getElementById('nav-' + targetId.replace('tab-', ''));
+            if (activeBtn) {
+                activeBtn.classList.add('bg-[#52128e]', 'font-semibold', 'text-white');
+                activeBtn.classList.remove('font-medium', 'text-purple-200');
+            }
+
+            // تحديث عنوان الهيدر
+            const titles = {
+                'overview': 'لوحة التحكم',
+                'products-catalog': 'المنتجات',
+                'targets': 'الأهداف والفرص',
+                'reps': 'فريق المبيعات',
+                'customers': 'العملاء',
+                'samples': 'العينات',
+                'calendar': 'التقويم',
+                'agents': 'الوكلاء الأذكياء',
+                'expenses-log': 'المصاريف',
+                'whatsapp-feed': 'رادار المحادثات',
+                'whatsapp-settings': 'إعدادات الواتساب'
+            };
+            const currentTitle = document.getElementById('current-tab-title');
+            if (currentTitle) currentTitle.innerText = titles[cleanId] || titles[targetId.replace('tab-', '')] || 'لوحة التحكم';
+
+            if (cleanId === 'whatsapp-feed') loadWhatsAppLogs();
+        }
+        window.switchTab = switchTab;
+
+        const STAGES_MAP = {
             'LEAD_CONTACT': { text: '1. التواصل الأولي والتأهيل', color: 'bg-blue-100 text-blue-800' },
             'MEETING_REQUIREMENTS': { text: '2. الاجتماع وحصر الاحتياج', color: 'bg-amber-100 text-amber-800' },
             'SAMPLE_DELIVERY': { text: '3. تسليم وتجربة العينات', color: 'bg-purple-100 text-purple-800' },
@@ -961,25 +1026,6 @@
             localStorage.removeItem('fdc_auth_token');
             document.cookie = "fdc_auth=; path=/; max-age=0";
             location.reload();
-        };
-
-        window.switchTab = function(id) {
-            try {
-                tabs.forEach(t => {
-                    const el = document.getElementById(`tab-${t}`);
-                    const nav = document.getElementById(`nav-${t}`);
-                    if (el) el.classList.add('hidden');
-                    if (nav) nav.className = "w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right";
-                });
-                const activeTab = document.getElementById(`tab-${id}`);
-                const activeNav = document.getElementById(`nav-${id}`);
-                if (activeTab) activeTab.classList.remove('hidden');
-                if (activeNav) activeNav.className = "w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-semibold bg-[#52128e] text-white text-right";
-                const titleEl = document.getElementById('current-tab-title');
-                if (titleEl) titleEl.innerText = titles[id] || '';
-                
-                if (id === 'whatsapp-feed') loadWhatsAppLogs();
-            } catch(e) {}
         };
 
         window.openModal = function(id) {
