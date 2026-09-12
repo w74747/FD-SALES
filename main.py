@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Complete Stable Backend
+Multi-Session WhatsApp & Inbound Sales Automation
 """
 
 import os
@@ -79,19 +79,28 @@ def run_isolated_ddl(sql_statement: str):
     finally:
         conn.close()
 
-async def send_whatsapp_direct(target_phone_or_group: str, message: str) -> bool:
+async def send_whatsapp_direct(target_phone_or_group: str, message: str, session_type: str = "operations") -> bool:
     if not target_phone_or_group:
         return False
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 "http://127.0.0.1:3001/send-message",
-                json={"phone_or_group": target_phone_or_group, "message": message},
+                json={"phone_or_group": target_phone_or_group, "message": message, "session_type": session_type},
                 timeout=5.0
             )
             return resp.status_code == 200
     except Exception:
         return False
+
+def match_rep_by_region(conn, region_term: str):
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, name, phone_number, region FROM sales_executives WHERE region ILIKE %s AND status = 'نشط' LIMIT 1;", (f"%{region_term}%",))
+        rep = cur.fetchone()
+        if not rep:
+            cur.execute("SELECT id, name, phone_number, region FROM sales_executives WHERE region ILIKE '%مسقط%' AND status = 'نشط' LIMIT 1;")
+            rep = cur.fetchone()
+        return rep
 
 def init_database():
     conn = get_db_connection()
@@ -120,6 +129,21 @@ def init_database():
             CREATE TABLE IF NOT EXISTS system_config (
                 key_name VARCHAR(100) PRIMARY KEY,
                 key_value TEXT NOT NULL
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS customer_bot_sessions (
+                phone_number VARCHAR(50) PRIMARY KEY,
+                customer_name VARCHAR(150),
+                company_name VARCHAR(150),
+                region VARCHAR(100),
+                intent VARCHAR(50),
+                step VARCHAR(50),
+                branches_count INT DEFAULT 1,
+                monthly_consumption TEXT,
+                sample_item TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
 
@@ -298,22 +322,6 @@ def init_database():
     run_isolated_ddl("ALTER TABLE sample_deliveries DROP CONSTRAINT IF EXISTS sample_deliveries_status_check;")
     run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN status TYPE VARCHAR(50);")
 
-    run_isolated_ddl("""
-    INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
-    SELECT 'وكيل كبار العملاء والتصنيع للغير (Private Label)', 'ADVISORY', 'KEY_ACCOUNTS_OEM',
-           'المستشار الاستراتيجي للشراكات الكبرى لشركة تنمية الغذاء: دراسة متطلبات سلاسل الهايبرماركت وموزعي الأغذية Bidfood وتقديم عروض Private Label بالأوزان والكراتين المطلوبة.',
-           'DAILY_09AM', '', TRUE
-    WHERE NOT EXISTS (SELECT 1 FROM ai_agents WHERE role_type = 'KEY_ACCOUNTS_OEM');
-    """)
-
-    run_isolated_ddl("""
-    INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
-    SELECT 'وكيل استخبارات المنافسين وبدائل المنتجات', 'ADVISORY', 'COMPETITIVE_DISPLACEMENT',
-           'خبير متابعة منتجات المنافسين (لوزين، أطياب) لمصنع تنمية الغذاء: مقارنة الأوزان والتسعير وتجهيز نقاط إقناع للمشترين للتحويل لمنتجاتنا المحلية الأعلى طراوة.',
-           'DAILY_10AM', '', TRUE
-    WHERE NOT EXISTS (SELECT 1 FROM ai_agents WHERE role_type = 'COMPETITIVE_DISPLACEMENT');
-    """)
-
 def start_whatsapp_service():
     global whatsapp_process
     if os.path.exists("whatsapp_service.js"):
@@ -335,7 +343,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="18.2.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="19.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -356,6 +364,7 @@ def get_logo():
         }
     )
 
+# ----------------- نماذج Pydantic -----------------
 class Verify2FAPayload(BaseModel):
     code: str
 
@@ -489,6 +498,12 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_name: str
     message_text: str
 
+class InboundBotMessage(BaseModel):
+    sender_phone: str
+    sender_name: str
+    message_text: str
+
+# ----------------- مسار التحقق 2FA الصارم -----------------
 @app.post("/api/auth/2fa/verify")
 def verify_2fa(payload: Verify2FAPayload):
     conn = get_db_connection()
@@ -503,7 +518,7 @@ def verify_2fa(payload: Verify2FAPayload):
             secret = row["totp_secret"] if row else None
 
         if not secret:
-            raise HTTPException(status_code=400, detail="لم يتم العثور على مفتاح التوثيق السري")
+            raise HTTPException(status_code=400, detail="لم يتم العثور على سر التوثيق")
 
         totp = pyotp.TOTP(secret)
         if totp.verify(clean_code, valid_window=1):
@@ -516,6 +531,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
+# ----------------- مسارات فريق المبيعات -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -604,6 +620,7 @@ def delete_rep(rep_id: int):
     finally:
         conn.close()
 
+# ----------------- مسارات العملاء -----------------
 @app.get("/api/customers")
 def get_customers():
     conn = get_db_connection()
@@ -706,6 +723,7 @@ def update_customer_group(payload: UpdateCustomerGroupPayload):
     finally:
         conn.close()
 
+# ----------------- مسارات الأهداف -----------------
 @app.get("/api/targets")
 def get_targets():
     conn = get_db_connection()
@@ -852,6 +870,7 @@ def delete_target(target_id: int):
     finally:
         conn.close()
 
+# ----------------- مسارات العينات -----------------
 @app.get("/api/samples")
 def get_samples():
     conn = get_db_connection()
@@ -982,6 +1001,7 @@ def delete_sample(sample_id: int):
     finally:
         conn.close()
 
+# ----------------- مسارات التقويم -----------------
 @app.get("/api/calendar")
 def get_calendar():
     conn = get_db_connection()
@@ -1085,6 +1105,7 @@ def delete_calendar_event(event_id: int):
     finally:
         conn.close()
 
+# ----------------- مسارات المنتجات والمصاريف -----------------
 @app.get("/api/products")
 def get_products():
     conn = get_db_connection()
@@ -1261,6 +1282,7 @@ def get_expense_categories():
     finally:
         conn.close()
 
+# ----------------- مسارات الوكلاء -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -1375,11 +1397,147 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
+# ----------------- مسار بوت مبيعات وتأهيل العملاء الجدد المباشر -----------------
+@app.post("/api/bot/inbound-sales")
+async def handle_inbound_sales_bot(msg: InboundBotMessage):
+    conn = get_db_connection()
+    if not conn:
+        return {"reply_text": "أهلاً بك في شركة تنمية الغذاء. سنعاود التواصل معك قريباً."}
+
+    phone = msg.sender_phone
+    text = msg.message_text.strip()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM customer_bot_sessions WHERE phone_number = %s;", (phone,))
+            session = cur.fetchone()
+
+            if not session:
+                cur.execute("""
+                INSERT INTO customer_bot_sessions (phone_number, customer_name, step, intent)
+                VALUES (%s, %s, 'INITIAL', 'GENERAL');
+                """, (phone, msg.sender_name))
+                conn.commit()
+                return {
+                    "reply_text": (
+                        f"مرحباً بك {msg.sender_name} في *شركة تنمية الغذاء* 🥖\n\n"
+                        f"نسعد بخدمتكم وتوريد أجود المخبوزات وعجائن المجمدات لقطاع الفنادق والمطاعم والهايبرماركت.\n\n"
+                        f"كيف يمكننا مساعدتك اليوم؟\n"
+                        f"1️⃣ طلب عينات تجريبية مجانية للشيف\n"
+                        f"2️⃣ الاستفسار عن الأسعار وقوائم التوريد\n"
+                        f"3️⃣ الاستفسار عن المنتجات ومواصفات التعبئة"
+                    )
+                }
+
+            step = session.get("step")
+            intent = session.get("intent")
+
+            # مسار طلب العينات
+            if "عين" in text or text == "1" or intent == "SAMPLE":
+                if step in ["INITIAL", "GENERAL"]:
+                    cur.execute("UPDATE customer_bot_sessions SET intent = 'SAMPLE', step = 'ASK_REGION' WHERE phone_number = %s;", (phone,))
+                    conn.commit()
+                    return {"reply_text": "نسعد بتوفير عينات تجريبية لمطبخكم الموقر 👨‍🍳\nفضلاً اذكر لنا: *اسم المطعم / المنشأة* وفي *أي ولاية أو منطقة* تقع؟"}
+
+                elif step == "ASK_REGION":
+                    cur.execute("UPDATE customer_bot_sessions SET company_name = %s, region = %s, step = 'ASK_PRODUCT' WHERE phone_number = %s;", (text, text, phone))
+                    conn.commit()
+                    return {"reply_text": "ممتاز! ما هي الأصناف المطلوب تجربتها؟ (مثلاً: خبز برجر بريوش، كرواسون، توست)"}
+
+                elif step == "ASK_PRODUCT":
+                    region_guess = session.get("region") or text
+                    rep = match_rep_by_region(conn, region_guess)
+                    company = session.get("company_name") or msg.sender_name
+
+                    cur.execute("""
+                    INSERT INTO sample_deliveries (customer_name, rep_name, rep_id, product_name, qty_free, delivery_date, status, source)
+                    VALUES (%s, %s, %s, %s, 10, CURRENT_DATE, 'PENDING', 'واتساب العملاء الجدد');
+                    """, (company, rep["name"] if rep else "فريق المبيعات", rep["id"] if rep else None, text))
+
+                    cur.execute("DELETE FROM customer_bot_sessions WHERE phone_number = %s;", (phone,))
+                    conn.commit()
+
+                    if rep and rep.get("phone_number"):
+                        lead_msg = (
+                            f"*طلب عينة تجريبية جديد من عميل وارد 🎁*\n\n"
+                            f"• المنشأة: {company}\n"
+                            f"• هاتف التواصل: {phone}\n"
+                            f"• الأصناف المطلوبة: {text}\n"
+                            f"• المنطقة: {rep['region']}\n\n"
+                            f"يرجى التواصل مع العميل وجدولة تسليم العينة."
+                        )
+                        await send_whatsapp_direct(rep["phone_number"], lead_msg)
+
+                    return {"reply_text": f"تم استلام طلبكم وتكليف مسؤول المبيعات الميداني لمنطقتكم (*{rep['name'] if rep else 'فريق مسقط'}*) بالتواصل معكم وتنسيق موعد التسليم مباشرة."}
+
+            # مسار الأسعار والتأهيل
+            if "سعر" in text or "أسعار" in text or text == "2" or intent == "PRICE_INQUIRY":
+                if step in ["INITIAL", "GENERAL"]:
+                    cur.execute("UPDATE customer_bot_sessions SET intent = 'PRICE_INQUIRY', step = 'ASK_BRANCHES' WHERE phone_number = %s;", (phone,))
+                    conn.commit()
+                    return {"reply_text": "نوفر أسعاراً تفضيلية وعقود توريد تعتمد على حجم التوريد المباشر.\nكم عدد الفروع أو منافذ التوزيع لديكم حالياً؟"}
+
+                elif step == "ASK_BRANCHES":
+                    digits = ''.join(filter(str.isdigit, text)) or "1"
+                    cur.execute("UPDATE customer_bot_sessions SET branches_count = %s, step = 'ASK_CONSUMPTION' WHERE phone_number = %s;", (int(digits), phone))
+                    conn.commit()
+                    return {"reply_text": "ممتاز. وما هو معدل استهلاككم الشهري التقريبي (أو الطلب الأسبوعي بالكرتون / الحبة) وفي أي مدينة تقع فروعكم؟"}
+
+                elif step == "ASK_CONSUMPTION":
+                    rep = match_rep_by_region(conn, text)
+                    branches = session.get("branches_count") or 1
+
+                    cur.execute("""
+                    INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, execution_status)
+                    VALUES (%s, %s, %s, TO_CHAR(NOW() + INTERVAL '1 day', 'YYYY-MM-DD 10:00'), %s, 'PENDING');
+                    """, (f"استفسار أسعار: {msg.sender_name}", rep["name"] if rep else "فريق المبيعات", f"مفاوضة أسعار وتوريد ({branches} فروع)", text))
+
+                    cur.execute("""
+                    INSERT INTO sales_targets (title, customer_id, customer_name, rep_id, rep_name, target_value, pipeline_stage, last_note, status)
+                    VALUES (%s, NULL, %s, %s, %s, 3000, 'MEETING_REQUIREMENTS', %s, 'IN_PROGRESS');
+                    """, (f"فرصة توريد فروع: {msg.sender_name}", msg.sender_name, rep["id"] if rep else None, rep["name"] if rep else "فريق المبيعات", f"الفروع: {branches} | الاستهلاك والمنطقة: {text}"))
+
+                    cur.execute("DELETE FROM customer_bot_sessions WHERE phone_number = %s;", (phone,))
+                    conn.commit()
+
+                    if rep and rep.get("phone_number"):
+                        sales_lead = (
+                            f"*عميل جديد يستفسر عن أسعار وعقود توريد 💼*\n\n"
+                            f"• المنشأة: {msg.sender_name}\n"
+                            f"• الهاتف: {phone}\n"
+                            f"• الفروع: {branches}\n"
+                            f"• الاستهلاك والمنطقة: {text}\n\n"
+                            f"تم تسجيل المهمة في تقويمك والفرصة في الـ Pipeline لمتابعة عرض الأسعار."
+                        )
+                        await send_whatsapp_direct(rep["phone_number"], sales_lead)
+
+                    return {"reply_text": "شكراً لمشاركتنا التفاصيل. تم تجهيز ملف طلبكم وتكليف مسؤول الحسابات التجارية للاتصال بكم وموافاتكم بعرض الأسعار المناسب لحجم استهلاككم."}
+
+            return {
+                "reply_text": "أهلاً بك. للمساعدة السريعة يرجى إرسال (1) لطلب عينات مجانية، أو (2) لطلب عروض الأسعار والتوريد، أو كتابة استفسارك وسيتواصل معك المختص مباشرة."
+            }
+
+    finally:
+        conn.close()
+
+# ----------------- مسارات الواتساب العامة ورادار المحادثات -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=1.5)
+            if resp.status_code == 200:
+                data = resp.json()
+                return {"connected": bool(data.get("connected")), "phone": data.get("user")}
+    except Exception:
+        pass
+    return {"connected": False, "phone": None}
+
+@app.get("/api/whatsapp/sales-status")
+async def get_whatsapp_sales_status():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/sales/qr-status", timeout=1.5)
             if resp.status_code == 200:
                 data = resp.json()
                 return {"connected": bool(data.get("connected")), "phone": data.get("user")}
@@ -1419,6 +1577,27 @@ async def get_whatsapp_qr():
         pass
     raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب...")
 
+@app.get("/api/whatsapp/sales-qr")
+async def get_whatsapp_sales_qr():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/sales/qr-status", timeout=3.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("connected"):
+                    return {"connected": True, "user": data.get("user")}
+                qr_base64 = data.get("qr")
+                if qr_base64:
+                    clean_b64 = qr_base64.split(",")[-1].strip()
+                    return Response(
+                        content=base64.b64decode(clean_b64),
+                        media_type="image/png",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
+                    )
+    except Exception:
+        pass
+    raise HTTPException(status_code=503, detail="جاري إقلاع محرك واتساب المبيعات...")
+
 @app.post("/api/whatsapp/disconnect")
 async def disconnect_whatsapp():
     try:
@@ -1429,6 +1608,17 @@ async def disconnect_whatsapp():
     except Exception:
         pass
     raise HTTPException(status_code=500, detail="تعذر إنهاء جلسة الواتساب")
+
+@app.post("/api/whatsapp/sales-disconnect")
+async def disconnect_whatsapp_sales():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post("http://127.0.0.1:3001/sales/disconnect", timeout=8.0)
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    raise HTTPException(status_code=500, detail="تعذر إنهاء جلسة واتساب المبيعات")
 
 @app.get("/api/whatsapp/logs")
 def get_whatsapp_logs():
