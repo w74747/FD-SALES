@@ -335,7 +335,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="18.1.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="18.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -345,7 +345,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ----------------- تقديم الشعار مباشرة -----------------
 @app.get("/logo.png")
 def get_logo():
     return Response(
@@ -357,7 +356,6 @@ def get_logo():
         }
     )
 
-# ----------------- نماذج Pydantic -----------------
 class Verify2FAPayload(BaseModel):
     code: str
 
@@ -444,18 +442,6 @@ class NewMultiCalendarEventPayload(BaseModel):
     location: str
     route_code: Optional[str] = "R-01"
 
-class UpdateCalendarEventPayload(BaseModel):
-    customer_name: str
-    rep_name: str
-    task_type: str
-    scheduled_at: str
-    reminder_at: Optional[str] = ""
-    location: str
-    change_notes: Optional[str] = ""
-
-class CalendarStatusPayload(BaseModel):
-    status: str
-
 class NewTargetPayload(BaseModel):
     title: str
     customer_id: int
@@ -503,7 +489,6 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_name: str
     message_text: str
 
-# ----------------- مسارات التحقق 2FA -----------------
 @app.post("/api/auth/2fa/verify")
 def verify_2fa(payload: Verify2FAPayload):
     conn = get_db_connection()
@@ -511,8 +496,6 @@ def verify_2fa(payload: Verify2FAPayload):
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         clean_code = payload.code.strip()
-        if clean_code == "999888":
-            return {"status": "SUCCESS", "message": "تم التحقق عبر الرمز الرئيسي"}
 
         with conn.cursor() as cur:
             cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
@@ -520,17 +503,19 @@ def verify_2fa(payload: Verify2FAPayload):
             secret = row["totp_secret"] if row else None
 
         if not secret:
-            raise HTTPException(status_code=400, detail="لم يتم العثور على سر التوثيق")
+            raise HTTPException(status_code=400, detail="لم يتم العثور على مفتاح التوثيق السري")
 
         totp = pyotp.TOTP(secret)
-        if totp.verify(clean_code, valid_window=4):
+        if totp.verify(clean_code, valid_window=1):
+            with conn.cursor() as cur:
+                cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
+            conn.commit()
             return {"status": "SUCCESS", "message": "تم التحقق بنجاح"}
         else:
-            raise HTTPException(status_code=401, detail="الرمز غير صحيح أو انتهت صلاحيته")
+            raise HTTPException(status_code=401, detail="رمز التحقق غير صحيح أو انتهت صلاحيته")
     finally:
         conn.close()
 
-# ----------------- مسارات فريق المبيعات -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -619,7 +604,6 @@ def delete_rep(rep_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات العملاء -----------------
 @app.get("/api/customers")
 def get_customers():
     conn = get_db_connection()
@@ -722,7 +706,6 @@ def update_customer_group(payload: UpdateCustomerGroupPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات الأهداف (Pipeline) -----------------
 @app.get("/api/targets")
 def get_targets():
     conn = get_db_connection()
@@ -785,7 +768,7 @@ async def add_target(payload: NewTargetPayload):
         conn.close()
 
 @app.post("/api/targets/{target_id}/stage")
-def update_target_stage(target_id: int, payload: UpdateTargetStagePayload):
+async def update_target_stage(target_id: int, payload: UpdateTargetStagePayload):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database not reachable")
@@ -794,10 +777,39 @@ def update_target_stage(target_id: int, payload: UpdateTargetStagePayload):
             cur.execute("""
             UPDATE sales_targets 
             SET pipeline_stage = %s, last_note = COALESCE(NULLIF(%s, ''), last_note), last_note_at = NOW() 
-            WHERE id = %s;
+            WHERE id = %s RETURNING title, customer_name, rep_name, target_value, rep_id;
             """, (payload.pipeline_stage, payload.note or "", target_id))
+            tgt = cur.fetchone()
             conn.commit()
-            return {"status": "SUCCESS"}
+
+            rep_phone = None
+            if tgt and tgt.get("rep_id"):
+                cur.execute("SELECT phone_number FROM sales_executives WHERE id = %s;", (tgt["rep_id"],))
+                r = cur.fetchone()
+                if r:
+                    rep_phone = r.get("phone_number")
+
+        if rep_phone and tgt:
+            stages_names = {
+                "LEAD_CONTACT": "1. التواصل الأولي والتأهيل",
+                "MEETING_REQUIREMENTS": "2. الاجتماع وحصر الاحتياج",
+                "SAMPLE_DELIVERY": "3. تسليم وتجربة العينات",
+                "PO_CLOSED_WON": "4. مغلق بأمر شراء ✓"
+            }
+            stage_title = stages_names.get(payload.pipeline_stage, payload.pipeline_stage)
+            msg = (
+                f"*تحديث على الهدف البيعي 🎯*\n\n"
+                f"مرحبا {tgt['rep_name']}،\n"
+                f"الهدف: {tgt['title']}\n"
+                f"العميل: {tgt['customer_name']}\n"
+                f"المرحلة الحالية: {stage_title}\n"
+            )
+            if payload.note:
+                msg += f"الملاحظة: {payload.note}\n"
+            msg += f"\nشركة تنمية الغذاء | FDC Sales CRM"
+            await send_whatsapp_direct(rep_phone, msg)
+
+        return {"status": "SUCCESS"}
     finally:
         conn.close()
 
@@ -840,7 +852,6 @@ def delete_target(target_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات العينات -----------------
 @app.get("/api/samples")
 def get_samples():
     conn = get_db_connection()
@@ -904,6 +915,27 @@ async def add_multi_sample(payload: NewMultiSamplePayload):
     finally:
         conn.close()
 
+@app.post("/api/samples/{sample_id}/update")
+def update_sample_details(sample_id: int, payload: dict):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE sample_deliveries
+            SET customer_name = %s, rep_name = %s, product_name = %s, qty_free = %s, delivery_date = %s
+            WHERE id = %s;
+            """, (
+                payload.get("customer_name"), payload.get("rep_name"), 
+                payload.get("product_name"), int(payload.get("qty_free", 1)), 
+                payload.get("delivery_date"), sample_id
+            ))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
 @app.post("/api/samples/{sample_id}/feedback")
 def update_sample_feedback(sample_id: int, payload: UpdateSampleFeedbackPayload):
     conn = get_db_connection()
@@ -950,7 +982,6 @@ def delete_sample(sample_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات التقويم -----------------
 @app.get("/api/calendar")
 def get_calendar():
     conn = get_db_connection()
@@ -1003,6 +1034,26 @@ async def add_multi_calendar_event(payload: NewMultiCalendarEventPayload):
     finally:
         conn.close()
 
+@app.post("/api/calendar/{event_id}/update")
+def update_calendar_event_details(event_id: int, payload: dict):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE calendar_events
+            SET customer_name = %s, task_type = %s, scheduled_at = %s, location = %s
+            WHERE id = %s;
+            """, (
+                payload.get("customer_name"), payload.get("task_type"), 
+                payload.get("scheduled_at"), payload.get("location"), event_id
+            ))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
 @app.post("/api/calendar/{event_id}/status")
 def update_calendar_event_status(event_id: int, payload: dict):
     conn = get_db_connection()
@@ -1034,7 +1085,6 @@ def delete_calendar_event(event_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات المنتجات -----------------
 @app.get("/api/products")
 def get_products():
     conn = get_db_connection()
@@ -1146,7 +1196,6 @@ async def upload_products_file(file: UploadFile = File(...)):
     finally:
         conn.close()
 
-# ----------------- مسارات المصاريف -----------------
 @app.get("/api/expenses")
 def get_expenses_log():
     conn = get_db_connection()
@@ -1212,7 +1261,6 @@ def get_expense_categories():
     finally:
         conn.close()
 
-# ----------------- مسارات الوكلاء -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -1327,7 +1375,6 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسارات الواتساب -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
