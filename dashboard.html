@@ -56,7 +56,7 @@
                 </div>
             </div>
             <h2 class="text-base font-bold text-gray-800">التحقق الأمني لتسجيل الدخول</h2>
-            <p class="text-xs text-gray-500">أدخل رمز التحقق (أو رمز الطوارئ: 999888)</p>
+            <p class="text-xs text-gray-500">يرجى إدخال رمز التحقق المكون من 6 أرقام من تطبيق Google Authenticator</p>
 
             <div>
                 <input type="text" id="auth-otp-code" maxlength="6" placeholder="000000" 
@@ -70,7 +70,7 @@
         </div>
     </div>
 
-    <!-- القائمة الجانبية (11 تبويب كامل) -->
+    <!-- القائمة الجانبية -->
     <aside class="w-64 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
@@ -123,7 +123,7 @@
         </div>
     </aside>
 
-    <!-- منطقة المحتوى الرئيسي -->
+    <!-- مساحة المحتوى -->
     <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
         <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs no-print">
             <div class="flex items-center gap-3">
@@ -225,13 +225,13 @@
                 </div>
             </div>
 
-            <!-- 3. الأهداف (Pipeline) -->
+            <!-- 3. الأهداف -->
             <div id="tab-targets" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">الأهداف والفرص البيعية (Pipeline Stages)</h3>
-                            <div class="text-xs text-gray-500">متابعة مراحل الصفقات مع إشعار واتساب تلقائي للموظف المكلف فور التكليف</div>
+                            <div class="text-xs text-gray-500">متابعة مراحل الصفقات مع إشعار واتساب تلقائي للموظف المكلف فور التكليف أو التعديل</div>
                         </div>
                         <button onclick="openModal('new-target-modal')" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة فرصة جديدة</button>
                     </div>
@@ -645,6 +645,72 @@
         </div>
     </div>
 
+    <!-- مودال تعديل مهمة التقويم -->
+    <div id="edit-calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل مهمة التقويم</h3>
+            <input type="hidden" id="edit-cal-id">
+            <div>
+                <label class="block font-bold mb-1">العميل المستهدف:</label>
+                <input type="text" id="edit-cal-customer" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-bold mb-1">نوع المهمة:</label>
+                <input type="text" id="edit-cal-task" class="w-full p-2 border rounded-lg">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">الموعد:</label>
+                    <input type="text" id="edit-cal-sched" class="w-full p-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">الموقع:</label>
+                    <input type="text" id="edit-cal-loc" class="w-full p-2 border rounded-lg">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="closeModal('edit-calendar-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitUpdateCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تحديث المهمة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال تعديل العينة -->
+    <div id="edit-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات العينة المسلمة</h3>
+            <input type="hidden" id="edit-sample-id">
+            <div>
+                <label class="block font-bold mb-1">اسم العميل:</label>
+                <input type="text" id="edit-sample-customer" class="w-full p-2 border rounded-lg">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">المندوب المسلّم:</label>
+                    <input type="text" id="edit-sample-rep" class="w-full p-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">المنتج / الصنف:</label>
+                    <input type="text" id="edit-sample-product" class="w-full p-2 border rounded-lg">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">الكمية:</label>
+                    <input type="number" id="edit-sample-qty" class="w-full p-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">تاريخ التسليم:</label>
+                    <input type="date" id="edit-sample-date" class="w-full p-2 border rounded-lg">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="closeModal('edit-sample-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitUpdateSample()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديل</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 13. مودال تحديث ملاحظة الهدف -->
     <div id="target-note-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
@@ -667,7 +733,7 @@
             <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">إغلاق الهدف بنجاح وتحويله لأمر شراء (PO)</h3>
             <input type="hidden" id="close-target-id">
             <div><label class="block font-bold mb-1">رقم أمر الشراء (PO):</label><input type="text" id="close-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-XXXX"></div>
-            <div><label class="block font-bold mb-1">القيمة المالية المحققة (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0"></div>
+            <div><label class="block font-bold mb-1">قيمة أمر الشراء (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold text-emerald-700" placeholder="0.0"></div>
             <div><label class="block font-bold mb-1">رابط المستند المرفق:</label><input type="text" id="close-po-url" class="w-full p-2 border rounded-lg" placeholder="رابط درايف أو مرجع السند"></div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="closeModal('close-target-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitCloseTarget()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الإغلاق والترحيل</button></div>
         </div>
@@ -1002,7 +1068,7 @@
         </div>
     </div>
 
-    <!-- ==================== كود الـ JAVASCRIPT الشامل والموثق ==================== -->
+    <!-- كود الـ JAVASCRIPT -->
     <script>
         function switchTab(tabId) {
             let cleanId = tabId.replace(/^tab-/, '');
@@ -1204,6 +1270,37 @@
             }
         };
 
+        window.openEditSampleModal = function(id, cust, rep, prod, qty, date) {
+            document.getElementById('edit-sample-id').value = id;
+            document.getElementById('edit-sample-customer').value = unescape(cust || '');
+            document.getElementById('edit-sample-rep').value = unescape(rep || '');
+            document.getElementById('edit-sample-product').value = unescape(prod || '');
+            document.getElementById('edit-sample-qty').value = qty || 1;
+            document.getElementById('edit-sample-date').value = date || '';
+            openModal('edit-sample-modal');
+        };
+
+        window.submitUpdateSample = async function() {
+            const id = document.getElementById('edit-sample-id').value;
+            const payload = {
+                customer_name: document.getElementById('edit-sample-customer').value.trim(),
+                rep_name: document.getElementById('edit-sample-rep').value.trim(),
+                product_name: document.getElementById('edit-sample-product').value.trim(),
+                qty_free: parseInt(document.getElementById('edit-sample-qty').value) || 1,
+                delivery_date: document.getElementById('edit-sample-date').value
+            };
+            const res = await fetch(`/api/samples/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                closeModal('edit-sample-modal');
+                await loadAllData();
+                alert("تم تحديث بيانات العينة بنجاح ✓");
+            }
+        };
+
         window.addCalendarRepRow = function() {
             const container = document.getElementById('calendar-reps-container');
             const row = document.createElement('div');
@@ -1260,6 +1357,35 @@
                 closeModal('new-calendar-modal');
                 await loadAllData();
                 alert(`✅ تم بنجاح جدولة المهمة وإرسال إشعار WhatsApp فوري لكافة الموظفين المكلفين (${repNames.join(" ، ")}) ✓`);
+            }
+        };
+
+        window.openEditCalendarModal = function(id, cust, task, sched, loc) {
+            document.getElementById('edit-cal-id').value = id;
+            document.getElementById('edit-cal-customer').value = unescape(cust || '');
+            document.getElementById('edit-cal-task').value = unescape(task || '');
+            document.getElementById('edit-cal-sched').value = sched || '';
+            document.getElementById('edit-cal-loc').value = unescape(loc || '');
+            openModal('edit-calendar-modal');
+        };
+
+        window.submitUpdateCalendarEvent = async function() {
+            const id = document.getElementById('edit-cal-id').value;
+            const payload = {
+                customer_name: document.getElementById('edit-cal-customer').value.trim(),
+                task_type: document.getElementById('edit-cal-task').value.trim(),
+                scheduled_at: document.getElementById('edit-cal-sched').value.trim(),
+                location: document.getElementById('edit-cal-loc').value.trim()
+            };
+            const res = await fetch(`/api/calendar/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                closeModal('edit-calendar-modal');
+                await loadAllData();
+                alert("تم تحديث مهمة التقويم بنجاح ✓");
             }
         };
 
@@ -1374,7 +1500,7 @@
             if (res.ok) {
                 closeModal('edit-target-modal');
                 await loadAllData();
-                alert("تم تحديث الهدف بنجاح ✓");
+                alert("تم تحديث الهدف وإشعار الموظف بنجاح ✓");
             }
         };
 
@@ -1396,7 +1522,7 @@
             if (res.ok) {
                 closeModal('target-note-modal');
                 await loadAllData();
-                alert("تم حفظ الملاحظة بنجاح ✓");
+                alert("تم حفظ الملاحظة وإشعار الموظف بنجاح ✓");
             }
         };
 
@@ -2042,6 +2168,7 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <span class="px-2 py-0.5 rounded text-xs font-bold ${isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${isDone ? 'مكتملة ✓' : 'مجدولة'}</span>
+                                <button onclick="openEditCalendarModal(${e.id}, '${escape(e.customer_name)}', '${escape(e.task_type)}', '${e.scheduled_at}', '${escape(e.location)}')" class="px-2 py-1 text-xs border border-purple-300 text-[#3A056A] font-bold rounded hover:bg-purple-50">تعديل</button>
                                 ${!isDone ? `<button onclick="updateCalendarStatus(${e.id}, 'COMPLETED')" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded">إتمام ✓</button>` : ''}
                                 <button onclick="deleteItem('/api/calendar/${e.id}')" class="text-red-600 font-bold px-1">حذف</button>
                             </div>
@@ -2099,6 +2226,7 @@
                     <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id !== '—' ? s.converted_po_id : '—'}</td>
                     <td class="p-3 no-print">
                         <div class="flex gap-1.5 flex-wrap">
+                            <button onclick="openEditSampleModal(${s.id}, '${escape(s.customer_name)}', '${escape(s.rep_name)}', '${escape(s.product_name)}', ${s.qty_free}, '${s.delivery_date}')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] font-bold rounded text-[10px]">تعديل</button>
                             <button onclick="openSampleFeedbackModal(${s.id}, '${escape(s.feedback_notes || '')}')" class="px-2 py-1 bg-amber-500 text-white font-bold rounded text-[10px]">تقييم</button>
                             ${s.status !== 'CONVERTED' ? `<button onclick="openConvertSampleModal(${s.id})" class="px-2 py-1 bg-emerald-600 text-white font-bold rounded text-[10px]">تحويل لـ PO</button>` : ''}
                             <button onclick="deleteItem('/api/samples/${s.id}')" class="text-red-600 hover:text-red-800 font-bold text-xs px-1">حذف</button>
