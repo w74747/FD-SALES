@@ -601,7 +601,6 @@
         </div>
     </div>
 
-    <!-- النوافذ المنبثقة التفاعلية -->
     <!-- 1. نافذة العينات المتعددة -->
     <div id="new-sample-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs max-h-[90vh] flex flex-col justify-between">
@@ -907,10 +906,8 @@
         function switchTab(tabId) {
             console.log('Navigating to tab:', tabId);
             
-            // 1. تنظيف اسم التبويب
             let cleanId = tabId.replace(/^tab-/, '');
             
-            // خريطة الربط للأقسام
             const tabMapping = {
                 'expenses': 'tab-expenses-log',
                 'expenses-log': 'tab-expenses-log',
@@ -921,18 +918,15 @@
             let targetId = tabMapping[cleanId] || ('tab-' + cleanId);
             let targetElem = document.getElementById(targetId) || document.getElementById(cleanId);
 
-            // 2. إخفاء جميع التبويبات
             const allTabs = document.querySelectorAll('.tab-content');
             allTabs.forEach(t => t.classList.add('hidden'));
 
-            // 3. إظهار القسم المطلوب
             if (targetElem) {
                 targetElem.classList.remove('hidden');
             } else {
                 console.error('Target tab element not found:', targetId);
             }
 
-            // 4. تحديث التظليل واللون النشط لأزرار القائمة الجانبية
             const navButtons = document.querySelectorAll('aside button');
             navButtons.forEach(btn => {
                 if (btn.id && btn.id.startsWith('nav-')) {
@@ -941,14 +935,12 @@
                 }
             });
 
-            // تظليل الزر النشط حالياً
             const activeBtn = document.getElementById('nav-' + cleanId) || document.getElementById('nav-' + targetId.replace('tab-', ''));
             if (activeBtn) {
                 activeBtn.classList.add('bg-[#52128e]', 'font-semibold', 'text-white');
                 activeBtn.classList.remove('font-medium', 'text-purple-200');
             }
 
-            // تحديث عنوان الهيدر
             const titles = {
                 'overview': 'لوحة التحكم',
                 'products-catalog': 'المنتجات',
@@ -1583,7 +1575,6 @@
             } catch(e) {}
         };
 
-        // 8. الدالة المركزية لجلب البيانات
         window.loadAllData = async function() {
             const savedPhone = localStorage.getItem('fdc_global_test_phone');
             if (savedPhone) document.getElementById('global-test-phone').value = savedPhone;
