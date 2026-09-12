@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Multi-Session WhatsApp & Inbound Sales Automation & Smart Logistics Dispatch
+Multi-Session WhatsApp & Inbound Sales Automation & Live Perplexity Intelligence
 """
 
 import os
@@ -41,6 +41,7 @@ DATABASE_URL = (
     or os.getenv("POSTGRES_URL") 
     or ""
 )
+PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY", "").strip()
 whatsapp_process = None
 
 LOGO_SVG_RAW = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 90" width="420" height="90">
@@ -94,37 +95,66 @@ async def send_whatsapp_direct(target_phone_or_group: str, message: str, session
     except Exception:
         return False
 
-def match_rep_by_region(conn, region_term: str):
-    with conn.cursor() as cur:
-        cur.execute("SELECT id, name, phone_number, region FROM sales_executives WHERE region ILIKE %s AND status = 'نشط' LIMIT 1;", (f"%{region_term}%",))
-        rep = cur.fetchone()
-        if not rep:
-            cur.execute("SELECT id, name, phone_number, region FROM sales_executives WHERE region ILIKE '%مسقط%' AND status = 'نشط' LIMIT 1;")
-            rep = cur.fetchone()
-        return rep
+async def query_perplexity_intelligence(system_prompt: str, search_query: str) -> str:
+    """استعلام محرك Perplexity عبر الإنترنت مع بحث حي وتلخيص تنفيذي"""
+    if not PERPLEXITY_API_KEY:
+        return "تنبيه: لم يتم العثور على PERPLEXITY_API_KEY في متغيرات البيئة بـ Railway."
+
+    url = "https://api.perplexity.ai/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    user_content = (
+        f"المطلوب: قم بإجراء بحث واستقصاء حي عبر الإنترنت ولينكدإن ومصادر الأخبار حول الآتي:\n"
+        f"الموضوع / الشركات المستهدفة: {search_query}\n\n"
+        f"قم بصياغة تقرير تنفيذي رسمي وموجز باللغة العربية يوضح: "
+        f"1. أحدث الأخبار والتحركات خلال الأيام الأخيرة.\n"
+        f"2. المنتجات الجديدة أو التغييرات التسعيرية وحملات الترويج المرصودة.\n"
+        f"3. توصية استراتيجية واضحة لشركة تنمية الغذاء لاقتناص الفرصة التنافسية.\n"
+        f"اجعل التقرير بدون إيموجيز ومهنياً تماماً."
+    )
+
+    payload = {
+        "model": "sonar",
+        "messages": [
+            {"role": "system", "content": system_prompt or "أنت مستشار استخبارات الأعمال وتطوير المبيعات لشركة تنمية الغذاء."},
+            {"role": "user", "content": user_content}
+        ],
+        "temperature": 0.2
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, json=payload, headers=headers, timeout=35.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data["choices"][0]["message"]["content"]
+            else:
+                logger.error(f"Perplexity API Error: {resp.status_code} - {resp.text}")
+                return f"تعذر استدعاء البحث الذكي (خطأ {resp.status_code}): {resp.text[:150]}"
+    except Exception as e:
+        logger.error(f"Perplexity Connection Exception: {e}")
+        return f"خطأ في الاتصال بمحرك Perplexity: {str(e)}"
 
 def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sender_name: str, branches: list) -> str:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     
-    # 1. Location
     loc_match = re.search(r'(https?://[^\s]+)', text)
     location_url = loc_match.group(1) if loc_match else ""
 
-    # 2. Branch contact
     contact_match = re.search(r'(?:contact|phone|tel|رقم)[:\s]*([0-9\+\s]{7,15})', text, re.IGNORECASE)
     branch_contact = contact_match.group(1).strip().replace(" ", "") if contact_match else ""
 
-    # 3. Delivery date
     delivery_date = "Next Scheduled Delivery"
     coming_match = re.search(r'(?:coming|delivery|توصيل|وصول)[:\s]*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})', text, re.IGNORECASE)
     if coming_match:
         delivery_date = coming_match.group(1).strip()
 
-    # 4. Order received date
     date_match = re.search(r'(?:date|تاريخ)[:\s]*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})', text, re.IGNORECASE)
     order_date = date_match.group(1).strip() if date_match else datetime.now().strftime("%d/%m/%Y")
 
-    # 5. Branch detection
     brand_name = customer.get("brand_name") or ""
     branch_name = "Main Branch"
     for l in lines:
@@ -137,20 +167,16 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
                 branch_name = clean_b.title() if clean_b else "Main Branch"
                 break
 
-    # If branch matches existing DB branch, enrich contact and location
-    matched_branch = None
     for b in branches:
         b_name = b.get("branch_name", "")
         if b_name.lower() in text.lower() or b_name.lower() in branch_name.lower():
             branch_name = b_name
-            matched_branch = b
             if not location_url and b.get("location_url"):
                 location_url = b["location_url"]
             if not branch_contact and b.get("branch_phone"):
                 branch_contact = b["branch_phone"]
             break
 
-    # 6. Items extraction
     raw_items = []
     for l in lines:
         if re.search(r'^(date|coming|location|contact|tel|phone|odare|order)', l, re.IGNORECASE):
@@ -303,17 +329,6 @@ def init_database():
             """)
 
             cur.execute("""
-            CREATE TABLE IF NOT EXISTS customer_product_aliases (
-                id SERIAL PRIMARY KEY,
-                customer_id INT REFERENCES customer_accounts(id) ON DELETE CASCADE,
-                product_id INT REFERENCES products_catalog(id) ON DELETE SET NULL,
-                raw_alias VARCHAR(200) NOT NULL,
-                canonical_name VARCHAR(200) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """)
-
-            cur.execute("""
             CREATE TABLE IF NOT EXISTS sales_targets (
                 id SERIAL PRIMARY KEY,
                 title VARCHAR(250) NOT NULL,
@@ -415,6 +430,7 @@ def init_database():
             );
             """)
 
+            # جدول الوكلاء مع دعم البحث الحي في الإنترنت
             cur.execute("""
             CREATE TABLE IF NOT EXISTS ai_agents (
                 id SERIAL PRIMARY KEY,
@@ -424,6 +440,8 @@ def init_database():
                 system_prompt TEXT NOT NULL,
                 trigger_schedule VARCHAR(100) DEFAULT 'DAILY_MORNING',
                 target_channel VARCHAR(100) DEFAULT '',
+                enable_web_search BOOLEAN DEFAULT FALSE,
+                search_keywords TEXT DEFAULT '',
                 is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -435,6 +453,8 @@ def init_database():
     finally:
         conn.close()
 
+    run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS enable_web_search BOOLEAN DEFAULT FALSE;")
+    run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS search_keywords TEXT DEFAULT '';")
     run_isolated_ddl("ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_execution_status_check;")
     run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN execution_status TYPE VARCHAR(50);")
     run_isolated_ddl("ALTER TABLE sample_deliveries DROP CONSTRAINT IF EXISTS sample_deliveries_status_check;")
@@ -461,7 +481,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="19.1.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="19.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -606,6 +626,8 @@ class NewAgentPayload(BaseModel):
     system_prompt: str
     trigger_schedule: Optional[str] = "DAILY_MORNING"
     target_channel: Optional[str] = ""
+    enable_web_search: Optional[bool] = False
+    search_keywords: Optional[str] = ""
 
 class UpdateAgentPayload(BaseModel):
     name: str
@@ -613,6 +635,8 @@ class UpdateAgentPayload(BaseModel):
     system_prompt: str
     trigger_schedule: Optional[str] = "DAILY_MORNING"
     target_channel: Optional[str] = ""
+    enable_web_search: Optional[bool] = False
+    search_keywords: Optional[str] = ""
 
 class ToggleAgentPayload(BaseModel):
     is_active: bool
@@ -848,7 +872,6 @@ def update_customer_group(payload: UpdateCustomerGroupPayload):
     finally:
         conn.close()
 
-# فروع العملاء (Customer Branches)
 @app.get("/api/customers/{customer_id}/branches")
 def get_customer_branches(customer_id: int):
     conn = get_db_connection()
@@ -1038,7 +1061,7 @@ def delete_target(target_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات العينات -----------------
+# ----------------- مسارات العينات والتقويم والمنتجات والمصاريف -----------------
 @app.get("/api/samples")
 def get_samples():
     conn = get_db_connection()
@@ -1169,7 +1192,6 @@ def delete_sample(sample_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات التقويم -----------------
 @app.get("/api/calendar")
 def get_calendar():
     conn = get_db_connection()
@@ -1273,7 +1295,6 @@ def delete_calendar_event(event_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات المنتجات والمصاريف -----------------
 @app.get("/api/products")
 def get_products():
     conn = get_db_connection()
@@ -1450,7 +1471,7 @@ def get_expense_categories():
     finally:
         conn.close()
 
-# ----------------- مسارات الوكلاء -----------------
+# ----------------- مسارات الوكلاء الأذكياء واستخبارات Perplexity -----------------
 @app.get("/api/agents")
 def get_ai_agents():
     conn = get_db_connection()
@@ -1463,6 +1484,8 @@ def get_ai_agents():
             for r in rows:
                 r["category"] = r.get("category") or "ADVISORY"
                 r["target_channel"] = r.get("target_channel") or ""
+                r["enable_web_search"] = bool(r.get("enable_web_search", False))
+                r["search_keywords"] = r.get("search_keywords") or ""
             return rows
     finally:
         conn.close()
@@ -1475,9 +1498,13 @@ def create_ai_agent(payload: NewAgentPayload):
     try:
         with conn.cursor() as cur:
             cur.execute("""
-            INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, TRUE) RETURNING id;
-            """, (payload.name.strip(), payload.category or "ADVISORY", payload.role_type.strip(), payload.system_prompt.strip(), payload.trigger_schedule or "DAILY_MORNING", payload.target_channel or ""))
+            INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, enable_web_search, search_keywords, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id;
+            """, (
+                payload.name.strip(), payload.category or "ADVISORY", payload.role_type.strip(), 
+                payload.system_prompt.strip(), payload.trigger_schedule or "DAILY_MORNING", 
+                payload.target_channel or "", payload.enable_web_search or False, payload.search_keywords or ""
+            ))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
@@ -1491,7 +1518,16 @@ def update_ai_agent(agent_id: int, payload: UpdateAgentPayload):
         raise HTTPException(status_code=500, detail="Database not reachable")
     try:
         with conn.cursor() as cur:
-            cur.execute("UPDATE ai_agents SET name = %s, category = %s, system_prompt = %s, trigger_schedule = %s, target_channel = %s WHERE id = %s;", (payload.name.strip(), payload.category or "ADVISORY", payload.system_prompt.strip(), payload.trigger_schedule, payload.target_channel or "", agent_id))
+            cur.execute("""
+            UPDATE ai_agents 
+            SET name = %s, category = %s, system_prompt = %s, trigger_schedule = %s, 
+                target_channel = %s, enable_web_search = %s, search_keywords = %s 
+            WHERE id = %s;
+            """, (
+                payload.name.strip(), payload.category or "ADVISORY", payload.system_prompt.strip(), 
+                payload.trigger_schedule, payload.target_channel or "", payload.enable_web_search or False, 
+                payload.search_keywords or "", agent_id
+            ))
             conn.commit()
             return {"status": "SUCCESS"}
     finally:
@@ -1555,7 +1591,19 @@ async def test_agent_global(payload: dict):
             if not target_destination:
                 raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار")
 
-            message_text = f"*{agent['name']}*\n\n«{agent['system_prompt']}»\n\nFood Development Company"
+            # إذا كانت خاصية البحث الحي في الإنترنت مفعلة لهذا الوكيل
+            if agent.get("enable_web_search"):
+                keywords = agent.get("search_keywords") or agent["name"]
+                intelligence_summary = await query_perplexity_intelligence(agent["system_prompt"], keywords)
+                message_text = (
+                    f"*{agent['name']} | تقرير استخبارات الويب الحي*\n"
+                    f"----------------------------------------\n"
+                    f"{intelligence_summary}\n"
+                    f"----------------------------------------\n"
+                    f"نظام المبيعات الذكي | شركة تنمية الغذاء"
+                )
+            else:
+                message_text = f"*{agent['name']}*\n\n«{agent['system_prompt']}»\n\nشركة تنمية الغذاء (Food Development Company)"
 
         sent = await send_whatsapp_direct(target_destination, message_text)
         if sent:
@@ -1600,7 +1648,6 @@ async def handle_inbound_sales_bot(msg: InboundBotMessage):
             step = session.get("step")
             intent = session.get("intent")
 
-            # مسار طلب العينات
             if "عين" in text or text == "1" or intent == "SAMPLE":
                 if step in ["INITIAL", "GENERAL"]:
                     cur.execute("UPDATE customer_bot_sessions SET intent = 'SAMPLE', step = 'ASK_REGION' WHERE phone_number = %s;", (phone,))
@@ -1638,7 +1685,6 @@ async def handle_inbound_sales_bot(msg: InboundBotMessage):
 
                     return {"reply_text": f"تم استلام طلبكم وتكليف مسؤول المبيعات الميداني لمنطقتكم (*{rep['name'] if rep else 'فريق مسقط'}*) بالتواصل معكم وتنسيق موعد التسليم مباشرة."}
 
-            # مسار الأسعار والتأهيل
             if "سعر" in text or "أسعار" in text or text == "2" or intent == "PRICE_INQUIRY":
                 if step in ["INITIAL", "GENERAL"]:
                     cur.execute("UPDATE customer_bot_sessions SET intent = 'PRICE_INQUIRY', step = 'ASK_BRANCHES' WHERE phone_number = %s;", (phone,))
@@ -1688,7 +1734,7 @@ async def handle_inbound_sales_bot(msg: InboundBotMessage):
     finally:
         conn.close()
 
-# ----------------- مسار الواتساب العام واستخراج الطلبات الرسمي للوجستيك -----------------
+# ----------------- مسار الواتساب العام واستخراج الطلبات للوجستيك -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
@@ -1821,7 +1867,6 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             logistics_group = conf.get("logistics_group_id", "")
             management_group = conf.get("management_group_id", "")
 
-            # فحص شات التحكم الخاص
             if chat_id.endswith("@s.whatsapp.net") and (chat_id.startswith(clean_phone) or "self" in chat_id):
                 channel_name = "شات التحكم الخاص (أنت)"
                 if text.startswith("تقرير") or text.startswith("مستجدات"):
@@ -1841,7 +1886,6 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         f"اكتب 'تقرير' لعرض الفرص والعينات الجارية."
                     )
             else:
-                # التحقق من مجموعة العميل
                 cur.execute("SELECT id, company_name, brand_name FROM customer_accounts WHERE whatsapp_group_id = %s;", (chat_id,))
                 customer = cur.fetchone()
                 cur.execute("SELECT id, name FROM sales_executives WHERE REPLACE(phone_number, '+', '') = %s;", (clean_phone,))
@@ -1850,16 +1894,13 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 if customer:
                     channel_name = f"مجموعة: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
                     
-                    # استخراج وتوجيه الطلبات بمرونة تامة لجميع من يكتب في المجموعة
                     trigger_keywords = ["box", "cartoon", "carton", "ctn", "odare", "order", "طلب", "طلبية", "كرتون", "حبة", "نحتاج", "ارسلوا", "محتاجين", "branch"]
                     is_order_detected = any(k in text.lower() for k in trigger_keywords)
 
                     if is_order_detected:
-                        # جلب الفروع المسجلة للعميل لدعم الاستدعاء الآلي
                         cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
                         branches = cur.fetchall()
 
-                        # صياغة أمر التوريد والتحضير الإنجليزي الرسمي
                         logistics_msg = format_dispatch_order_en(
                             text=text,
                             customer=customer,
