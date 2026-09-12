@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Multi-Session WhatsApp & Inbound Sales Automation
+Multi-Session WhatsApp & Inbound Sales Automation & Smart Logistics Dispatch
 """
 
 import os
@@ -13,6 +13,7 @@ import base64
 import logging
 import subprocess
 import csv
+import re
 from datetime import datetime
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -101,6 +102,100 @@ def match_rep_by_region(conn, region_term: str):
             cur.execute("SELECT id, name, phone_number, region FROM sales_executives WHERE region ILIKE '%مسقط%' AND status = 'نشط' LIMIT 1;")
             rep = cur.fetchone()
         return rep
+
+def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sender_name: str, branches: list) -> str:
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    
+    # 1. Location
+    loc_match = re.search(r'(https?://[^\s]+)', text)
+    location_url = loc_match.group(1) if loc_match else ""
+
+    # 2. Branch contact
+    contact_match = re.search(r'(?:contact|phone|tel|رقم)[:\s]*([0-9\+\s]{7,15})', text, re.IGNORECASE)
+    branch_contact = contact_match.group(1).strip().replace(" ", "") if contact_match else ""
+
+    # 3. Delivery date
+    delivery_date = "Next Scheduled Delivery"
+    coming_match = re.search(r'(?:coming|delivery|توصيل|وصول)[:\s]*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})', text, re.IGNORECASE)
+    if coming_match:
+        delivery_date = coming_match.group(1).strip()
+
+    # 4. Order received date
+    date_match = re.search(r'(?:date|تاريخ)[:\s]*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})', text, re.IGNORECASE)
+    order_date = date_match.group(1).strip() if date_match else datetime.now().strftime("%d/%m/%Y")
+
+    # 5. Branch detection
+    brand_name = customer.get("brand_name") or ""
+    branch_name = "Main Branch"
+    for l in lines:
+        if 'branch' in l.lower():
+            m = re.search(r'([A-Za-z\u0600-\u06FF\s\-]+branch)', l, re.IGNORECASE)
+            if m:
+                clean_b = m.group(1).strip()
+                if brand_name and brand_name.lower() in clean_b.lower():
+                    clean_b = re.sub(brand_name, '', clean_b, flags=re.IGNORECASE).strip()
+                branch_name = clean_b.title() if clean_b else "Main Branch"
+                break
+
+    # If branch matches existing DB branch, enrich contact and location
+    matched_branch = None
+    for b in branches:
+        b_name = b.get("branch_name", "")
+        if b_name.lower() in text.lower() or b_name.lower() in branch_name.lower():
+            branch_name = b_name
+            matched_branch = b
+            if not location_url and b.get("location_url"):
+                location_url = b["location_url"]
+            if not branch_contact and b.get("branch_phone"):
+                branch_contact = b["branch_phone"]
+            break
+
+    # 6. Items extraction
+    raw_items = []
+    for l in lines:
+        if re.search(r'^(date|coming|location|contact|tel|phone|odare|order)', l, re.IGNORECASE):
+            continue
+        if 'http' in l.lower() or 'branch' in l.lower() or (brand_name and l.lower() == brand_name.lower()):
+            continue
+        if re.search(r'(box|cartoon|carton|ctn|كرتون|حبة|pc|pcs|bag|كيس|bread|buns|bun|brioche|potato)', l, re.IGNORECASE):
+            raw_items.append(l)
+
+    cleaned_items = []
+    i = 0
+    while i < len(raw_items):
+        item_text = raw_items[i]
+        if i + 1 < len(raw_items) and re.search(r'^\d+\s*(box|cartoon|carton|ctn|كرتون)', raw_items[i+1], re.IGNORECASE):
+            item_text = f"{raw_items[i]}: {raw_items[i+1]}"
+            i += 1
+        cleaned_items.append(item_text)
+        i += 1
+
+    if not cleaned_items:
+        cleaned_items = ["Items specified in customer communication"]
+
+    items_formatted = "\n".join([f"- {it}" for it in cleaned_items])
+    sender_clean = f"{sender_phone} ({sender_name})"
+
+    msg_output = (
+        f"*DISPATCH & DELIVERY ORDER*\n"
+        f"----------------------------------------\n"
+        f"*Company:* {customer.get('company_name', 'Customer')}\n"
+        f"*Brand:* {brand_name if brand_name else customer.get('company_name', '')}\n"
+        f"*Branch:* {branch_name}\n"
+        f"*Order Received Date:* {order_date}\n"
+        f"*Target Delivery Date:* {delivery_date}\n"
+        f"----------------------------------------\n"
+        f"*Ordered Items & Quantities:*\n"
+        f"{items_formatted}\n"
+        f"----------------------------------------\n"
+        f"*Branch Contact:* {branch_contact if branch_contact else 'N/A'}\n"
+        f"*Sender Contact:* {sender_clean}\n"
+        f"*Delivery Location:*\n"
+        f"{location_url if location_url else 'Registered Branch Location'}\n"
+        f"----------------------------------------\n"
+        f"Food Development Co. | Logistics & Operations"
+    )
+    return msg_output
 
 def init_database():
     conn = get_db_connection()
@@ -192,6 +287,29 @@ def init_database():
                 whatsapp_group_id VARCHAR(100),
                 tier VARCHAR(10) DEFAULT 'B',
                 status VARCHAR(20) DEFAULT 'نشط'
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS customer_branches (
+                id SERIAL PRIMARY KEY,
+                customer_id INT REFERENCES customer_accounts(id) ON DELETE CASCADE,
+                branch_name VARCHAR(150) NOT NULL,
+                branch_phone VARCHAR(50) DEFAULT '',
+                location_url TEXT DEFAULT '',
+                city VARCHAR(100) DEFAULT 'مسقط',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS customer_product_aliases (
+                id SERIAL PRIMARY KEY,
+                customer_id INT REFERENCES customer_accounts(id) ON DELETE CASCADE,
+                product_id INT REFERENCES products_catalog(id) ON DELETE SET NULL,
+                raw_alias VARCHAR(200) NOT NULL,
+                canonical_name VARCHAR(200) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
 
@@ -343,7 +461,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="19.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="19.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -414,6 +532,13 @@ class UpdateCustomerPayload(BaseModel):
     phone: str
     assigned_rep_id: Optional[int] = None
     notes: Optional[str] = ""
+
+class CustomerBranchPayload(BaseModel):
+    customer_id: int
+    branch_name: str
+    branch_phone: Optional[str] = ""
+    location_url: Optional[str] = ""
+    city: Optional[str] = "مسقط"
 
 class UpdateCustomerGroupPayload(BaseModel):
     customer_id: int
@@ -503,7 +628,7 @@ class InboundBotMessage(BaseModel):
     sender_name: str
     message_text: str
 
-# ----------------- مسار التحقق 2FA الصارم -----------------
+# ----------------- التحقق الأمني الصارم -----------------
 @app.post("/api/auth/2fa/verify")
 def verify_2fa(payload: Verify2FAPayload):
     conn = get_db_connection()
@@ -518,7 +643,7 @@ def verify_2fa(payload: Verify2FAPayload):
             secret = row["totp_secret"] if row else None
 
         if not secret:
-            raise HTTPException(status_code=400, detail="لم يتم العثور على سر التوثيق")
+            raise HTTPException(status_code=400, detail="لم يتم العثور على مفتاح التوثيق السري")
 
         totp = pyotp.TOTP(secret)
         if totp.verify(clean_code, valid_window=1):
@@ -620,7 +745,7 @@ def delete_rep(rep_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات العملاء -----------------
+# ----------------- مسارات العملاء والفروع -----------------
 @app.get("/api/customers")
 def get_customers():
     conn = get_db_connection()
@@ -718,6 +843,49 @@ def update_customer_group(payload: UpdateCustomerGroupPayload):
     try:
         with conn.cursor() as cur:
             cur.execute("UPDATE customer_accounts SET whatsapp_group_id = %s WHERE id = %s;", (payload.whatsapp_group_id.strip(), payload.customer_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+# فروع العملاء (Customer Branches)
+@app.get("/api/customers/{customer_id}/branches")
+def get_customer_branches(customer_id: int):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s ORDER BY id ASC;", (customer_id,))
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/customers/branches")
+def add_customer_branch(payload: CustomerBranchPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO customer_branches (customer_id, branch_name, branch_phone, location_url, city)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id;
+            """, (payload.customer_id, payload.branch_name.strip(), payload.branch_phone or "", payload.location_url or "", payload.city or "مسقط"))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.delete("/api/customers/branches/{branch_id}")
+def delete_customer_branch(branch_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM customer_branches WHERE id = %s;", (branch_id,))
             conn.commit()
             return {"status": "SUCCESS"}
     finally:
@@ -1387,7 +1555,7 @@ async def test_agent_global(payload: dict):
             if not target_destination:
                 raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار")
 
-            message_text = f"*{agent['name']}*\n\n«{agent['system_prompt']}»\n\nشركة تنمية الغذاء (Food Development Company)"
+            message_text = f"*{agent['name']}*\n\n«{agent['system_prompt']}»\n\nFood Development Company"
 
         sent = await send_whatsapp_direct(target_destination, message_text)
         if sent:
@@ -1520,7 +1688,7 @@ async def handle_inbound_sales_bot(msg: InboundBotMessage):
     finally:
         conn.close()
 
-# ----------------- مسارات الواتساب العامة ورادار المحادثات -----------------
+# ----------------- مسار الواتساب العام واستخراج الطلبات الرسمي للوجستيك -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
@@ -1653,6 +1821,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             logistics_group = conf.get("logistics_group_id", "")
             management_group = conf.get("management_group_id", "")
 
+            # فحص شات التحكم الخاص
             if chat_id.endswith("@s.whatsapp.net") and (chat_id.startswith(clean_phone) or "self" in chat_id):
                 channel_name = "شات التحكم الخاص (أنت)"
                 if text.startswith("تقرير") or text.startswith("مستجدات"):
@@ -1672,6 +1841,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         f"اكتب 'تقرير' لعرض الفرص والعينات الجارية."
                     )
             else:
+                # التحقق من مجموعة العميل
                 cur.execute("SELECT id, company_name, brand_name FROM customer_accounts WHERE whatsapp_group_id = %s;", (chat_id,))
                 customer = cur.fetchone()
                 cur.execute("SELECT id, name FROM sales_executives WHERE REPLACE(phone_number, '+', '') = %s;", (clean_phone,))
@@ -1679,22 +1849,34 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
 
                 if customer:
                     channel_name = f"مجموعة: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
-                    trigger_words = ["نحتاج", "ارسلوا", "طلب", "كرتون", "طلبية", "محتاجين", "order"]
-                    if any(w in text.lower() for w in trigger_words):
+                    
+                    # استخراج وتوجيه الطلبات بمرونة تامة لجميع من يكتب في المجموعة
+                    trigger_keywords = ["box", "cartoon", "carton", "ctn", "odare", "order", "طلب", "طلبية", "كرتون", "حبة", "نحتاج", "ارسلوا", "محتاجين", "branch"]
+                    is_order_detected = any(k in text.lower() for k in trigger_keywords)
+
+                    if is_order_detected:
+                        # جلب الفروع المسجلة للعميل لدعم الاستدعاء الآلي
+                        cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
+                        branches = cur.fetchall()
+
+                        # صياغة أمر التوريد والتحضير الإنجليزي الرسمي
+                        logistics_msg = format_dispatch_order_en(
+                            text=text,
+                            customer=customer,
+                            sender_phone=msg.sender_phone,
+                            sender_name=msg.sender_name,
+                            branches=branches
+                        )
+
                         cur.execute("""
                         INSERT INTO incoming_orders (customer_name, requester_name, requester_phone, order_raw_text, detected_items, status)
-                        VALUES (%s, %s, %s, %s, 'طلب شراء تم رصده', 'FORWARDED_TO_LOGISTICS');
-                        """, (customer['company_name'], msg.sender_name, msg.sender_phone, text))
+                        VALUES (%s, %s, %s, %s, %s, 'FORWARDED_TO_LOGISTICS');
+                        """, (customer['company_name'], msg.sender_name, msg.sender_phone, text, logistics_msg))
 
                         if logistics_group:
                             forward_to_logistics = logistics_group
-                            logistics_text = (
-                                f"*إشعار طلبية جديدة من العميل (مصنع تنمية الغذاء) 📦*\n\n"
-                                f"• العميل: {customer['company_name']}\n"
-                                f"• طالب الشراء: {msg.sender_name} ({msg.sender_phone})\n"
-                                f"• نص الطلب: «{text}»\n\n"
-                                f"يرجى جدولة التجهيز والتوصيل."
-                            )
+                            logistics_text = logistics_msg
+
                 elif rep:
                     channel_name = f"المندوب: {rep['name']}"
                 elif chat_id == management_group:
