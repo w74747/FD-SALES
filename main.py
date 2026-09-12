@@ -42,6 +42,18 @@ DATABASE_URL = (
 )
 whatsapp_process = None
 
+LOGO_SVG_RAW = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 90" width="420" height="90">
+  <rect width="100%" height="100%" fill="transparent"/>
+  <g transform="translate(10, 10)">
+    <circle cx="35" cy="35" r="32" fill="#F5F0FC" stroke="#E4D9F5" stroke-width="2"/>
+    <path d="M 35 15 C 23.95 15 15 23.95 15 35 C 15 46.05 23.95 55 35 55 C 43.5 55 50.8 49.7 53.6 42 L 44.5 42 C 42.4 46.3 38.9 48.5 35 48.5 C 27.5 48.5 21.5 42.5 21.5 35 C 21.5 27.5 27.5 21.5 35 21.5 C 40.2 21.5 44.6 25.2 46.5 29.5 L 54.2 29.5 C 51.5 20.9 44 15 35 15 Z" fill="#3A056A"/>
+    <circle cx="35" cy="35" r="5.5" fill="#7E22CE"/>
+    <path d="M 48 20 C 49 23 48.5 27 46 29 C 44 26 44.5 22 48 20 Z" fill="#C194FB"/>
+    <text x="85" y="34" font-family="'Cairo', sans-serif" font-size="21" font-weight="900" fill="#3A056A">شركة تنمية الغذاء</text>
+    <text x="86" y="54" font-family="'Cairo', sans-serif" font-size="11" font-weight="700" fill="#7E22CE" letter-spacing="1.5">FOOD DEVELOPMENT CO.</text>
+  </g>
+</svg>"""
+
 def get_db_connection():
     if not DATABASE_URL:
         return None
@@ -281,13 +293,11 @@ def init_database():
     finally:
         conn.close()
 
-    # إسقاط القيود القديمة لحل أخطاء 500 نهائياً
     run_isolated_ddl("ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_execution_status_check;")
     run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN execution_status TYPE VARCHAR(50);")
     run_isolated_ddl("ALTER TABLE sample_deliveries DROP CONSTRAINT IF EXISTS sample_deliveries_status_check;")
     run_isolated_ddl("ALTER TABLE sample_deliveries ALTER COLUMN status TYPE VARCHAR(50);")
 
-    # إضافة وكلاء استشاريين أساسيين إذا لم يتوفروا
     run_isolated_ddl("""
     INSERT INTO ai_agents (name, category, role_type, system_prompt, trigger_schedule, target_channel, is_active)
     SELECT 'وكيل كبار العملاء والتصنيع للغير (Private Label)', 'ADVISORY', 'KEY_ACCOUNTS_OEM',
@@ -325,7 +335,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="18.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="18.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -334,6 +344,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ----------------- تقديم الشعار مباشرة -----------------
+@app.get("/logo.png")
+def get_logo():
+    return Response(
+        content=LOGO_SVG_RAW.strip().encode("utf-8"),
+        media_type="image/svg+xml",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "Access-Control-Allow-Origin": "*"
+        }
+    )
 
 # ----------------- نماذج Pydantic -----------------
 class Verify2FAPayload(BaseModel):
@@ -818,7 +840,7 @@ def delete_target(target_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات العينات المتعددة -----------------
+# ----------------- مسارات العينات -----------------
 @app.get("/api/samples")
 def get_samples():
     conn = get_db_connection()
@@ -989,7 +1011,6 @@ def update_calendar_event_status(event_id: int, payload: dict):
     try:
         status_val = str(payload.get("status", "COMPLETED")).strip()
         with conn.cursor() as cur:
-            # إسقاط القيد فوراً إن وُجد لتفادي أي خطأ
             cur.execute("ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_execution_status_check;")
             cur.execute("UPDATE calendar_events SET execution_status = %s WHERE id = %s;", (status_val, event_id))
             conn.commit()
@@ -1013,7 +1034,7 @@ def delete_calendar_event(event_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات المنتجات والمصاريف -----------------
+# ----------------- مسارات المنتجات -----------------
 @app.get("/api/products")
 def get_products():
     conn = get_db_connection()
@@ -1125,6 +1146,7 @@ async def upload_products_file(file: UploadFile = File(...)):
     finally:
         conn.close()
 
+# ----------------- مسارات المصاريف -----------------
 @app.get("/api/expenses")
 def get_expenses_log():
     conn = get_db_connection()
@@ -1305,7 +1327,7 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسارات الواتساب ورادار المحادثات والـ Webhook -----------------
+# ----------------- مسارات الواتساب -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
@@ -1343,7 +1365,7 @@ async def get_whatsapp_qr():
                     clean_b64 = qr_base64.split(",")[-1].strip()
                     return Response(
                         content=base64.b64decode(clean_b64),
-                        media_type="image/svg+xml",
+                        media_type="image/png",
                         headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
                     )
     except Exception:
