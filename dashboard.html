@@ -253,7 +253,7 @@
                 </div>
             </div>
 
-            <!-- 5. العملاء -->
+            <!-- 5. العملاء والفروع -->
             <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -334,13 +334,13 @@
                 </div>
             </div>
 
-            <!-- 8. الوكلاء -->
+            <!-- 8. الوكلاء الأذكياء (مع دعم استخبارات الويب) -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">منظومة الوكلاء الأذكياء (Enterprise AI Agents)</h3>
-                            <div class="text-xs text-gray-500">مجلس استشاري تنفيذي لقيادة نمو المصنع + وكلاء ميدانيون لمتابعة العينات ومسارات المبيعات</div>
+                            <div class="text-xs text-gray-500">مجلس استشاري تنفيذي مع دعم البحث الحي واستخبارات الويب عبر Perplexity</div>
                         </div>
                         <div class="flex gap-2">
                             <button onclick="cleanDuplicateAgents()" class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg border">
@@ -357,7 +357,7 @@
                             <span class="text-base">📱</span>
                             <div>
                                 <div class="font-bold text-xs text-[#3A056A]">رقم هاتف الاختبار الموحد المعتمد:</div>
-                                <div class="text-[10px] text-gray-500">تُرسل تجارب الوكلاء الميدانية لهذا الرقم فوراً عند الضغط على زر الاختبار.</div>
+                                <div class="text-[10px] text-gray-500">تُرسل نتائج استخبارات الويب والتجارب لهذا الرقم فوراً عند النقر.</div>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
@@ -481,7 +481,6 @@
                         <button onclick="saveSpecialGroupsConfig()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs">حفظ مجموعات العمل المعتمدة</button>
                     </div>
 
-                    <!-- حاوية المجموعات المكتشفة -->
                     <div id="discovered-groups-container" class="hidden border rounded-xl p-3 bg-gray-50 space-y-2">
                         <div class="font-bold text-xs text-gray-700">المجموعات المكتشفة بحساب الواتساب:</div>
                         <div id="discovered-groups-list" class="space-y-1.5 max-h-48 overflow-y-auto"></div>
@@ -543,7 +542,6 @@
                 </div>
                 <input type="hidden" id="branch-modal-customer-id">
 
-                <!-- إضافة فرع جديد -->
                 <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2 mt-3">
                     <div class="font-bold text-[#3A056A]">إضافة فرع جديد:</div>
                     <div class="grid grid-cols-2 gap-2">
@@ -556,7 +554,6 @@
                     </div>
                 </div>
 
-                <!-- قائمة الفروع الحالية -->
                 <div class="mt-3 space-y-2 max-h-48 overflow-y-auto">
                     <div class="font-bold text-gray-700">الفروع المسجلة:</div>
                     <div id="cust-branches-list" class="space-y-1.5"></div>
@@ -568,7 +565,93 @@
         </div>
     </div>
 
-    <!-- مودالات التعديل -->
+    <!-- مودال إنشاء وكيل ذكي جديد (مع خيار تفعيل البحث في الويب) -->
+    <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إنشاء وكيل ذكي جديد</h3>
+            <div>
+                <label class="block font-bold mb-1">اسم الوكيل:</label>
+                <input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: وكيل استخبارات المنافسين">
+            </div>
+            <div>
+                <label class="block font-bold mb-1">المستوى والتصنيف:</label>
+                <select id="agent-category-select" class="w-full p-2 border rounded-lg bg-purple-50/70 font-bold text-[#3A056A]">
+                    <option value="ADVISORY">🏛️ المجلس الاستشاري التنفيذي</option>
+                    <option value="FIELD_OPERATIONS">🚚 المتابعة والعمليات الميدانية</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">البرومبت التوجيهي (System Prompt):</label>
+                <textarea id="agent-prompt-input" rows="3" class="w-full p-2.5 border rounded-lg" placeholder="حدد مهام وشخصية الوكيل..."></textarea>
+            </div>
+            
+            <!-- خيار تفعيل البحث الحي عبر الويب -->
+            <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="agent-enable-search" class="w-4 h-4 text-[#3A056A] rounded">
+                    <span class="font-bold text-blue-950">تفعيل ميزة البحث اللحظي ومراقبة الويب (Live Web Search)</span>
+                </label>
+                <div class="text-[10px] text-gray-600">يبحث في الأخبار والويب وحسابات لينكدإن ومواقع التواصل عن أحدث التطورات عبر Perplexity.</div>
+                <div>
+                    <label class="block text-[10px] font-bold text-blue-900 mb-0.5">الشركات أو الكلمات المفتاحية المستهدفة:</label>
+                    <input type="text" id="agent-keywords-input" placeholder="مثال: لوزين، المراعي، أطياب، منافسين المخبوزات" class="w-full p-1.5 border rounded bg-white text-xs">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="closeModal('new-agent-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ واعتماد الوكيل</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال تعديل وكيل ذكي (مع خيار تفعيل/تعطيل البحث في الويب) -->
+    <div id="edit-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm brand-primary-text">تعديل وكيل المتابعة والاستخبارات</h3>
+                <span class="text-[10px] text-gray-500">تحديث التعليمات والمشغّل</span>
+            </div>
+            <input type="hidden" id="edit-agent-id">
+            <div>
+                <label class="block font-bold mb-1">اسم الوكيل:</label>
+                <input type="text" id="edit-agent-name" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-bold mb-1">توقيت التشغيل والمشغّل:</label>
+                <select id="edit-agent-schedule" class="w-full p-2 border rounded-lg bg-white">
+                    <option value="DAILY_10AM">يومياً الساعة 10:00 صباحاً</option>
+                    <option value="DAILY_08AM">يومياً الساعة 08:30 صباحاً</option>
+                    <option value="WEEKLY_SUNDAY">أسبوعياً (كل يوم أحد)</option>
+                    <option value="MANUAL">تشغيل يدوي عند الطلب فقط</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">توجيهات البرومبت والتعليمات المخصصة (System Prompt):</label>
+                <textarea id="edit-agent-prompt" rows="3" class="w-full p-2 border rounded-lg"></textarea>
+            </div>
+
+            <!-- خيار تفعيل/تعطيل البحث عبر الويب -->
+            <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="edit-agent-enable-search" class="w-4 h-4 text-[#3A056A] rounded">
+                    <span class="font-bold text-blue-950">تفعيل ميزة البحث اللحظي ومراقبة الويب (Live Web Search)</span>
+                </label>
+                <div class="text-[10px] text-gray-600">يبحث في الأخبار والويب وحسابات لينكدإن ومواقع التواصل عن أحدث التطورات عبر Perplexity.</div>
+                <div>
+                    <label class="block text-[10px] font-bold text-blue-900 mb-0.5">الشركات أو الكلمات المفتاحية المستهدفة:</label>
+                    <input type="text" id="edit-agent-keywords" placeholder="مثال: لوزين، المراعي، أطياب، منافسين المخبوزات" class="w-full p-1.5 border rounded bg-white text-xs">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="closeModal('edit-agent-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitUpdateAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تحديث الوكيل</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- باقي المودالات -->
     <div id="edit-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل الهدف البيعي</h3>
@@ -669,28 +752,6 @@
         </div>
     </div>
 
-    <div id="edit-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل وكيل المتابعة الذكي</h3>
-            <input type="hidden" id="edit-agent-id">
-            <div><label class="block font-bold mb-1">اسم الوكيل:</label><input type="text" id="edit-agent-name" class="w-full p-2 border rounded-lg"></div>
-            <div><label class="block font-bold mb-1">توقيت التشغيل:</label>
-                <select id="edit-agent-schedule" class="w-full p-2 border rounded-lg bg-white">
-                    <option value="DAILY_10AM">يومياً الساعة 10:00 صباحاً</option>
-                    <option value="DAILY_08AM">يومياً الساعة 08:30 صباحاً</option>
-                    <option value="WEEKLY_SUNDAY">أسبوعياً (كل يوم أحد)</option>
-                    <option value="MANUAL">تشغيل يدوي عند الطلب فقط</option>
-                </select>
-            </div>
-            <div><label class="block font-bold mb-1">توجيهات البرومبت والتعليمات المخصصة:</label><textarea id="edit-agent-prompt" rows="4" class="w-full p-2 border rounded-lg"></textarea></div>
-            <div class="flex justify-end gap-2 pt-2 border-t">
-                <button onclick="closeModal('edit-agent-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
-                <button onclick="submitUpdateAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">تحديث التوجيه</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- مودالات الواتساب QR -->
     <div id="sales-qr-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4 text-xs text-center">
             <h3 class="font-bold text-sm text-emerald-900 border-b pb-2">ربط واتساب مبيعات العملاء الجدد</h3>
@@ -722,7 +783,6 @@
         </div>
     </div>
 
-    <!-- مودالات الإضافة البسيطة -->
     <div id="new-target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تحديد هدف بيعي / فرصة جديدة</h3>
@@ -815,15 +875,6 @@
         </div>
     </div>
 
-    <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إنشاء وكيل ذكي جديد</h3>
-            <div><label class="block font-bold mb-1">اسم الوكيل:</label><input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg"></div>
-            <div><label class="block font-bold mb-1">البرومبت التوجيهي:</label><textarea id="agent-prompt-input" rows="4" class="w-full p-2.5 border rounded-lg"></textarea></div>
-            <div class="flex justify-end gap-2 pt-2 border-t"><button onclick="closeModal('new-agent-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitNewAgent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ الوكيل</button></div>
-        </div>
-    </div>
-
     <div id="report-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">مركز إصدار التقارير الرسمية (A4)</h3>
@@ -846,7 +897,8 @@
             <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">إغلاق الهدف بنجاح وتحويله لأمر شراء (PO)</h3>
             <input type="hidden" id="close-target-id">
             <div><label class="block font-bold mb-1">رقم أمر الشراء (PO):</label><input type="text" id="close-po-number" class="w-full p-2 border rounded-lg font-mono"></div>
-            <div><label class="block font-bold mb-1">القيمة (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold"></div>
+            <div><label class="block font-bold mb-1">قيمة أمر الشراء (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold"></div>
+            <div><label class="block font-bold mb-1">رابط السند المرفق:</label><input type="text" id="close-po-url" class="w-full p-2 border rounded-lg"></div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="closeModal('close-target-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitCloseTarget()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الإغلاق</button></div>
         </div>
     </div>
@@ -871,6 +923,7 @@
         </div>
     </div>
 
+    <!-- كود الجافاسكربت -->
     <script>
         function switchTab(tabId) {
             let cleanId = tabId.replace(/^tab-/, '');
@@ -1479,7 +1532,6 @@
             }
         };
 
-        // إدارة الفروع التفاعلية
         window.openCustomerBranchesModal = async function(custId, compName) {
             document.getElementById('branch-modal-customer-id').value = custId;
             document.getElementById('cust-branch-modal-title').innerText = `فروع ومواقع: ${unescape(compName || '')}`;
@@ -1569,7 +1621,9 @@
             if (res.ok) await loadAllData();
         };
 
+        // بطاقات الوكلاء الأذكياء مع تمييز ميزة البحث الحي
         window.renderAgentCard = function(a) {
+            const hasSearch = Boolean(a.enable_web_search);
             return `
             <div class="p-4 rounded-xl border ${a.is_active ? 'brand-border bg-white shadow-xs' : 'border-gray-200 bg-gray-50 opacity-75'} space-y-3 flex flex-col justify-between">
                 <div class="space-y-2">
@@ -1578,18 +1632,24 @@
                             <span class="font-bold text-sm text-gray-900">${a.name}</span>
                             <div class="text-[10px] text-purple-700 font-mono font-bold mt-1">${a.role_type}</div>
                         </div>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'}">
-                            ${a.is_active ? 'نشط ومفعّل ✓' : 'متوقف'}
-                        </span>
+                        <div class="flex flex-col items-end gap-1">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'}">
+                                ${a.is_active ? 'نشط ومفعّل ✓' : 'متوقف'}
+                            </span>
+                            ${hasSearch ? `<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200">🌐 بحث حي نشط</span>` : ''}
+                        </div>
                     </div>
-                    <div class="p-2.5 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-28 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
+                    <div class="p-2.5 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-24 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
                         ${a.system_prompt}
                     </div>
+                    ${hasSearch && a.search_keywords ? `<div class="text-[10px] text-blue-900 bg-blue-50/50 p-1.5 rounded border border-blue-100"><strong>الرصد المستهدف:</strong> ${a.search_keywords}</div>` : ''}
                 </div>
                 <div class="pt-2 border-t flex justify-between items-center no-print">
-                    <button onclick="testAgentNowGlobal(${a.id})" class="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[10px]">إرسال تجربة</button>
+                    <button onclick="testAgentNowGlobal(${a.id})" class="px-2.5 py-1 ${hasSearch ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-bold rounded text-[10px] flex items-center gap-1">
+                        <span>${hasSearch ? '🔍 مسح الويب الآن' : 'إرسال تجربة'}</span>
+                    </button>
                     <div class="flex gap-1">
-                        <button onclick="openEditAgentModal(${a.id}, '${escape(a.name)}', '${escape(a.system_prompt)}', '${a.trigger_schedule}')" class="px-2 py-1 text-xs border border-purple-300 text-[#3A056A] font-bold rounded hover:bg-purple-50">تعديل</button>
+                        <button onclick="openEditAgentModal(${a.id}, '${escape(a.name)}', '${escape(a.system_prompt)}', '${a.trigger_schedule}', ${hasSearch}, '${escape(a.search_keywords || '')}')" class="px-2 py-1 text-xs border border-purple-300 text-[#3A056A] font-bold rounded hover:bg-purple-50">تعديل</button>
                         <button onclick="deleteItem('/api/agents/${a.id}')" class="text-red-600 font-bold text-xs px-1">حذف</button>
                     </div>
                 </div>
@@ -1613,27 +1673,35 @@
 
         window.submitNewAgent = async function() {
             const name = document.getElementById('agent-name-input').value.trim();
+            const category = document.getElementById('agent-category-select').value;
             const system_prompt = document.getElementById('agent-prompt-input').value.trim();
+            const enable_web_search = document.getElementById('agent-enable-search').checked;
+            const search_keywords = document.getElementById('agent-keywords-input').value.trim();
 
             if (!name || !system_prompt) return alert("يرجى إدخال اسم الوكيل والبرومبت");
 
             const res = await fetch('/api/agents', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, category: "ADVISORY", role_type: "CUSTOM", system_prompt })
+                body: JSON.stringify({ 
+                    name, category, role_type: "CUSTOM", system_prompt,
+                    enable_web_search, search_keywords
+                })
             });
             if (res.ok) {
                 closeModal('new-agent-modal');
                 await loadAllData();
-                alert("تم إنشاء الوكيل بنجاح ✓");
+                alert("تم إنشاء الوكيل بنجاح واعتماد إعدادات البحث ✓");
             }
         };
 
-        window.openEditAgentModal = function(id, name, prompt, schedule) {
+        window.openEditAgentModal = function(id, name, prompt, schedule, enableSearch, keywords) {
             document.getElementById('edit-agent-id').value = id;
             document.getElementById('edit-agent-name').value = unescape(name || '');
             document.getElementById('edit-agent-prompt').value = unescape(prompt || '');
             document.getElementById('edit-agent-schedule').value = schedule || 'DAILY_10AM';
+            document.getElementById('edit-agent-enable-search').checked = Boolean(enableSearch);
+            document.getElementById('edit-agent-keywords').value = unescape(keywords || '');
             openModal('edit-agent-modal');
         };
 
@@ -1642,7 +1710,9 @@
             const payload = {
                 name: document.getElementById('edit-agent-name').value.trim(),
                 system_prompt: document.getElementById('edit-agent-prompt').value.trim(),
-                trigger_schedule: document.getElementById('edit-agent-schedule').value
+                trigger_schedule: document.getElementById('edit-agent-schedule').value,
+                enable_web_search: document.getElementById('edit-agent-enable-search').checked,
+                search_keywords: document.getElementById('edit-agent-keywords').value.trim()
             };
             const res = await fetch(`/api/agents/${id}/update`, {
                 method: 'POST',
@@ -1652,19 +1722,37 @@
             if (res.ok) {
                 closeModal('edit-agent-modal');
                 await loadAllData();
-                alert("تم تحديث توجيه الوكيل الذكي بنجاح ✓");
+                alert("تم تحديث توجيه وإعدادات الوكيل الذكي بنجاح ✓");
             }
         };
 
         window.testAgentNowGlobal = async function(id) {
             const phone = document.getElementById('global-test-phone').value.trim();
-            const res = await fetch('/api/agents/test-global', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ agent_id: id, test_phone: phone })
-            });
-            if (res.ok) alert("تم إرسال رسالة تجربة الوكيل للواتساب بنجاح ✓");
-            else alert("فشل الإرسال");
+            if (!phone) return alert("يرجى كتابة رقم هاتف الاختبار بالأعلى أولاً");
+            
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span>جاري الفحص...</span>';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/agents/test-global', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agent_id: id, test_phone: phone })
+                });
+                if (res.ok) {
+                    alert("تم إجراء البحث والاستقصاء بنجاح وإرسال التقرير الكامل إلى هاتفك عبر الواتساب ✓");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert("تعذر إرسال التقرير: " + (err.detail || "خطأ غير متوقع"));
+                }
+            } catch(e) {
+                alert("فشل الاتصال بالخادم");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
         };
 
         window.saveGlobalTestPhone = function(show = false) {
@@ -1691,7 +1779,6 @@
                     if (text) text.innerText = "واتساب: بانتظار المسح";
                 }
 
-                // فحص جلسة مبيعات العملاء الجدد
                 const sRes = await fetch('/api/whatsapp/sales-status?t=' + new Date().getTime());
                 const sData = await sRes.json();
                 const sBadge = document.getElementById('sales-wa-badge');
@@ -1876,7 +1963,6 @@
             loadAgentsData();
             loadWhatsAppLogs();
 
-            // المندوبين
             try {
                 const rRes = await fetch('/api/reps');
                 allRepsCache = await rRes.json();
@@ -1938,7 +2024,6 @@
                 document.querySelectorAll('.cal-rep-select-item').forEach(s => s.innerHTML = repNamesOpts);
             } catch(e) {}
 
-            // العملاء والمجموعات والفروع
             try {
                 const cRes = await fetch('/api/customers');
                 const custs = await cRes.json();
@@ -1988,7 +2073,6 @@
                 document.getElementById('cal-customers-datalist').innerHTML = custs.map(c => `<option value="${c.company_name}">`).join('');
             } catch(e) {}
 
-            // المنتجات
             try {
                 const pRes = await fetch('/api/products');
                 allProductsCache = await pRes.json();
@@ -2009,7 +2093,6 @@
                 document.getElementById('sample-products-datalist').innerHTML = allProductsCache.map(p => `<option value="${p.name_ar}">`).join('');
             } catch(e) {}
 
-            // الأهداف
             try {
                 const tRes = await fetch('/api/targets');
                 const targets = await tRes.json();
@@ -2039,14 +2122,12 @@
                 }
             } catch(e) {}
 
-            // العينات
             try {
                 const sRes = await fetch('/api/samples');
                 allSamplesCache = await sRes.json();
                 renderSamplesTable(allSamplesCache);
             } catch(e) {}
 
-            // التقويم
             try {
                 const cRes = await fetch('/api/calendar');
                 const cal = await cRes.json();
@@ -2071,7 +2152,6 @@
                 }
             } catch(e) {}
 
-            // المصاريف
             try {
                 const expRes = await fetch('/api/expenses');
                 const expenses = await expRes.json();
@@ -2091,7 +2171,6 @@
                 }
             } catch(e) {}
 
-            // قراءة الإعدادات المحفوظة وتعبئة حقول المجموعات
             try {
                 const confRes = await fetch('/api/system/config');
                 const conf = await confRes.json();
