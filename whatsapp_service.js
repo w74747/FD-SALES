@@ -1,6 +1,7 @@
 /**
  * whatsapp_service.js - Multi-Session WhatsApp Engine
- * Session 1 (operations): Group monitoring, dispatch, team notifications
+ * Dual-session persistent storage via PostgreSQL for Railway deployment
+ * Session 1 (operations): Group monitoring, smart dispatch & notifications
  * Session 2 (sales): Inbound new customer sales bot & auto-qualification
  */
 
@@ -50,22 +51,103 @@ if (DATABASE_URL) {
   }
 }
 
-// ----------------- حالة الجلسات -----------------
+// ----------------- تهيئة التخزين الدائم في PostgreSQL -----------------
+async function getPostgresAuthState(sessionKey) {
+  if (pool) {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS baileys_auth_sessions (
+          key_id VARCHAR(255) PRIMARY KEY,
+          data TEXT NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      const writeData = async (key_id, data) => {
+        try {
+          const serialized = JSON.stringify(data, BufferJSON.replacer);
+          await pool.query(`
+            INSERT INTO baileys_auth_sessions (key_id, data, updated_at) 
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (key_id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW();
+          `, [`${sessionKey}_${key_id}`, serialized]);
+        } catch (e) {}
+      };
+
+      const readData = async (key_id) => {
+        try {
+          const res = await pool.query('SELECT data FROM baileys_auth_sessions WHERE key_id = $1;', [`${sessionKey}_${key_id}`]);
+          if (res.rows.length > 0) return JSON.parse(res.rows[0].data, BufferJSON.reviver);
+        } catch (e) {}
+        return null;
+      };
+
+      const removeData = async (key_id) => {
+        try {
+          await pool.query('DELETE FROM baileys_auth_sessions WHERE key_id = $1;', [`${sessionKey}_${key_id}`]);
+        } catch (e) {}
+      };
+
+      let creds = await readData('creds');
+      if (!creds) {
+        creds = initAuthCreds();
+        await writeData('creds', creds);
+      }
+
+      return {
+        state: {
+          creds,
+          keys: {
+            get: async (type, ids) => {
+              const data = {};
+              for (const id of ids) {
+                let val = await readData(`${type}-${id}`);
+                if (type === 'app-state-sync-key' && val) val = proto.Message.AppStateSyncKeyData.fromObject(val);
+                data[id] = val;
+              }
+              return data;
+            },
+            set: async (data) => {
+              for (const category in data) {
+                for (const id in data[category]) {
+                  const val = data[category][id];
+                  const key = `${category}-${id}`;
+                  if (val) {
+                    await writeData(key, val);
+                  } else {
+                    await removeData(key);
+                  }
+                }
+              }
+            }
+          }
+        },
+        saveCreds: () => writeData('creds', creds)
+      };
+    } catch (e) {
+      console.error(`[PostgresAuth Error - ${sessionKey}]:`, e.message);
+    }
+  }
+
+  // في حال غياب الاتصال بقاعدة البيانات يتم الاعتماد على مجلد محلي كنسخة احتياطية
+  const localFolder = path.join(__dirname, `auth_${sessionKey}`);
+  if (!fs.existsSync(localFolder)) fs.mkdirSync(localFolder, { recursive: true });
+  return await useMultiFileAuthState(localFolder);
+}
+
+// ----------------- كائنات الجلسات -----------------
 const sessions = {
   operations: { sock: null, qr: null, connected: false, user: null, isStarting: false },
   sales: { sock: null, qr: null, connected: false, user: null, isStarting: false }
 };
 
-// ----------------- الجلسة الأولى: العمليات والمجموعات -----------------
+// ----------------- الجلسة الأولى: رقم العمليات -----------------
 async function startOperationsWhatsApp() {
   if (sessions.operations.isStarting) return;
   sessions.operations.isStarting = true;
 
   try {
-    const authFolder = path.join(__dirname, 'auth_info');
-    if (!fs.existsSync(authFolder)) fs.mkdirSync(authFolder, { recursive: true });
-
-    const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+    const { state, saveCreds } = await getPostgresAuthState('operations');
 
     if (sessions.operations.sock) {
       try { sessions.operations.sock.ev.removeAllListeners(); } catch (e) {}
@@ -75,7 +157,7 @@ async function startOperationsWhatsApp() {
       auth: state,
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false,
-      browser: ['FDC Operations', 'Chrome', '11.0.0']
+      browser: ['FDC Operations CRM', 'Chrome', '11.0.0']
     });
 
     sessions.operations.sock = sock;
@@ -97,7 +179,15 @@ async function startOperationsWhatsApp() {
         sessions.operations.connected = false;
         sessions.operations.qr = null;
         sessions.operations.isStarting = false;
-        setTimeout(startOperationsWhatsApp, 3000);
+
+        if (shouldReconnect) {
+          setTimeout(startOperationsWhatsApp, 3000);
+        } else {
+          if (pool) {
+            try { await pool.query("DELETE FROM baileys_auth_sessions WHERE key_id LIKE 'operations_%';"); } catch (e) {}
+          }
+          setTimeout(startOperationsWhatsApp, 3000);
+        }
       } else if (connection === 'open') {
         sessions.operations.connected = true;
         sessions.operations.qr = null;
@@ -149,16 +239,13 @@ async function startOperationsWhatsApp() {
   }
 }
 
-// ----------------- الجلسة الثانية: مبيعات وتأهيل العملاء الجدد -----------------
+// ----------------- الجلسة الثانية: رقم مبيعات العملاء الجدد -----------------
 async function startSalesWhatsApp() {
   if (sessions.sales.isStarting) return;
   sessions.sales.isStarting = true;
 
   try {
-    const authFolder = path.join(__dirname, 'auth_sales');
-    if (!fs.existsSync(authFolder)) fs.mkdirSync(authFolder, { recursive: true });
-
-    const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+    const { state, saveCreds } = await getPostgresAuthState('sales');
 
     if (sessions.sales.sock) {
       try { sessions.sales.sock.ev.removeAllListeners(); } catch (e) {}
@@ -185,10 +272,20 @@ async function startSalesWhatsApp() {
       }
 
       if (connection === 'close') {
+        const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
         sessions.sales.connected = false;
         sessions.sales.qr = null;
         sessions.sales.isStarting = false;
-        setTimeout(startSalesWhatsApp, 3000);
+
+        if (shouldReconnect) {
+          setTimeout(startSalesWhatsApp, 3000);
+        } else {
+          if (pool) {
+            try { await pool.query("DELETE FROM baileys_auth_sessions WHERE key_id LIKE 'sales_%';"); } catch (e) {}
+          }
+          setTimeout(startSalesWhatsApp, 3000);
+        }
       } else if (connection === 'open') {
         sessions.sales.connected = true;
         sessions.sales.qr = null;
@@ -203,7 +300,7 @@ async function startSalesWhatsApp() {
         if (!msg || !msg.message || msg.key.fromMe) return;
 
         const chatId = msg.key.remoteJid;
-        if (chatId.endsWith('@g.us')) return; // الرد على العملاء الأفراد فقط
+        if (chatId.endsWith('@g.us')) return;
 
         const senderPhone = chatId.split('@')[0];
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
@@ -227,8 +324,7 @@ async function startSalesWhatsApp() {
   }
 }
 
-// ----------------- مسارات API -----------------
-// حالة جلسة العمليات
+// ----------------- مسارات الـ API للتحكم -----------------
 app.get('/qr-status', (req, res) => {
   res.json({
     connected: sessions.operations.connected,
@@ -237,7 +333,6 @@ app.get('/qr-status', (req, res) => {
   });
 });
 
-// حالة جلسة مبيعات العملاء الجدد
 app.get('/sales/qr-status', (req, res) => {
   res.json({
     connected: sessions.sales.connected,
@@ -268,7 +363,7 @@ app.post('/send-message', async (req, res) => {
     : sessions.operations;
 
   if (!activeSession.connected || !activeSession.sock) {
-    return res.status(503).json({ error: 'خدمة الواتساب غير متصلة حالياً' });
+    return res.status(503).json({ error: 'خدمة الواتساب المطلوبة غير متصلة حالياً' });
   }
 
   try {
@@ -291,6 +386,9 @@ app.post('/disconnect', async (req, res) => {
       try { await sessions.operations.sock.logout(); } catch (e) {}
       try { sessions.operations.sock.end(); } catch (e) {}
     }
+    if (pool) {
+      try { await pool.query("DELETE FROM baileys_auth_sessions WHERE key_id LIKE 'operations_%';"); } catch (e) {}
+    }
     setTimeout(startOperationsWhatsApp, 2000);
     return res.json({ status: 'DISCONNECTED' });
   } catch (e) {
@@ -307,6 +405,9 @@ app.post('/sales/disconnect', async (req, res) => {
       try { await sessions.sales.sock.logout(); } catch (e) {}
       try { sessions.sales.sock.end(); } catch (e) {}
     }
+    if (pool) {
+      try { await pool.query("DELETE FROM baileys_auth_sessions WHERE key_id LIKE 'sales_%';"); } catch (e) {}
+    }
     setTimeout(startSalesWhatsApp, 2000);
     return res.json({ status: 'DISCONNECTED' });
   } catch (e) {
@@ -314,6 +415,7 @@ app.post('/sales/disconnect', async (req, res) => {
   }
 });
 
+// بدء تشغيل الجلستين
 startOperationsWhatsApp();
 startSalesWhatsApp();
 
