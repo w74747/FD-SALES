@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Multi-Session WhatsApp & Inbound Sales Automation & Live Perplexity Intelligence
+Multi-Session WhatsApp & Inbound Sales Automation & Live Perplexity Intelligence & Smart Logistics Dispatch
 """
 
 import os
@@ -109,7 +109,7 @@ async def query_perplexity_intelligence(system_prompt: str, search_query: str) -
     user_content = (
         f"المطلوب: قم بإجراء بحث واستقصاء حي عبر الإنترنت ولينكدإن ومصادر الأخبار حول الآتي:\n"
         f"الموضوع / الشركات المستهدفة: {search_query}\n\n"
-        f"قم بصياغة تقرير تنفيذي رسمي وموجز باللغة العربية يوضح: "
+        f"قم بصياغة تقرير تنفيذي رسمي وموجز باللغة العربية يوضح:\n"
         f"1. أحدث الأخبار والتحركات خلال الأيام الأخيرة.\n"
         f"2. المنتجات الجديدة أو التغييرات التسعيرية وحملات الترويج المرصودة.\n"
         f"3. توصية استراتيجية واضحة لشركة تنمية الغذاء لاقتناص الفرصة التنافسية.\n"
@@ -137,6 +137,15 @@ async def query_perplexity_intelligence(system_prompt: str, search_query: str) -
     except Exception as e:
         logger.error(f"Perplexity Connection Exception: {e}")
         return f"خطأ في الاتصال بمحرك Perplexity: {str(e)}"
+
+def match_rep_by_region(conn, region_term: str):
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, name, phone_number, region FROM sales_executives WHERE region ILIKE %s AND status = 'نشط' LIMIT 1;", (f"%{region_term}%",))
+        rep = cur.fetchone()
+        if not rep:
+            cur.execute("SELECT id, name, phone_number, region FROM sales_executives WHERE region ILIKE '%مسقط%' AND status = 'نشط' LIMIT 1;")
+            rep = cur.fetchone()
+        return rep
 
 def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sender_name: str, branches: list) -> str:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
@@ -430,7 +439,6 @@ def init_database():
             );
             """)
 
-            # جدول الوكلاء مع دعم البحث الحي في الإنترنت
             cur.execute("""
             CREATE TABLE IF NOT EXISTS ai_agents (
                 id SERIAL PRIMARY KEY,
@@ -481,7 +489,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="19.2.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="19.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1591,7 +1599,7 @@ async def test_agent_global(payload: dict):
             if not target_destination:
                 raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار")
 
-            # إذا كانت خاصية البحث الحي في الإنترنت مفعلة لهذا الوكيل
+            # فحص إذا كانت خاصية استخبارات وبحث الويب مفعلة
             if agent.get("enable_web_search"):
                 keywords = agent.get("search_keywords") or agent["name"]
                 intelligence_summary = await query_perplexity_intelligence(agent["system_prompt"], keywords)
@@ -1734,7 +1742,7 @@ async def handle_inbound_sales_bot(msg: InboundBotMessage):
     finally:
         conn.close()
 
-# ----------------- مسار الواتساب العام واستخراج الطلبات للوجستيك -----------------
+# ----------------- مسار الواتساب العام واستخراج الطلبات وتوجيهها للوجستيك -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
@@ -1854,7 +1862,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
 
     try:
         clean_phone = msg.sender_phone.replace("+", "").strip()
-        chat_id = msg.chat_id
+        chat_id = msg.chat_id.strip()
         text = msg.message_text.strip()
         channel_name = "محادثة مباشرة"
         reply_text = None
@@ -1864,37 +1872,43 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         with conn.cursor() as cur:
             cur.execute("SELECT key_name, key_value FROM system_config;")
             conf = {r["key_name"]: r["key_value"] for r in cur.fetchall()}
-            logistics_group = conf.get("logistics_group_id", "")
-            management_group = conf.get("management_group_id", "")
+            logistics_group = conf.get("logistics_group_id", "").strip()
+            management_group = conf.get("management_group_id", "").strip()
 
+            # 1. شات التحكم الخاص بالمسؤول
             if chat_id.endswith("@s.whatsapp.net") and (chat_id.startswith(clean_phone) or "self" in chat_id):
-                channel_name = "شات التحكم الخاص (أنت)"
+                channel_name = "شات التحكم الخاص"
                 if text.startswith("تقرير") or text.startswith("مستجدات"):
                     cur.execute("SELECT COUNT(*) FROM sales_targets WHERE status = 'IN_PROGRESS';")
                     active_t = cur.fetchone()["count"]
                     cur.execute("SELECT COUNT(*) FROM sample_deliveries WHERE status = 'PENDING';")
                     pending_s = cur.fetchone()["count"]
                     reply_text = (
-                        f"*تقرير موجز من الوكيل الذكي (شركة تنمية الغذاء):*\n\n"
+                        f"*تقرير موجز من نظام تنمية الغذاء:*\n\n"
                         f"• الفرص البيعية الجارية: {active_t}\n"
                         f"• العينات قيد التجربة: {pending_s}\n\n"
                         f"النظام يعمل بنجاح ويرصد المجموعات المعتمدة."
                     )
-                else:
-                    reply_text = (
-                        f"مرحباً بك في نظام شركة تنمية الغذاء الذكي.\n"
-                        f"اكتب 'تقرير' لعرض الفرص والعينات الجارية."
-                    )
+            
+            # 2. مجموعات العملاء المربوطة
             else:
                 cur.execute("SELECT id, company_name, brand_name FROM customer_accounts WHERE whatsapp_group_id = %s;", (chat_id,))
                 customer = cur.fetchone()
-                cur.execute("SELECT id, name FROM sales_executives WHERE REPLACE(phone_number, '+', '') = %s;", (clean_phone,))
-                rep = cur.fetchone()
+
+                if not customer and "@g.us" in chat_id:
+                    clean_gid = chat_id.split("@")[0]
+                    cur.execute("SELECT id, company_name, brand_name FROM customer_accounts WHERE whatsapp_group_id LIKE %s;", (f"%{clean_gid}%",))
+                    customer = cur.fetchone()
 
                 if customer:
                     channel_name = f"مجموعة: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
                     
-                    trigger_keywords = ["box", "cartoon", "carton", "ctn", "odare", "order", "طلب", "طلبية", "كرتون", "حبة", "نحتاج", "ارسلوا", "محتاجين", "branch"]
+                    trigger_keywords = [
+                        "box", "boxes", "cartoon", "carton", "cartoons", "ctn", "odare", "order", 
+                        "potato", "buns", "bun", "bread", "brioche", "طلب", "طلبية", "كرتون", 
+                        "حبة", "نحتاج", "ارسلوا", "محتاجين", "branch", "توصيل"
+                    ]
+                    
                     is_order_detected = any(k in text.lower() for k in trigger_keywords)
 
                     if is_order_detected:
@@ -1917,11 +1931,14 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         if logistics_group:
                             forward_to_logistics = logistics_group
                             logistics_text = logistics_msg
+                            print(f"[SUCCESS] Order formatted & sent to logistics: {logistics_group}")
+                        else:
+                            print("[WARNING] Order detected but Logistics Group ID is not set in settings!")
 
-                elif rep:
-                    channel_name = f"المندوب: {rep['name']}"
                 elif chat_id == management_group:
                     channel_name = "مجموعة الإدارة العليا"
+                else:
+                    channel_name = f"مجموعة غير مربوطة ({chat_id[:15]}...)"
 
             cur.execute("""
             INSERT INTO whatsapp_logs (created_at, sender_name, channel_name, is_external_call, message_body)
