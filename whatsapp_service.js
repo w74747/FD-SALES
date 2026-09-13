@@ -1,15 +1,14 @@
 /**
- * whatsapp_service.js - Multi-Session WhatsApp Engine
- * Ultra-stable native Baileys sessions for Railway deployment
- * Session 1 (operations): Group monitoring, smart dispatch & notifications
- * Session 2 (sales): Inbound new customer sales bot & auto-qualification
+ * whatsapp_service.js - Ultra-Fast & Resilient WhatsApp Engine
+ * Designed specifically for Railway container environments
  */
 
 const express = require('express');
 const { 
   default: makeWASocket, 
   DisconnectReason, 
-  useMultiFileAuthState 
+  useMultiFileAuthState,
+  fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const axios = require('axios');
@@ -29,13 +28,12 @@ app.use(express.json());
 
 const PORT = 3001;
 
-// كائنات تخزين الجلسات المزدوجة
 const sessions = {
   operations: { sock: null, qr: null, connected: false, user: null, isStarting: false },
   sales: { sock: null, qr: null, connected: false, user: null, isStarting: false }
 };
 
-// ----------------- 1. تشغيل جلسة العمليات (Operations) -----------------
+// ----------------- 1. جلسة العمليات والمجموعات (Operations) -----------------
 async function startOperationsWhatsApp() {
   if (sessions.operations.isStarting) return;
   sessions.operations.isStarting = true;
@@ -45,16 +43,23 @@ async function startOperationsWhatsApp() {
     if (!fs.existsSync(authFolder)) fs.mkdirSync(authFolder, { recursive: true });
 
     const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+    const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] }));
 
     if (sessions.operations.sock) {
       try { sessions.operations.sock.ev.removeAllListeners(); } catch (e) {}
     }
 
     const sock = makeWASocket({
+      version,
       auth: state,
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false,
-      browser: ['FDC Operations CRM', 'Chrome', '11.0.0']
+      browser: ['FDC Operations CRM', 'Chrome', '120.0.0'],
+      syncFullHistory: false, // منع تجميد الجلسة بمزامنة الشات القديم
+      markOnlineOnConnect: true,
+      generateHighQualityLinkPreview: false,
+      connectTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000
     });
 
     sessions.operations.sock = sock;
@@ -77,6 +82,8 @@ async function startOperationsWhatsApp() {
         sessions.operations.qr = null;
         sessions.operations.isStarting = false;
 
+        console.log(`[Operations WA] Closed. Reason Code: ${statusCode}. Reconnecting: ${shouldReconnect}`);
+
         if (shouldReconnect) {
           setTimeout(startOperationsWhatsApp, 3000);
         } else {
@@ -89,45 +96,54 @@ async function startOperationsWhatsApp() {
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
         sessions.operations.user = cleanPhone;
         sessions.operations.isStarting = false;
-        console.log('[Operations WA] تم الاتصال بنجاح بالرقم:', cleanPhone);
+        console.log('[Operations WA] Connected Successfully! Number:', cleanPhone);
       }
     });
 
     sock.ev.on('messages.upsert', async (m) => {
       try {
+        if (!m.messages || m.messages.length === 0) return;
         const msg = m.messages[0];
-        if (!msg || !msg.message) return;
+        if (!msg.message) return;
 
         const chatId = msg.key.remoteJid;
-        const fromMe = Boolean(msg.key.fromMe);
-        const myPhoneNumber = sessions.operations.user || '';
-        const isSelfChat = chatId.includes(myPhoneNumber);
+        
+        // استخراج النص بجميع أنواعه
+        const text = msg.message.conversation || 
+                     msg.message.extendedTextMessage?.text || 
+                     msg.message.imageMessage?.caption || 
+                     '';
+        if (!text.trim()) return;
 
-        if (fromMe && !isSelfChat) return;
-
-        const senderPhone = (msg.key.participant || chatId).split('@')[0];
+        const senderPhone = (msg.key.participant || chatId).split('@')[0].replace(/[^0-9]/g, '');
         const senderName = msg.pushName || senderPhone;
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-        if (!text) return;
 
+        console.log(`[Incoming Msg] From: ${senderName} (${senderPhone}) | Chat: ${chatId} | Text: ${text.substring(0, 40)}...`);
+
+        // تمرير الرسالة إلى بايثون للتحليل
         const resp = await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
           chat_id: chatId,
-          sender_phone: `+${senderPhone.replace(/^\+/, '')}`,
+          sender_phone: `+${senderPhone}`,
           sender_name: senderName,
           message_text: text
-        }, { timeout: 6000 });
+        }, { timeout: 8000 });
 
         if (resp.data && resp.data.reply_text) {
           await sock.sendMessage(chatId, { text: resp.data.reply_text });
         }
 
+        // توجيه الطلبية لمجموعة اللوجستيك فوراً
         if (resp.data && resp.data.forward_to_logistics && resp.data.logistics_text) {
-          const logJid = resp.data.forward_to_logistics.includes('@g.us') 
-            ? resp.data.forward_to_logistics 
-            : `${resp.data.forward_to_logistics.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+          let logJid = resp.data.forward_to_logistics.trim();
+          if (!logJid.endsWith('@g.us') && !logJid.endsWith('@s.whatsapp.net')) {
+            logJid = `${logJid}@g.us`;
+          }
+          console.log(`[Dispatching Order] To Logistics Group: ${logJid}`);
           await sock.sendMessage(logJid, { text: resp.data.logistics_text });
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('[Error in messages.upsert]:', e.message);
+      }
     });
 
   } catch (err) {
@@ -136,7 +152,7 @@ async function startOperationsWhatsApp() {
   }
 }
 
-// ----------------- 2. تشغيل جلسة مبيعات العملاء الجدد (Sales) -----------------
+// ----------------- 2. جلسة مبيعات العملاء الجدد (Sales) -----------------
 async function startSalesWhatsApp() {
   if (sessions.sales.isStarting) return;
   sessions.sales.isStarting = true;
@@ -146,16 +162,22 @@ async function startSalesWhatsApp() {
     if (!fs.existsSync(authFolder)) fs.mkdirSync(authFolder, { recursive: true });
 
     const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+    const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] }));
 
     if (sessions.sales.sock) {
       try { sessions.sales.sock.ev.removeAllListeners(); } catch (e) {}
     }
 
     const sock = makeWASocket({
+      version,
       auth: state,
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false,
-      browser: ['FDC Inbound Sales', 'Chrome', '1.0.0']
+      browser: ['FDC Inbound Sales', 'Chrome', '120.0.0'],
+      syncFullHistory: false,
+      markOnlineOnConnect: true,
+      connectTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000
     });
 
     sessions.sales.sock = sock;
@@ -178,6 +200,8 @@ async function startSalesWhatsApp() {
         sessions.sales.qr = null;
         sessions.sales.isStarting = false;
 
+        console.log(`[Sales WA] Closed. Reason: ${statusCode}. Reconnecting: ${shouldReconnect}`);
+
         if (shouldReconnect) {
           setTimeout(startSalesWhatsApp, 3000);
         } else {
@@ -190,24 +214,25 @@ async function startSalesWhatsApp() {
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
         sessions.sales.user = cleanPhone;
         sessions.sales.isStarting = false;
-        console.log('[Sales WA] تم الاتصال بنجاح بالرقم:', cleanPhone);
+        console.log('[Sales WA] Connected Successfully! Number:', cleanPhone);
       }
     });
 
     sock.ev.on('messages.upsert', async (m) => {
       try {
+        if (!m.messages || m.messages.length === 0) return;
         const msg = m.messages[0];
-        if (!msg || !msg.message || msg.key.fromMe) return;
+        if (!msg.message || msg.key.fromMe) return;
 
         const chatId = msg.key.remoteJid;
-        if (chatId.endsWith('@g.us')) return; // تجاهل المجموعات، التركيز على محادثات العملاء الأفراد
+        if (chatId.endsWith('@g.us')) return; // الرد حصراً على الأفراد
 
-        const senderPhone = chatId.split('@')[0];
+        const senderPhone = chatId.split('@')[0].replace(/[^0-9]/g, '');
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-        if (!text) return;
+        if (!text.trim()) return;
 
         const resp = await axios.post('http://127.0.0.1:8000/api/bot/inbound-sales', {
-          sender_phone: `+${senderPhone.replace(/^\+/, '')}`,
+          sender_phone: `+${senderPhone}`,
           sender_name: msg.pushName || 'عميل جديد',
           message_text: text
         }, { timeout: 8000 });
@@ -215,7 +240,9 @@ async function startSalesWhatsApp() {
         if (resp.data && resp.data.reply_text) {
           await sock.sendMessage(chatId, { text: resp.data.reply_text });
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('[Error in sales messages.upsert]:', e.message);
+      }
     });
 
   } catch (err) {
@@ -224,9 +251,7 @@ async function startSalesWhatsApp() {
   }
 }
 
-// ----------------- مسارات API للتحكم بالجلسات -----------------
-
-// حالة جلسة العمليات
+// ----------------- مسارات التحكم -----------------
 app.get('/qr-status', (req, res) => {
   res.json({
     connected: sessions.operations.connected,
@@ -235,7 +260,6 @@ app.get('/qr-status', (req, res) => {
   });
 });
 
-// حالة جلسة مبيعات العملاء الجدد
 app.get('/sales/qr-status', (req, res) => {
   res.json({
     connected: sessions.sales.connected,
@@ -244,7 +268,6 @@ app.get('/sales/qr-status', (req, res) => {
   });
 });
 
-// جلب مجموعات حساب العمليات
 app.get('/groups', async (req, res) => {
   if (!sessions.operations.connected || !sessions.operations.sock) return res.json([]);
   try {
@@ -260,7 +283,6 @@ app.get('/groups', async (req, res) => {
   }
 });
 
-// إرسال رسائل من الجلسة المحددة
 app.post('/send-message', async (req, res) => {
   const { phone_or_group, message, session_type } = req.body;
   const activeSession = (session_type === 'sales' && sessions.sales.connected) 
@@ -282,7 +304,6 @@ app.post('/send-message', async (req, res) => {
   }
 });
 
-// فصل جلسة العمليات
 app.post('/disconnect', async (req, res) => {
   try {
     sessions.operations.connected = false;
@@ -301,7 +322,6 @@ app.post('/disconnect', async (req, res) => {
   }
 });
 
-// فصل جلسة المبيعات
 app.post('/sales/disconnect', async (req, res) => {
   try {
     sessions.sales.connected = false;
@@ -320,10 +340,9 @@ app.post('/sales/disconnect', async (req, res) => {
   }
 });
 
-// إطلاق الجلستين معاً في الخلفية
 startOperationsWhatsApp();
 startSalesWhatsApp();
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Baileys Multi-Session Server] شغال ويستمع على 127.0.0.1:${PORT}`);
+  console.log(`[Baileys Multi-Session Server] شغال بنجاح على 127.0.0.1:${PORT}`);
 });
