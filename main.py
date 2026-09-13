@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Multi-Session WhatsApp & Inbound Sales Automation & Live Perplexity Intelligence & Smart Logistics Dispatch
+Multi-Session WhatsApp & Conversational Inbound Sales Bot & Smart Logistics Dispatch
 """
 
 import os
@@ -96,7 +96,6 @@ async def send_whatsapp_direct(target_phone_or_group: str, message: str, session
         return False
 
 async def query_perplexity_intelligence(system_prompt: str, search_query: str) -> str:
-    """استعلام محرك Perplexity عبر الإنترنت مع بحث حي وتلخيص تنفيذي"""
     if not PERPLEXITY_API_KEY:
         return "تنبيه: لم يتم العثور على PERPLEXITY_API_KEY في متغيرات البيئة بـ Railway."
 
@@ -107,13 +106,13 @@ async def query_perplexity_intelligence(system_prompt: str, search_query: str) -
     }
 
     user_content = (
-        f"المطلوب: قم بإجراء بحث واستقصاء حي عبر الإنترنت ولينكدإن ومصادر الأخبار حول الآتي:\n"
+        f"المطلوب: قم بإجراء استقصاء وبحث حي عبر الإنترنت ومصادر الأعمال والأخبار حول:\n"
         f"الموضوع / الشركات المستهدفة: {search_query}\n\n"
         f"قم بصياغة تقرير تنفيذي رسمي وموجز باللغة العربية يوضح:\n"
         f"1. أحدث الأخبار والتحركات خلال الأيام الأخيرة.\n"
         f"2. المنتجات الجديدة أو التغييرات التسعيرية وحملات الترويج المرصودة.\n"
         f"3. توصية استراتيجية واضحة لشركة تنمية الغذاء لاقتناص الفرصة التنافسية.\n"
-        f"اجعل التقرير بدون إيموجيز ومهنياً تماماً."
+        f"اجعل التقرير مهنياً تماماً وخالياً من الرموز التعبيرية."
     )
 
     payload = {
@@ -262,18 +261,38 @@ def init_database():
             );
             """)
 
+            # تهيئة إعدادات بوت المبيعات التفاعلي الافتراضية
+            default_bot_prompt = (
+                "أنت مسؤول المبيعات والاستشارات التجارية في 'شركة تنمية الغذاء' (Food Development Company)، "
+                "أحد أكبر وأحدث مصانع المخبوزات الصناعية وعجائن المجمدات في سلطنة عمان. "
+                "تتحدث بأسلوب بشري مهني، ترحيبي، واثق، وسلس، دون إظهار أي طابع آلي، وبدون خيارات رقمية أو إجبار العميل على قوالب. "
+                "هدفك: فهم احتياج العميل، الإجابة عن مواصفات منتجاتنا (بريوش، خبز برجر، كرواسون، توست، عجائن مجمدة)، "
+                "وعند طلب الأسعار تستفسر منه بلطف عن عدد فروعه واستهلاكه التقريبي لتقديم عرض مخصص، "
+                "وعند طلبه للعينات ترحب به وتطلب اسم المنشأة وموقع الفرع لتنسيق تسليم العينة مجاناً للشيف."
+            )
+            default_bot_knowledge = (
+                "- المصنع: شركة تنمية الغذاء - منطقة الرسيل الصناعية / مسقط.\n"
+                "- التخصص: توريد المخبوزات الطازجة والمجمدة لقطاع الفنادق، المطاعم (HoReCa)، وسلاسل الهايبرماركت.\n"
+                "- الطاقة الإنتاجية: خطوط أوتوماتيكية متطورة تضمن أعلى معايير الجودة وثبات الوزن والطراوة.\n"
+                "- عينات مجانية: نوفر عينات تجريبية مجانية لكافة المطابخ والفنادق لاعتماد الشيف.\n"
+                "- التسعير: يعتمد على التعاقد المباشر وحجم الاستهلاك الأسبوعي مع توفير أسعار تفضيلية للسلاسل ذات الفروع المتعددة.\n"
+                "- مناطق التغطية: توزيع مباشر يومي في محافظة مسقط، وجدولة منتظمة لظفار والباطنة والداخلية."
+            )
+
+            cur.execute("INSERT INTO system_config (key_name, key_value) VALUES ('inbound_bot_prompt', %s) ON CONFLICT (key_name) DO NOTHING;", (default_bot_prompt,))
+            cur.execute("INSERT INTO system_config (key_name, key_value) VALUES ('inbound_bot_knowledge', %s) ON CONFLICT (key_name) DO NOTHING;", (default_bot_knowledge,))
+
             cur.execute("""
             CREATE TABLE IF NOT EXISTS customer_bot_sessions (
                 phone_number VARCHAR(50) PRIMARY KEY,
                 customer_name VARCHAR(150),
                 company_name VARCHAR(150),
                 region VARCHAR(100),
-                intent VARCHAR(50),
-                step VARCHAR(50),
+                conversation_history JSONB DEFAULT '[]'::jsonb,
+                sample_requested BOOLEAN DEFAULT FALSE,
+                price_inquired BOOLEAN DEFAULT FALSE,
                 branches_count INT DEFAULT 1,
-                monthly_consumption TEXT,
-                sample_item TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                last_interaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
 
@@ -463,6 +482,7 @@ def init_database():
 
     run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS enable_web_search BOOLEAN DEFAULT FALSE;")
     run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS search_keywords TEXT DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE customer_bot_sessions ADD COLUMN IF NOT EXISTS conversation_history JSONB DEFAULT '[]'::jsonb;")
     run_isolated_ddl("ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_execution_status_check;")
     run_isolated_ddl("ALTER TABLE calendar_events ALTER COLUMN execution_status TYPE VARCHAR(50);")
     run_isolated_ddl("ALTER TABLE sample_deliveries DROP CONSTRAINT IF EXISTS sample_deliveries_status_check;")
@@ -489,7 +509,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="19.3.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="19.4.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -575,6 +595,10 @@ class UpdateCustomerGroupPayload(BaseModel):
 class SystemConfigPayload(BaseModel):
     logistics_group_id: Optional[str] = ""
     management_group_id: Optional[str] = ""
+
+class InboundBotConfigPayload(BaseModel):
+    inbound_bot_prompt: str
+    inbound_bot_knowledge: str
 
 class SampleItemEntry(BaseModel):
     product_name: str
@@ -685,6 +709,158 @@ def verify_2fa(payload: Verify2FAPayload):
             return {"status": "SUCCESS", "message": "تم التحقق بنجاح"}
         else:
             raise HTTPException(status_code=401, detail="رمز التحقق غير صحيح أو انتهت صلاحيته")
+    finally:
+        conn.close()
+
+# ----------------- مسارات ضبط بوت المبيعات التفاعلي -----------------
+@app.get("/api/system/inbound-bot-config")
+def get_inbound_bot_config():
+    conn = get_db_connection()
+    if not conn:
+        return {"inbound_bot_prompt": "", "inbound_bot_knowledge": ""}
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT key_name, key_value FROM system_config WHERE key_name IN ('inbound_bot_prompt', 'inbound_bot_knowledge');")
+            rows = {r["key_name"]: r["key_value"] for r in cur.fetchall()}
+            return {
+                "inbound_bot_prompt": rows.get("inbound_bot_prompt", ""),
+                "inbound_bot_knowledge": rows.get("inbound_bot_knowledge", "")
+            }
+    finally:
+        conn.close()
+
+@app.post("/api/system/inbound-bot-config")
+def update_inbound_bot_config(payload: InboundBotConfigPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO system_config (key_name, key_value) VALUES 
+            ('inbound_bot_prompt', %s), ('inbound_bot_knowledge', %s)
+            ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;
+            """, (payload.inbound_bot_prompt.strip(), payload.inbound_bot_knowledge.strip()))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+# ----------------- مسار بوت مبيعات وتأهيل العملاء الجدد التفاعلي البشري -----------------
+@app.post("/api/bot/inbound-sales")
+async def handle_inbound_sales_bot(msg: InboundBotMessage):
+    conn = get_db_connection()
+    if not conn:
+        return {"reply_text": "أهلاً بك في شركة تنمية الغذاء. سنعاود التواصل معك قريباً."}
+
+    phone = msg.sender_phone
+    text = msg.message_text.strip()
+
+    try:
+        with conn.cursor() as cur:
+            # 1. جلب إعدادات برومبت البوت والمعرفة الخاصة والكتالوج
+            cur.execute("SELECT key_name, key_value FROM system_config WHERE key_name IN ('inbound_bot_prompt', 'inbound_bot_knowledge');")
+            conf = {r["key_name"]: r["key_value"] for r in cur.fetchall()}
+            bot_prompt = conf.get("inbound_bot_prompt", "")
+            bot_knowledge = conf.get("inbound_bot_knowledge", "")
+
+            cur.execute("SELECT name_ar, weight_spec, carton_pack_spec FROM products_catalog ORDER BY name_ar ASC LIMIT 30;")
+            prods = cur.fetchall()
+            products_summary = "\n".join([f"- {p['name_ar']} (الوزن: {p['weight_spec'] or 'غير محدد'}, التعبئة: {p['carton_pack_spec'] or 'معتمد'})" for p in prods])
+
+            # 2. جلب وتحديث سياق المحادثة السابقة مع هذا العميل
+            cur.execute("SELECT * FROM customer_bot_sessions WHERE phone_number = %s;", (phone,))
+            session = cur.fetchone()
+
+            history = []
+            if session and session.get("conversation_history"):
+                history = session["conversation_history"]
+                if not isinstance(history, list):
+                    history = []
+
+            history.append({"role": "user", "content": text})
+            # الاحتفاظ بآخر 6 رسائل فقط للحفاظ على سياق الحوار الحي
+            history = history[-6:]
+
+            # 3. إعداد النظام للرد البشري التفاعلي عبر Perplexity / LLM
+            system_instruction = (
+                f"{bot_prompt}\n\n"
+                f"معلومات ومعرفة المصنع المعتمدة:\n{bot_knowledge}\n\n"
+                f"أبرز منتجات الكتالوج المتاحة لدينا:\n{products_summary}\n\n"
+                f"تعليمات الحوار الهامة:\n"
+                f"- تحدث كإنسان حقيقي (مسؤول مبيعات ودود وخبير) باسم شركة تنمية الغذاء.\n"
+                f"- لا تستخدم مطلقاً قوائم أو خيارات مرقمة (مثل 1 أو 2 أو 3).\n"
+                f"- أجب عن أي سؤال يخص المنتجات والجودة بثقة وسلاسة.\n"
+                f"- إذا استفسر عن الأسعار: أخبره أننا نوفر أسعاراً تفضيلية للمطاعم والفنادق حسب حجم الاستهلاك، واسأله بأسلوب لطيف عن عدد فروعه واستهلاكه المتوقع لنقدم له أفضل تسعير.\n"
+                f"- إذا رغب في تجربة عينات: رحب به وأكد له أننا نقدم عينات تجريبية مجانية لتقييم الشيف، واسأله عن اسم المطعم أو المنشأة وموقع الفرع لترتيب تسليمها مباشرة."
+            )
+
+            messages_payload = [{"role": "system", "content": system_instruction}]
+            for h in history:
+                messages_payload.append({"role": h["role"], "content": h["content"]})
+
+            reply_text = ""
+            if PERPLEXITY_API_KEY:
+                url = "https://api.perplexity.ai/chat/completions"
+                headers = {"Authorization": f"Bearer {PERPLEXITY_API_KEY}", "Content-Type": "application/json"}
+                payload = {"model": "sonar", "messages": messages_payload, "temperature": 0.3}
+                try:
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post(url, json=payload, headers=headers, timeout=15.0)
+                        if resp.status_code == 200:
+                            reply_text = resp.json()["choices"][0]["message"]["content"]
+                except Exception:
+                    pass
+
+            if not reply_text:
+                reply_text = f"أهلاً بك أخي العزيز، مرحباً بك في شركة تنمية الغذاء. كيف يمكننا خدمتك اليوم بخصوص توريد المخبوزات وعجائن المجمدات لمطعمكم الموقر؟"
+
+            history.append({"role": "assistant", "content": reply_text})
+
+            # 4. الرصد الآلي في الخلفية (Background Actions Extraction)
+            # رصد طلب العينة وجدولتها
+            if any(w in text.lower() for w in ["عينة", "عينات", "نجرب", "تجربة", "تذوق", "sample"]):
+                rep = match_rep_by_region(conn, text)
+                cur.execute("""
+                INSERT INTO sample_deliveries (customer_name, rep_name, rep_id, product_name, qty_free, delivery_date, status, source)
+                VALUES (%s, %s, %s, %s, 10, CURRENT_DATE, 'PENDING', 'واتساب مبيعات العملاء الجدد');
+                """, (msg.sender_name, rep["name"] if rep else "فريق المبيعات", rep["id"] if rep else None, f"مخبوزات مشكلة (طلب عميل: {text[:40]})"))
+
+                if rep and rep.get("phone_number"):
+                    lead_msg = (
+                        f"*اهتمام بعينة تجريبية من عميل وارد 🥖*\n\n"
+                        f"• الاسم: {msg.sender_name}\n"
+                        f"• الهاتف: {phone}\n"
+                        f"• تفاصيل المحادثة: {text}\n"
+                        f"• المندوب الميداني: {rep['name']} ({rep['region']})\n\n"
+                        f"يرجى التواصل مع العميل للتنسيق وتسليم العينات."
+                    )
+                    await send_whatsapp_direct(rep["phone_number"], lead_msg)
+
+            # رصد الاستفسار عن الأسعار أو الفروع
+            if any(w in text.lower() for w in ["سعر", "اسعار", "أسعار", "فرع", "فروع", "كرتون", "تخفيض"]):
+                rep = match_rep_by_region(conn, text)
+                cur.execute("""
+                INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, execution_status)
+                VALUES (%s, %s, %s, TO_CHAR(NOW() + INTERVAL '1 day', 'YYYY-MM-DD 10:00'), %s, 'PENDING');
+                """, (f"متابعة تسعير: {msg.sender_name}", rep["name"] if rep else "فريق المبيعات", "متابعة متطلبات التوريد وعرض الأسعار", "مقر العميل"))
+
+                cur.execute("""
+                INSERT INTO sales_targets (title, customer_id, customer_name, rep_id, rep_name, target_value, pipeline_stage, last_note, status)
+                VALUES (%s, NULL, %s, %s, %s, 2500, 'LEAD_CONTACT', %s, 'IN_PROGRESS');
+                """, (f"فرصة توريد: {msg.sender_name}", msg.sender_name, rep["id"] if rep else None, rep["name"] if rep else "فريق المبيعات", f"رقم التواصل: {phone} | كلام العميل: {text}"))
+
+            # 5. حفظ الجلسة وسياق المحادثة المحدث
+            cur.execute("""
+            INSERT INTO customer_bot_sessions (phone_number, customer_name, conversation_history, last_interaction)
+            VALUES (%s, %s, %s, NOW())
+            ON CONFLICT (phone_number) DO UPDATE SET 
+                conversation_history = EXCLUDED.conversation_history,
+                last_interaction = NOW();
+            """, (phone, msg.sender_name, json.dumps(history, ensure_ascii=False)))
+            conn.commit()
+
+            return {"reply_text": reply_text}
     finally:
         conn.close()
 
@@ -1599,7 +1775,6 @@ async def test_agent_global(payload: dict):
             if not target_destination:
                 raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار")
 
-            # فحص إذا كانت خاصية استخبارات وبحث الويب مفعلة
             if agent.get("enable_web_search"):
                 keywords = agent.get("search_keywords") or agent["name"]
                 intelligence_summary = await query_perplexity_intelligence(agent["system_prompt"], keywords)
@@ -1621,128 +1796,7 @@ async def test_agent_global(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسار بوت مبيعات وتأهيل العملاء الجدد المباشر -----------------
-@app.post("/api/bot/inbound-sales")
-async def handle_inbound_sales_bot(msg: InboundBotMessage):
-    conn = get_db_connection()
-    if not conn:
-        return {"reply_text": "أهلاً بك في شركة تنمية الغذاء. سنعاود التواصل معك قريباً."}
-
-    phone = msg.sender_phone
-    text = msg.message_text.strip()
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM customer_bot_sessions WHERE phone_number = %s;", (phone,))
-            session = cur.fetchone()
-
-            if not session:
-                cur.execute("""
-                INSERT INTO customer_bot_sessions (phone_number, customer_name, step, intent)
-                VALUES (%s, %s, 'INITIAL', 'GENERAL');
-                """, (phone, msg.sender_name))
-                conn.commit()
-                return {
-                    "reply_text": (
-                        f"مرحباً بك {msg.sender_name} في *شركة تنمية الغذاء* 🥖\n\n"
-                        f"نسعد بخدمتكم وتوريد أجود المخبوزات وعجائن المجمدات لقطاع الفنادق والمطاعم والهايبرماركت.\n\n"
-                        f"كيف يمكننا مساعدتك اليوم؟\n"
-                        f"1️⃣ طلب عينات تجريبية مجانية للشيف\n"
-                        f"2️⃣ الاستفسار عن الأسعار وقوائم التوريد\n"
-                        f"3️⃣ الاستفسار عن المنتجات ومواصفات التعبئة"
-                    )
-                }
-
-            step = session.get("step")
-            intent = session.get("intent")
-
-            if "عين" in text or text == "1" or intent == "SAMPLE":
-                if step in ["INITIAL", "GENERAL"]:
-                    cur.execute("UPDATE customer_bot_sessions SET intent = 'SAMPLE', step = 'ASK_REGION' WHERE phone_number = %s;", (phone,))
-                    conn.commit()
-                    return {"reply_text": "نسعد بتوفير عينات تجريبية لمطبخكم الموقر 👨‍🍳\nفضلاً اذكر لنا: *اسم المطعم / المنشأة* وفي *أي ولاية أو منطقة* تقع؟"}
-
-                elif step == "ASK_REGION":
-                    cur.execute("UPDATE customer_bot_sessions SET company_name = %s, region = %s, step = 'ASK_PRODUCT' WHERE phone_number = %s;", (text, text, phone))
-                    conn.commit()
-                    return {"reply_text": "ممتاز! ما هي الأصناف المطلوب تجربتها؟ (مثلاً: خبز برجر بريوش، كرواسون، توست)"}
-
-                elif step == "ASK_PRODUCT":
-                    region_guess = session.get("region") or text
-                    rep = match_rep_by_region(conn, region_guess)
-                    company = session.get("company_name") or msg.sender_name
-
-                    cur.execute("""
-                    INSERT INTO sample_deliveries (customer_name, rep_name, rep_id, product_name, qty_free, delivery_date, status, source)
-                    VALUES (%s, %s, %s, %s, 10, CURRENT_DATE, 'PENDING', 'واتساب العملاء الجدد');
-                    """, (company, rep["name"] if rep else "فريق المبيعات", rep["id"] if rep else None, text))
-
-                    cur.execute("DELETE FROM customer_bot_sessions WHERE phone_number = %s;", (phone,))
-                    conn.commit()
-
-                    if rep and rep.get("phone_number"):
-                        lead_msg = (
-                            f"*طلب عينة تجريبية جديد من عميل وارد 🎁*\n\n"
-                            f"• المنشأة: {company}\n"
-                            f"• هاتف التواصل: {phone}\n"
-                            f"• الأصناف المطلوبة: {text}\n"
-                            f"• المنطقة: {rep['region']}\n\n"
-                            f"يرجى التواصل مع العميل وجدولة تسليم العينة."
-                        )
-                        await send_whatsapp_direct(rep["phone_number"], lead_msg)
-
-                    return {"reply_text": f"تم استلام طلبكم وتكليف مسؤول المبيعات الميداني لمنطقتكم (*{rep['name'] if rep else 'فريق مسقط'}*) بالتواصل معكم وتنسيق موعد التسليم مباشرة."}
-
-            if "سعر" in text or "أسعار" in text or text == "2" or intent == "PRICE_INQUIRY":
-                if step in ["INITIAL", "GENERAL"]:
-                    cur.execute("UPDATE customer_bot_sessions SET intent = 'PRICE_INQUIRY', step = 'ASK_BRANCHES' WHERE phone_number = %s;", (phone,))
-                    conn.commit()
-                    return {"reply_text": "نوفر أسعاراً تفضيلية وعقود توريد تعتمد على حجم التوريد المباشر.\nكم عدد الفروع أو منافذ التوزيع لديكم حالياً؟"}
-
-                elif step == "ASK_BRANCHES":
-                    digits = ''.join(filter(str.isdigit, text)) or "1"
-                    cur.execute("UPDATE customer_bot_sessions SET branches_count = %s, step = 'ASK_CONSUMPTION' WHERE phone_number = %s;", (int(digits), phone))
-                    conn.commit()
-                    return {"reply_text": "ممتاز. وما هو معدل استهلاككم الشهري التقريبي (أو الطلب الأسبوعي بالكرتون / الحبة) وفي أي مدينة تقع فروعكم؟"}
-
-                elif step == "ASK_CONSUMPTION":
-                    rep = match_rep_by_region(conn, text)
-                    branches = session.get("branches_count") or 1
-
-                    cur.execute("""
-                    INSERT INTO calendar_events (customer_name, rep_name, task_type, scheduled_at, location, execution_status)
-                    VALUES (%s, %s, %s, TO_CHAR(NOW() + INTERVAL '1 day', 'YYYY-MM-DD 10:00'), %s, 'PENDING');
-                    """, (f"استفسار أسعار: {msg.sender_name}", rep["name"] if rep else "فريق المبيعات", f"مفاوضة أسعار وتوريد ({branches} فروع)", text))
-
-                    cur.execute("""
-                    INSERT INTO sales_targets (title, customer_id, customer_name, rep_id, rep_name, target_value, pipeline_stage, last_note, status)
-                    VALUES (%s, NULL, %s, %s, %s, 3000, 'MEETING_REQUIREMENTS', %s, 'IN_PROGRESS');
-                    """, (f"فرصة توريد فروع: {msg.sender_name}", msg.sender_name, rep["id"] if rep else None, rep["name"] if rep else "فريق المبيعات", f"الفروع: {branches} | الاستهلاك والمنطقة: {text}"))
-
-                    cur.execute("DELETE FROM customer_bot_sessions WHERE phone_number = %s;", (phone,))
-                    conn.commit()
-
-                    if rep and rep.get("phone_number"):
-                        sales_lead = (
-                            f"*عميل جديد يستفسر عن أسعار وعقود توريد 💼*\n\n"
-                            f"• المنشأة: {msg.sender_name}\n"
-                            f"• الهاتف: {phone}\n"
-                            f"• الفروع: {branches}\n"
-                            f"• الاستهلاك والمنطقة: {text}\n\n"
-                            f"تم تسجيل المهمة في تقويمك والفرصة في الـ Pipeline لمتابعة عرض الأسعار."
-                        )
-                        await send_whatsapp_direct(rep["phone_number"], sales_lead)
-
-                    return {"reply_text": "شكراً لمشاركتنا التفاصيل. تم تجهيز ملف طلبكم وتكليف مسؤول الحسابات التجارية للاتصال بكم وموافاتكم بعرض الأسعار المناسب لحجم استهلاككم."}
-
-            return {
-                "reply_text": "أهلاً بك. للمساعدة السريعة يرجى إرسال (1) لطلب عينات مجانية، أو (2) لطلب عروض الأسعار والتوريد، أو كتابة استفسارك وسيتواصل معك المختص مباشرة."
-            }
-
-    finally:
-        conn.close()
-
-# ----------------- مسار الواتساب العام واستخراج الطلبات وتوجيهها للوجستيك -----------------
+# ----------------- مسارات الواتساب العام واستخراج الطلبات للوجستيك -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
@@ -1875,7 +1929,6 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             logistics_group = conf.get("logistics_group_id", "").strip()
             management_group = conf.get("management_group_id", "").strip()
 
-            # 1. شات التحكم الخاص بالمسؤول
             if chat_id.endswith("@s.whatsapp.net") and (chat_id.startswith(clean_phone) or "self" in chat_id):
                 channel_name = "شات التحكم الخاص"
                 if text.startswith("تقرير") or text.startswith("مستجدات"):
@@ -1889,8 +1942,6 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         f"• العينات قيد التجربة: {pending_s}\n\n"
                         f"النظام يعمل بنجاح ويرصد المجموعات المعتمدة."
                     )
-            
-            # 2. مجموعات العملاء المربوطة
             else:
                 cur.execute("SELECT id, company_name, brand_name FROM customer_accounts WHERE whatsapp_group_id = %s;", (chat_id,))
                 customer = cur.fetchone()
@@ -1931,9 +1982,9 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         if logistics_group:
                             forward_to_logistics = logistics_group
                             logistics_text = logistics_msg
-                            print(f"[SUCCESS] Order formatted & sent to logistics: {logistics_group}")
+                            print(f"[SUCCESS] Order forwarded to logistics: {logistics_group}")
                         else:
-                            print("[WARNING] Order detected but Logistics Group ID is not set in settings!")
+                            print("[WARNING] Order detected but logistics_group_id is empty in system config!")
 
                 elif chat_id == management_group:
                     channel_name = "مجموعة الإدارة العليا"
