@@ -429,26 +429,28 @@
                 </div>
             </div>
 
-            <!-- 11. إعدادات الواتساب وتعيين مجموعة اللوجستيك المباشرة -->
+            <!-- 11. إعدادات الواتساب وتعيين مجموعة اللوجستيك وبوت المبيعات -->
             <div id="tab-whatsapp-settings" class="tab-content hidden space-y-6">
-                <!-- بطاقة واتساب مبيعات العملاء الجدد -->
+                <!-- بطاقة واتساب مبيعات العملاء الجدد وضبط البرومبت والمعرفة -->
                 <div class="p-5 bg-white border-2 border-emerald-300 rounded-2xl shadow-xs space-y-4">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2">
                             <span class="text-2xl">🤖</span>
                             <div>
-                                <h3 class="font-bold text-sm text-emerald-900">رقم واتساب المبيعات وتأهيل العملاء الجدد (Inbound Sales Bot)</h3>
-                                <div class="text-[11px] text-gray-500">يتولى الرد التلقائي، حصر الفروع والاستهلاك، تسجيل العينات الميدانية، وتكليف المندوب المختص جغرافياً</div>
+                                <h3 class="font-bold text-sm text-emerald-900">رقم واتساب المبيعات وتأهيل العملاء الجدد (Inbound Sales Human Agent)</h3>
+                                <div class="text-[11px] text-gray-500">يتولى الحوار التفاعلي البشري، تقديم معلومات المصنع والأسعار، وتسجيل العينات وتكليف المندوب تلقائياً</div>
                             </div>
                         </div>
                         <span id="sales-wa-badge" class="px-2.5 py-1 rounded text-xs font-bold bg-amber-100 text-amber-800">بانتظار المسح</span>
                     </div>
+
                     <div class="p-4 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200 flex items-center justify-between">
                         <div class="space-y-1">
                             <div id="sales-wa-status-text" class="text-xs font-bold text-emerald-900">حالة الجلسة: غير متصل</div>
                             <div id="sales-wa-phone-text" class="text-[11px] text-gray-600 font-mono">الرقم المقترن: --</div>
                         </div>
                         <div class="flex gap-2">
+                            <button onclick="openInboundBotConfigModal()" class="px-3 py-1.5 bg-purple-100 text-[#3A056A] border border-purple-300 font-bold rounded-lg text-xs hover:bg-purple-200">⚙️ ضبط البرومبت وقاعدة المعرفة</button>
                             <button onclick="openSalesWhatsAppQR()" class="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-lg text-xs hover:bg-emerald-700">ربط الرقم الآن (QR)</button>
                             <button onclick="disconnectSalesWhatsApp()" class="px-3 py-1.5 bg-red-100 text-red-700 border border-red-300 font-bold rounded-lg text-xs hover:bg-red-200">فصل الرقم</button>
                         </div>
@@ -529,6 +531,34 @@
         </div>
     </main>
 
+    <!-- مودال ضبط البرومبت وقاعدة المعرفة لبوت المبيعات -->
+    <div id="inbound-bot-config-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-2xl space-y-4 text-xs max-h-[90vh] flex flex-col justify-between">
+            <div class="space-y-3 overflow-y-auto pr-1">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <div>
+                        <h3 class="font-bold text-sm brand-primary-text">إعدادات وبطاقة معرفة مسؤول المبيعات الذكي (Inbound Sales Bot)</h3>
+                        <div class="text-[10px] text-gray-500">تحديد أسلوب الحوار البشري، قواعد التسعير، والمعلومات التي يعتمد عليها في الإجابة</div>
+                    </div>
+                    <button onclick="closeModal('inbound-bot-config-modal')" class="text-gray-400 hover:text-gray-700 font-bold text-lg">✕</button>
+                </div>
+                <div>
+                    <label class="block font-bold mb-1 text-purple-900">البرومبت التوجيهي لشخصية مسؤول المبيعات (Persona System Prompt):</label>
+                    <textarea id="inbound-prompt-input" rows="4" class="w-full p-2.5 border rounded-lg leading-relaxed text-gray-800" placeholder="حدد نبرة الحوار والأسلوب الترحيبي البشري..."></textarea>
+                </div>
+                <div>
+                    <label class="block font-bold mb-1 text-purple-900">ملف ونصوص المعرفة والسياسات الخاصة (Knowledge Base Context):</label>
+                    <div class="text-[10px] text-gray-500 mb-1">ضع هنا تفاصيل إضافية مثل سياسات الأسعار، مواعيد التوصيل، مميزات الجودة والطراوة، ومواصفات المصنع ليجيب العميل بناءً عليها:</div>
+                    <textarea id="inbound-knowledge-input" rows="8" class="w-full p-2.5 border rounded-lg leading-relaxed text-gray-800 font-mono text-[11px]" placeholder="أدخل معلومات المصنع والأسعار والتغطية..."></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t mt-2">
+                <button onclick="closeModal('inbound-bot-config-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="saveInboundBotConfig()" class="px-5 py-2 brand-primary-bg text-white font-bold rounded-lg shadow-sm">حفظ وتطبيق المعرفة فوراً</button>
+            </div>
+        </div>
+    </div>
+
     <!-- مودال إدارة فروع العميل ومواقعه -->
     <div id="customer-branches-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4 text-xs max-h-[90vh] flex flex-col justify-between">
@@ -565,7 +595,7 @@
         </div>
     </div>
 
-    <!-- مودال إنشاء وكيل ذكي جديد (مع خيار تفعيل البحث في الويب) -->
+    <!-- مودال إنشاء وكيل ذكي جديد -->
     <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إنشاء وكيل ذكي جديد</h3>
@@ -585,7 +615,6 @@
                 <textarea id="agent-prompt-input" rows="3" class="w-full p-2.5 border rounded-lg" placeholder="حدد مهام وشخصية الوكيل..."></textarea>
             </div>
             
-            <!-- خيار تفعيل البحث الحي عبر الويب -->
             <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="agent-enable-search" class="w-4 h-4 text-[#3A056A] rounded">
@@ -605,7 +634,7 @@
         </div>
     </div>
 
-    <!-- مودال تعديل وكيل ذكي (مع خيار تفعيل/تعطيل البحث في الويب) -->
+    <!-- مودال تعديل وكيل ذكي -->
     <div id="edit-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
             <div class="flex justify-between items-center border-b pb-2">
@@ -631,7 +660,6 @@
                 <textarea id="edit-agent-prompt" rows="3" class="w-full p-2 border rounded-lg"></textarea>
             </div>
 
-            <!-- خيار تفعيل/تعطيل البحث عبر الويب -->
             <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="edit-agent-enable-search" class="w-4 h-4 text-[#3A056A] rounded">
@@ -897,7 +925,7 @@
             <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">إغلاق الهدف بنجاح وتحويله لأمر شراء (PO)</h3>
             <input type="hidden" id="close-target-id">
             <div><label class="block font-bold mb-1">رقم أمر الشراء (PO):</label><input type="text" id="close-po-number" class="w-full p-2 border rounded-lg font-mono"></div>
-            <div><label class="block font-bold mb-1">قيمة أمر الشراء (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold"></div>
+            <div><label class="block font-bold mb-1">القيمة (ر.ع):</label><input type="number" id="close-po-value" class="w-full p-2 border rounded-lg font-bold"></div>
             <div><label class="block font-bold mb-1">رابط السند المرفق:</label><input type="text" id="close-po-url" class="w-full p-2 border rounded-lg"></div>
             <div class="flex justify-end gap-2 pt-2"><button onclick="closeModal('close-target-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button><button onclick="submitCloseTarget()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg">تأكيد الإغلاق</button></div>
         </div>
@@ -1065,6 +1093,39 @@
 
         window.openReportModal = function() { openModal('report-modal'); };
         window.previewReportOfficial = function() { closeModal('report-modal'); window.print(); };
+
+        // إدارة إعدادات ومعرفة بوت المبيعات
+        window.openInboundBotConfigModal = async function() {
+            try {
+                const res = await fetch('/api/system/inbound-bot-config');
+                const conf = await res.json();
+                document.getElementById('inbound-prompt-input').value = conf.inbound_bot_prompt || '';
+                document.getElementById('inbound-knowledge-input').value = conf.inbound_bot_knowledge || '';
+                openModal('inbound-bot-config-modal');
+            } catch(e) {
+                alert("تعذر جلب إعدادات بوت المبيعات");
+            }
+        };
+
+        window.saveInboundBotConfig = async function() {
+            const prompt = document.getElementById('inbound-prompt-input').value.trim();
+            const knowledge = document.getElementById('inbound-knowledge-input').value.trim();
+
+            if (!prompt) return alert("يرجى إدخال البرومبت التوجيهي لبوت المبيعات");
+
+            const res = await fetch('/api/system/inbound-bot-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ inbound_bot_prompt: prompt, inbound_bot_knowledge: knowledge })
+            });
+
+            if (res.ok) {
+                closeModal('inbound-bot-config-modal');
+                alert("تم تحديث وحفظ البرومبت وقاعدة المعرفة المخصصة لبوت المبيعات بنجاح ✓");
+            } else {
+                alert("فشل الحفظ");
+            }
+        };
 
         window.addSampleItemRow = function() {
             const container = document.getElementById('sample-items-rows-container');
@@ -1621,7 +1682,6 @@
             if (res.ok) await loadAllData();
         };
 
-        // بطاقات الوكلاء الأذكياء مع تمييز ميزة البحث الحي
         window.renderAgentCard = function(a) {
             const hasSearch = Boolean(a.enable_web_search);
             return `
@@ -2115,7 +2175,7 @@
                                     <button onclick="openTargetNoteModal(${t.id})" class="text-xs text-purple-700 font-bold underline">ملاحظة</button>
                                     ${t.status !== 'CLOSED' ? `<button onclick="openCloseTargetModal(${t.id})" class="text-xs bg-emerald-600 text-white font-bold px-2 py-1 rounded">إغلاق بـ PO</button>` : ''}
                                 </div>
-                                <button onclick="deleteItem('/api/targets/${t.id}')" class="text-xs text-red-600 font-bold">حذف</button>
+                                <button onclick="deleteItem('/api/targets/${t.id}')" class="text-red-600 font-bold">حذف</button>
                             </div>
                         </div>`;
                     }).join('');
