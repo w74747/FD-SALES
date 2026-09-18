@@ -1,7 +1,7 @@
 /**
- * whatsapp_service.js - Resilient Multi-Session WhatsApp Engine
- * Backed by PostgreSQL Database Auth State to Prevent Disconnections across Deployments
+ * whatsapp_service.js - Multi-Session WhatsApp Engine with Batch Database Auth
  * Food Development Company (شركة تنمية الغذاء)
+ * Solves Connection Timeout & Ephemeral Container Storage via In-Memory Cache + Batch DB Upsert
  */
 
 const express = require('express');
@@ -24,40 +24,26 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
 const PORT = 3001;
 
-// ----------------- محول تخزين الجلسة الدائم في قاعدة البيانات -----------------
+// ----------------- محول تخزين الجلسة المجمّع السريع في PostgreSQL -----------------
 async function useDatabaseAuthState(sessionId) {
-  // قراءة مفتاح محدد من قاعدة البيانات
+  const memoryCache = new Map();
+
+  // قراءة المفتاح: من الذاكرة أولاً ثم قاعدة البيانات
   const readData = async (keyId) => {
+    if (memoryCache.has(keyId)) return memoryCache.get(keyId);
     try {
       const res = await axios.get(`http://127.0.0.1:8000/api/internal/auth-store/${sessionId}/${encodeURIComponent(keyId)}`, { timeout: 3000 });
       if (res.data && res.data.key_data) {
-        return JSON.parse(res.data.key_data, BufferJSON.reviver);
+        const parsed = JSON.parse(res.data.key_data, BufferJSON.reviver);
+        memoryCache.set(keyId, parsed);
+        return parsed;
       }
     } catch (e) {}
     return null;
-  };
-
-  // كتابة مفتاح في قاعدة البيانات
-  const writeData = async (keyId, data) => {
-    try {
-      const serialized = JSON.stringify(data, BufferJSON.replacer);
-      await axios.post('http://127.0.0.1:8000/api/internal/auth-store', {
-        session_id: sessionId,
-        key_id: keyId,
-        key_data: serialized
-      }, { timeout: 3000 });
-    } catch (e) {}
-  };
-
-  // حذف مفتاح من قاعدة البيانات
-  const removeData = async (keyId) => {
-    try {
-      await axios.delete(`http://127.0.0.1:8000/api/internal/auth-store/${sessionId}/${encodeURIComponent(keyId)}`, { timeout: 3000 });
-    } catch (e) {}
   };
 
   const creds = (await readData('creds')) || initAuthCreds();
@@ -70,31 +56,49 @@ async function useDatabaseAuthState(sessionId) {
           const data = {};
           await Promise.all(
             ids.map(async (id) => {
-              let value = await readData(`${type}-${id}`);
-              if (type === 'app-state-sync-key' && value) {
-                value = BufferJSON.reviver(value);
-              }
-              if (value) {
-                data[id] = value;
-              }
+              const val = await readData(`${type}-${id}`);
+              if (val) data[id] = val;
             })
           );
           return data;
         },
         set: async (data) => {
-          const tasks = [];
+          const batchItems = [];
           for (const category in data) {
             for (const id in data[category]) {
               const val = data[category][id];
               const key = `${category}-${id}`;
-              tasks.push(val ? writeData(key, val) : removeData(key));
+              if (val) {
+                memoryCache.set(key, val);
+                batchItems.push({
+                  key_id: key,
+                  key_data: JSON.stringify(val, BufferJSON.replacer)
+                });
+              } else {
+                memoryCache.delete(key);
+                // حذف غير متزامن بدون تعطيل العملية
+                axios.delete(`http://127.0.0.1:8000/api/internal/auth-store/${sessionId}/${encodeURIComponent(key)}`, { timeout: 3000 }).catch(() => {});
+              }
             }
           }
-          await Promise.all(tasks);
+          // حفظ دفعة المفاتيح في استعلام واحد وسريع بقاعدة البيانات
+          if (batchItems.length > 0) {
+            axios.post('http://127.0.0.1:8000/api/internal/auth-store/batch', {
+              session_id: sessionId,
+              items: batchItems
+            }, { timeout: 6000 }).catch(() => {});
+          }
         }
       }
     },
-    saveCreds: () => writeData('creds', creds)
+    saveCreds: () => {
+      memoryCache.set('creds', creds);
+      return axios.post('http://127.0.0.1:8000/api/internal/auth-store', {
+        session_id: sessionId,
+        key_id: 'creds',
+        key_data: JSON.stringify(creds, BufferJSON.replacer)
+      }, { timeout: 4000 }).catch(() => {});
+    }
   };
 }
 
@@ -105,7 +109,7 @@ const sessions = {
 
 const messageStore = new Map();
 
-// ----------------- 1. تشغيل جلسة العمليات الرئيسية الدائمة -----------------
+// ----------------- 1. جلسة العمليات الرئيسية -----------------
 async function startOperationsWhatsApp() {
   if (sessions.operations.isStarting) return;
   sessions.operations.isStarting = true;
@@ -156,7 +160,6 @@ async function startOperationsWhatsApp() {
         if (shouldReconnect) {
           setTimeout(startOperationsWhatsApp, 3000);
         } else {
-          // في حال تسجيل الخروج الصريح فقط يتم مسح بيانات الجلسة من قاعدة البيانات
           try {
             await axios.delete('http://127.0.0.1:8000/api/internal/auth-store/operations_main');
           } catch (e) {}
@@ -168,7 +171,7 @@ async function startOperationsWhatsApp() {
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
         sessions.operations.user = cleanPhone;
         sessions.operations.isStarting = false;
-        console.log('[Operations WA] Persistent Session Restored & Active on Number:', cleanPhone);
+        console.log('[Operations WA] Persistent Session Restored & Active on:', cleanPhone);
       }
     });
 
@@ -181,8 +184,8 @@ async function startOperationsWhatsApp() {
         if (msg.key && msg.key.id) {
           messageStore.set(msg.key.id, msg.message);
           if (messageStore.size > 200) {
-            const first = messageStore.keys().next().value;
-            messageStore.delete(first);
+            const firstKey = messageStore.keys().next().value;
+            messageStore.delete(firstKey);
           }
         }
 
@@ -223,7 +226,7 @@ async function startOperationsWhatsApp() {
   }
 }
 
-// ----------------- 2. تشغيل جلسة مبيعات العملاء الجدد الدائمة -----------------
+// ----------------- 2. جلسة مبيعات العملاء الجدد -----------------
 async function startSalesWhatsApp() {
   if (sessions.sales.isStarting) return;
   sessions.sales.isStarting = true;
@@ -282,7 +285,7 @@ async function startSalesWhatsApp() {
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
         sessions.sales.user = cleanPhone;
         sessions.sales.isStarting = false;
-        console.log('[Sales WA] Inbound Bot Session Restored on Number:', cleanPhone);
+        console.log('[Sales WA] Inbound Bot Active on Number:', cleanPhone);
       }
     });
 
@@ -317,7 +320,7 @@ async function startSalesWhatsApp() {
   }
 }
 
-// ----------------- مسارات الـ API للتحكم -----------------
+// ----------------- مسارات التحكم -----------------
 app.get('/qr-status', (req, res) => {
   res.json({
     connected: sessions.operations.connected,
@@ -408,7 +411,6 @@ app.post('/sales/disconnect', async (req, res) => {
   }
 });
 
-// بدء الاتصال عند تشغيل الخادم
 setTimeout(() => {
   startOperationsWhatsApp();
   startSalesWhatsApp();
