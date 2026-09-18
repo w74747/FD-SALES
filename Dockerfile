@@ -2,8 +2,9 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-# تثبيت متطلبات بايثون الأساسية من مستودعات دبيان الحديثة والمستقرة
+# تثبيت git وبايثون وأدوات التجميع اللازمة لحزم Baileys و PostgreSQL
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
     python3 \
     python3-pip \
     python3-dev \
@@ -12,20 +13,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# تثبيت حزم Node.js للواتساب
+# تثبيت حزم Node.js للواتساب (أصبح git متوفراً الآن ولن يفشل)
 COPY package*.json ./
 RUN npm install --production
 
-# تثبيت حزم بايثون
+# تثبيت متطلبات بايثون
 COPY requirements.txt ./
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
-# نسخ باقي ملفات المشروع
+# نسخ باقي ملفات التطبيق
 COPY . .
 
-# منفذ التشغيل
 ENV PORT=8000
 EXPOSE 8000
 
-# أمر بدء التشغيل
 CMD ["python3", "main.py"]
