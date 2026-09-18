@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Unified Agent Model & PostgreSQL-Backed WhatsApp Auth Sessions with Batch Upsert
+Unified Agent Model & Instant PostgreSQL Session Snapshot Engine
 """
 
 import os
@@ -15,7 +15,7 @@ import subprocess
 import csv
 import re
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Response, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -236,13 +236,12 @@ def init_database():
 
     try:
         with conn.cursor() as cur:
+            # جدول حفظ النسخ الاحتياطية المجمعة للجلسات Snapshots
             cur.execute("""
-            CREATE TABLE IF NOT EXISTS whatsapp_auth_sessions (
-                session_id VARCHAR(50) NOT NULL,
-                key_id VARCHAR(255) NOT NULL,
-                key_data TEXT NOT NULL,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (session_id, key_id)
+            CREATE TABLE IF NOT EXISTS whatsapp_session_snapshots (
+                session_name VARCHAR(50) PRIMARY KEY,
+                snapshot_data JSONB NOT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
             """)
 
@@ -492,7 +491,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="20.5.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="20.6.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -555,93 +554,56 @@ class SystemConfigPayload(BaseModel):
     logistics_group_id: Optional[str] = ""
     management_group_id: Optional[str] = ""
 
-class AuthStorePayload(BaseModel):
-    session_id: str
-    key_id: str
-    key_data: str
+class SessionSnapshotPayload(BaseModel):
+    session_name: str
+    snapshot: Dict[str, str]
 
-class BatchAuthStorePayload(BaseModel):
-    session_id: str
-    items: List[dict]
-
-# ----------------- مسارات تخزين مصادقة الواتساب السريعة والدفعية -----------------
-@app.get("/api/internal/auth-store/{session_id}/{key_id}")
-def get_auth_store_key(session_id: str, key_id: str):
+# ----------------- مسارات مزامنة واسترجاع الـ Snapshot المجمعة -----------------
+@app.get("/api/internal/session-snapshot/{session_name}")
+def get_session_snapshot(session_name: str):
     conn = get_db_connection()
     if not conn:
         return Response(status_code=500)
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT key_data FROM whatsapp_auth_sessions WHERE session_id = %s AND key_id = %s;", (session_id, key_id))
+            cur.execute("SELECT snapshot_data FROM whatsapp_session_snapshots WHERE session_name = %s;", (session_name,))
             row = cur.fetchone()
             if row:
-                return {"key_data": row["key_data"]}
+                return {"snapshot": row["snapshot_data"]}
             return Response(status_code=404)
     finally:
         conn.close()
 
-@app.post("/api/internal/auth-store")
-def set_auth_store_key(payload: AuthStorePayload):
+@app.post("/api/internal/session-snapshot")
+def save_session_snapshot(payload: SessionSnapshotPayload):
     conn = get_db_connection()
     if not conn:
         return Response(status_code=500)
     try:
         with conn.cursor() as cur:
             cur.execute("""
-            INSERT INTO whatsapp_auth_sessions (session_id, key_id, key_data, updated_at)
-            VALUES (%s, %s, %s, NOW())
-            ON CONFLICT (session_id, key_id) DO UPDATE 
-            SET key_data = EXCLUDED.key_data, updated_at = NOW();
-            """, (payload.session_id, payload.key_id, payload.key_data))
+            INSERT INTO whatsapp_session_snapshots (session_name, snapshot_data, updated_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (session_name) DO UPDATE 
+            SET snapshot_data = EXCLUDED.snapshot_data, updated_at = NOW();
+            """, (payload.session_name, json.dumps(payload.snapshot)))
             conn.commit()
             return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/internal/auth-store/batch")
-def set_auth_store_batch(payload: BatchAuthStorePayload):
-    conn = get_db_connection()
-    if not conn:
-        return Response(status_code=500)
-    try:
-        with conn.cursor() as cur:
-            records = [(payload.session_id, item["key_id"], item["key_data"]) for item in payload.items]
-            cur.executemany("""
-            INSERT INTO whatsapp_auth_sessions (session_id, key_id, key_data, updated_at)
-            VALUES (%s, %s, %s, NOW())
-            ON CONFLICT (session_id, key_id) DO UPDATE 
-            SET key_data = EXCLUDED.key_data, updated_at = NOW();
-            """, records)
-            conn.commit()
-            return {"status": "SUCCESS", "count": len(records)}
     except Exception as e:
-        logger.error(f"Batch store error: {e}")
+        logger.error(f"Error saving session snapshot: {e}")
         conn.rollback()
         return Response(status_code=500)
     finally:
         conn.close()
 
-@app.delete("/api/internal/auth-store/{session_id}/{key_id}")
-def delete_auth_store_key(session_id: str, key_id: str):
+@app.delete("/api/internal/session-snapshot/{session_name}")
+def delete_session_snapshot(session_name: str):
     conn = get_db_connection()
     if not conn:
         return Response(status_code=500)
     try:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM whatsapp_auth_sessions WHERE session_id = %s AND key_id = %s;", (session_id, key_id))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.delete("/api/internal/auth-store/{session_id}")
-def clear_auth_store_session(session_id: str):
-    conn = get_db_connection()
-    if not conn:
-        return Response(status_code=500)
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM whatsapp_auth_sessions WHERE session_id = %s;", (session_id,))
+            cur.execute("DELETE FROM whatsapp_session_snapshots WHERE session_name = %s;", (session_name,))
             conn.commit()
             return {"status": "CLEARED"}
     finally:
