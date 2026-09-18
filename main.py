@@ -106,13 +106,13 @@ async def query_perplexity_intelligence(system_prompt: str, search_query: str) -
     }
 
     user_content = (
-        f"المطلوب: إجراء بحث واستقصاء حي عبر الإنترنت ولينكدإن ومصادر الأعمال والأخبار حول:\n"
+        f"المطلوب: إجراء استقصاء وبحث حي عبر الإنترنت ومصادر الأعمال والأخبار حول:\n"
         f"الموضوع / الشركات المستهدفة: {search_query}\n\n"
         f"قم بصياغة تقرير تنفيذي رسمي وموجز باللغة العربية يوضح:\n"
         f"1. أحدث الأخبار والتحركات خلال الأيام الأخيرة.\n"
         f"2. المنتجات الجديدة أو التغييرات التسعيرية وحملات الترويج المرصودة.\n"
         f"3. توصية استراتيجية واضحة لشركة تنمية الغذاء لاقتناص الفرصة التنافسية.\n"
-        f"اجعل التقرير مهنياً تماماً وخالياً من الرموز التعبيرية."
+        f"اجعل التقرير مهنياً تماماً وخالياً من أي رموز تعبيرية."
     )
 
     payload = {
@@ -422,7 +422,7 @@ def init_database():
             cur.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_logs (
                 id SERIAL PRIMARY KEY,
-                created_at VARCHAR(10) NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 sender_name VARCHAR(150) NOT NULL,
                 channel_name VARCHAR(150) DEFAULT 'محادثة مباشرة',
                 is_external_call BOOLEAN DEFAULT FALSE,
@@ -477,7 +477,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="20.1.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="20.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -540,16 +540,12 @@ class SystemConfigPayload(BaseModel):
     logistics_group_id: Optional[str] = ""
     management_group_id: Optional[str] = ""
 
-# ----------------- التحقق الأمني الصارم 2FA (مع معالجة استثناءات ASGI) -----------------
+# ----------------- التحقق الأمني 2FA الصارم النظيف -----------------
 @app.post("/api/auth/2fa/verify")
 def verify_2fa(payload: Verify2FAPayload):
     conn = get_db_connection()
     if not conn:
-        return Response(
-            content=json.dumps({"detail": "قاعدة البيانات غير متاحة"}),
-            status_code=500,
-            media_type="application/json"
-        )
+        return Response(content=json.dumps({"detail": "قاعدة البيانات غير متاحة"}), status_code=500, media_type="application/json")
     try:
         clean_code = payload.code.strip()
         with conn.cursor() as cur:
@@ -558,11 +554,7 @@ def verify_2fa(payload: Verify2FAPayload):
             secret = row["totp_secret"] if row else None
 
         if not secret:
-            return Response(
-                content=json.dumps({"detail": "لم يتم العثور على مفتاح التوثيق السري"}),
-                status_code=400,
-                media_type="application/json"
-            )
+            return Response(content=json.dumps({"detail": "لم يتم العثور على مفتاح التوثيق السري"}), status_code=400, media_type="application/json")
 
         totp = pyotp.TOTP(secret)
         if totp.verify(clean_code, valid_window=1):
@@ -571,11 +563,7 @@ def verify_2fa(payload: Verify2FAPayload):
             conn.commit()
             return {"status": "SUCCESS", "message": "تم التحقق بنجاح"}
         else:
-            return Response(
-                content=json.dumps({"detail": "رمز التحقق غير صحيح أو انتهت صلاحيته"}),
-                status_code=401,
-                media_type="application/json"
-            )
+            return Response(content=json.dumps({"detail": "رمز التحقق غير صحيح أو انتهت صلاحيته"}), status_code=401, media_type="application/json")
     finally:
         conn.close()
 
@@ -707,7 +695,7 @@ async def test_unified_agent(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسار بوت مبيعات العملاء الجدد التفاعلي البشري -----------------
+# ----------------- مسار بوت مبيعات وتأهيل العملاء الجدد التفاعلي -----------------
 @app.post("/api/bot/inbound-sales")
 async def handle_inbound_sales_bot(msg: InboundBotMessage):
     conn = get_db_connection()
@@ -798,7 +786,7 @@ async def handle_inbound_sales_bot(msg: InboundBotMessage):
     finally:
         conn.close()
 
-# ----------------- مسار الواتساب العام وتوجيه طلبيات المجموعات للوجستيك -----------------
+# ----------------- مسار الواتساب العام وتوجيه طلبيات المجموعات المحمي -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     conn = get_db_connection()
@@ -873,16 +861,22 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         if logistics_group:
                             forward_to_logistics = logistics_group
                             logistics_text = logistics_msg
+                            print(f"[SUCCESS] Order automatically routed to Logistics Group: {logistics_group}")
 
                 elif chat_id == management_group:
                     channel_name = "مجموعة الإدارة العليا"
                 else:
                     channel_name = f"مجموعة ({chat_id[:15]}...)"
 
-            cur.execute("""
-            INSERT INTO whatsapp_logs (created_at, sender_name, channel_name, is_external_call, message_body)
-            VALUES (%s, %s, %s, FALSE, %s);
-            """, (datetime.now().strftime("%H:%M"), msg.sender_name, channel_name, text))
+            # تسجيل الرادار المحمي مع صيغة تاريخ كاملة تتطابق مع TIMESTAMP WITH TIME ZONE
+            try:
+                cur.execute("""
+                INSERT INTO whatsapp_logs (created_at, sender_name, channel_name, is_external_call, message_body)
+                VALUES (NOW(), %s, %s, FALSE, %s);
+                """, (msg.sender_name, channel_name, text))
+            except Exception as log_err:
+                logger.warning(f"Notice logging message: {log_err}")
+
             conn.commit()
 
             return {
@@ -894,7 +888,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     finally:
         conn.close()
 
-# ----------------- باقي مسارات الـ API (العملاء، الفروع، التقويم، المستهدفات) -----------------
+# ----------------- باقي المسارات الأساسية للـ API -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -1168,7 +1162,11 @@ def get_whatsapp_logs():
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM whatsapp_logs ORDER BY id DESC LIMIT 50;")
-            return cur.fetchall()
+            rows = cur.fetchall()
+            for r in rows:
+                if r.get("created_at") and hasattr(r["created_at"], "strftime"):
+                    r["created_at"] = r["created_at"].strftime("%H:%M")
+            return rows
     finally:
         conn.close()
 
