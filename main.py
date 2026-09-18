@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Unified Agent Model & Auto-Dispatch Logistics Pipeline
+Unified Agent Model & PostgreSQL-Backed WhatsApp Auth Sessions
 """
 
 import os
@@ -236,6 +236,17 @@ def init_database():
 
     try:
         with conn.cursor() as cur:
+            # جدول حفظ جلسات الواتساب الدائمة في قاعدة البيانات
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS whatsapp_auth_sessions (
+                session_id VARCHAR(50) NOT NULL,
+                key_id VARCHAR(255) NOT NULL,
+                key_data TEXT NOT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (session_id, key_id)
+            );
+            """)
+
             cur.execute("""
             CREATE TABLE IF NOT EXISTS system_auth (
                 id SERIAL PRIMARY KEY,
@@ -452,7 +463,6 @@ def init_database():
     finally:
         conn.close()
 
-    # تعديل أي قيود سابقة قديمة برمجياً لضمان استقرار الإدخال 100%
     run_isolated_ddl("ALTER TABLE ai_agents ALTER COLUMN role_type DROP NOT NULL;")
     run_isolated_ddl("ALTER TABLE ai_agents ALTER COLUMN role_type SET DEFAULT 'UNIFIED';")
     run_isolated_ddl("ALTER TABLE ai_agents ALTER COLUMN category SET DEFAULT 'UNIFIED';")
@@ -483,7 +493,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="20.3.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="20.4.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -546,6 +556,71 @@ class SystemConfigPayload(BaseModel):
     logistics_group_id: Optional[str] = ""
     management_group_id: Optional[str] = ""
 
+class AuthStorePayload(BaseModel):
+    session_id: str
+    key_id: str
+    key_data: str
+
+# ----------------- مسارات تخزين مصادقة الواتساب في PostgreSQL -----------------
+@app.get("/api/internal/auth-store/{session_id}/{key_id}")
+def get_auth_store_key(session_id: str, key_id: str):
+    conn = get_db_connection()
+    if not conn:
+        return Response(status_code=500)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT key_data FROM whatsapp_auth_sessions WHERE session_id = %s AND key_id = %s;", (session_id, key_id))
+            row = cur.fetchone()
+            if row:
+                return {"key_data": row["key_data"]}
+            return Response(status_code=404)
+    finally:
+        conn.close()
+
+@app.post("/api/internal/auth-store")
+def set_auth_store_key(payload: AuthStorePayload):
+    conn = get_db_connection()
+    if not conn:
+        return Response(status_code=500)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO whatsapp_auth_sessions (session_id, key_id, key_data, updated_at)
+            VALUES (%s, %s, %s, NOW())
+            ON CONFLICT (session_id, key_id) DO UPDATE 
+            SET key_data = EXCLUDED.key_data, updated_at = NOW();
+            """, (payload.session_id, payload.key_id, payload.key_data))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.delete("/api/internal/auth-store/{session_id}/{key_id}")
+def delete_auth_store_key(session_id: str, key_id: str):
+    conn = get_db_connection()
+    if not conn:
+        return Response(status_code=500)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM whatsapp_auth_sessions WHERE session_id = %s AND key_id = %s;", (session_id, key_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.delete("/api/internal/auth-store/{session_id}")
+def clear_auth_store_session(session_id: str):
+    conn = get_db_connection()
+    if not conn:
+        return Response(status_code=500)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM whatsapp_auth_sessions WHERE session_id = %s;", (session_id,))
+            conn.commit()
+            return {"status": "CLEARED"}
+    finally:
+        conn.close()
+
 # ----------------- التحقق الأمني الصارم 2FA النظيف -----------------
 @app.post("/api/auth/2fa/verify")
 def verify_2fa(payload: Verify2FAPayload):
@@ -573,7 +648,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات الوكلاء الموحدين (مع معالجة role_type) -----------------
+# ----------------- مسارات الوكلاء الموحدين -----------------
 @app.get("/api/agents")
 def get_unified_agents():
     conn = get_db_connection()
@@ -709,7 +784,7 @@ async def test_unified_agent(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسار بوت مبيعات العملاء الجدد التفاعلي البشري -----------------
+# ----------------- مسار بوت مبيعات العملاء الجدد التفاعلي -----------------
 @app.post("/api/bot/inbound-sales")
 async def handle_inbound_sales_bot(msg: InboundBotMessage):
     conn = get_db_connection()
@@ -800,7 +875,7 @@ async def handle_inbound_sales_bot(msg: InboundBotMessage):
     finally:
         conn.close()
 
-# ----------------- مسار الواتساب العام وتوجيه طلبيات المجموعات المحمي -----------------
+# ----------------- مسار الواتساب العام وتوجيه طلبيات المجموعات -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     conn = get_db_connection()
@@ -882,7 +957,6 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 else:
                     channel_name = f"مجموعة ({chat_id[:15]}...)"
 
-            # استخدام NOW() المتوافق كلياً مع TIMESTAMP WITH TIME ZONE
             try:
                 cur.execute("""
                 INSERT INTO whatsapp_logs (created_at, sender_name, channel_name, is_external_call, message_body)
@@ -902,7 +976,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     finally:
         conn.close()
 
-# ----------------- باقي مسارات الـ API الأساسية -----------------
+# ----------------- باقي مسارات الـ API -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
