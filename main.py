@@ -106,13 +106,13 @@ async def query_perplexity_intelligence(system_prompt: str, search_query: str) -
     }
 
     user_content = (
-        f"المطلوب: قم بإجراء استقصاء وبحث حي عبر الإنترنت ومصادر الأعمال والأخبار حول:\n"
+        f"المطلوب: إجراء بحث واستقصاء حي عبر الإنترنت ولينكدإن ومصادر الأعمال والأخبار حول:\n"
         f"الموضوع / الشركات المستهدفة: {search_query}\n\n"
         f"قم بصياغة تقرير تنفيذي رسمي وموجز باللغة العربية يوضح:\n"
         f"1. أحدث الأخبار والتحركات خلال الأيام الأخيرة.\n"
         f"2. المنتجات الجديدة أو التغييرات التسعيرية وحملات الترويج المرصودة.\n"
         f"3. توصية استراتيجية واضحة لشركة تنمية الغذاء لاقتناص الفرصة التنافسية.\n"
-        f"اجعل التقرير مهنياً وخالياً من أي رموز تعبيرية."
+        f"اجعل التقرير مهنياً تماماً وخالياً من الرموز التعبيرية."
     )
 
     payload = {
@@ -430,7 +430,6 @@ def init_database():
             );
             """)
 
-            # جدول الوكلاء الموحد الجديد (Unified Agent Schema)
             cur.execute("""
             CREATE TABLE IF NOT EXISTS ai_agents (
                 id SERIAL PRIMARY KEY,
@@ -478,7 +477,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="20.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="20.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -496,7 +495,7 @@ def get_logo():
         headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"}
     )
 
-# ----------------- نماذج Pydantic للوكلاء الموحدين -----------------
+# ----------------- نماذج Pydantic -----------------
 class Verify2FAPayload(BaseModel):
     code: str
 
@@ -541,12 +540,16 @@ class SystemConfigPayload(BaseModel):
     logistics_group_id: Optional[str] = ""
     management_group_id: Optional[str] = ""
 
-# ----------------- التحقق الأمني 2FA -----------------
+# ----------------- التحقق الأمني الصارم 2FA (مع معالجة استثناءات ASGI) -----------------
 @app.post("/api/auth/2fa/verify")
 def verify_2fa(payload: Verify2FAPayload):
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
+        return Response(
+            content=json.dumps({"detail": "قاعدة البيانات غير متاحة"}),
+            status_code=500,
+            media_type="application/json"
+        )
     try:
         clean_code = payload.code.strip()
         with conn.cursor() as cur:
@@ -555,7 +558,11 @@ def verify_2fa(payload: Verify2FAPayload):
             secret = row["totp_secret"] if row else None
 
         if not secret:
-            raise HTTPException(status_code=400, detail="لم يتم العثور على مفتاح التوثيق السري")
+            return Response(
+                content=json.dumps({"detail": "لم يتم العثور على مفتاح التوثيق السري"}),
+                status_code=400,
+                media_type="application/json"
+            )
 
         totp = pyotp.TOTP(secret)
         if totp.verify(clean_code, valid_window=1):
@@ -564,11 +571,15 @@ def verify_2fa(payload: Verify2FAPayload):
             conn.commit()
             return {"status": "SUCCESS", "message": "تم التحقق بنجاح"}
         else:
-            raise HTTPException(status_code=401, detail="رمز التحقق غير صحيح أو انتهت صلاحيته")
+            return Response(
+                content=json.dumps({"detail": "رمز التحقق غير صحيح أو انتهت صلاحيته"}),
+                status_code=401,
+                media_type="application/json"
+            )
     finally:
         conn.close()
 
-# ----------------- مسارات الوكلاء الموحدين (Unified Agents API) -----------------
+# ----------------- مسارات الوكلاء الموحدين -----------------
 @app.get("/api/agents")
 def get_unified_agents():
     conn = get_db_connection()
@@ -756,7 +767,6 @@ async def handle_inbound_sales_bot(msg: InboundBotMessage):
 
             history.append({"role": "assistant", "content": reply_text})
 
-            # رصد آلي للعينات في الخلفية
             if any(w in text.lower() for w in ["عينة", "عينات", "تجربة", "تذوق", "sample"]):
                 rep = match_rep_by_region(conn, text)
                 cur.execute("""
@@ -863,9 +873,6 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         if logistics_group:
                             forward_to_logistics = logistics_group
                             logistics_text = logistics_msg
-                            print(f"[SUCCESS] Order automatically routed to Logistics Group: {logistics_group}")
-                        else:
-                            print("[NOTICE] Order detected but logistics_group_id is not set.")
 
                 elif chat_id == management_group:
                     channel_name = "مجموعة الإدارة العليا"
