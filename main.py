@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Unified Agent Model & PostgreSQL-Backed WhatsApp Auth Sessions
+Unified Agent Model & PostgreSQL-Backed WhatsApp Auth Sessions with Batch Upsert
 """
 
 import os
@@ -236,7 +236,6 @@ def init_database():
 
     try:
         with conn.cursor() as cur:
-            # جدول حفظ جلسات الواتساب الدائمة في قاعدة البيانات
             cur.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_auth_sessions (
                 session_id VARCHAR(50) NOT NULL,
@@ -493,7 +492,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="20.4.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="20.5.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -561,7 +560,11 @@ class AuthStorePayload(BaseModel):
     key_id: str
     key_data: str
 
-# ----------------- مسارات تخزين مصادقة الواتساب في PostgreSQL -----------------
+class BatchAuthStorePayload(BaseModel):
+    session_id: str
+    items: List[dict]
+
+# ----------------- مسارات تخزين مصادقة الواتساب السريعة والدفعية -----------------
 @app.get("/api/internal/auth-store/{session_id}/{key_id}")
 def get_auth_store_key(session_id: str, key_id: str):
     conn = get_db_connection()
@@ -592,6 +595,29 @@ def set_auth_store_key(payload: AuthStorePayload):
             """, (payload.session_id, payload.key_id, payload.key_data))
             conn.commit()
             return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/internal/auth-store/batch")
+def set_auth_store_batch(payload: BatchAuthStorePayload):
+    conn = get_db_connection()
+    if not conn:
+        return Response(status_code=500)
+    try:
+        with conn.cursor() as cur:
+            records = [(payload.session_id, item["key_id"], item["key_data"]) for item in payload.items]
+            cur.executemany("""
+            INSERT INTO whatsapp_auth_sessions (session_id, key_id, key_data, updated_at)
+            VALUES (%s, %s, %s, NOW())
+            ON CONFLICT (session_id, key_id) DO UPDATE 
+            SET key_data = EXCLUDED.key_data, updated_at = NOW();
+            """, records)
+            conn.commit()
+            return {"status": "SUCCESS", "count": len(records)}
+    except Exception as e:
+        logger.error(f"Batch store error: {e}")
+        conn.rollback()
+        return Response(status_code=500)
     finally:
         conn.close()
 
@@ -875,7 +901,7 @@ async def handle_inbound_sales_bot(msg: InboundBotMessage):
     finally:
         conn.close()
 
-# ----------------- مسار الواتساب العام وتوجيه طلبيات المجموعات -----------------
+# ----------------- مسار الواتساب العام وتوجيه طلبيات المجموعات المحمي -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     conn = get_db_connection()
@@ -976,7 +1002,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     finally:
         conn.close()
 
-# ----------------- باقي مسارات الـ API -----------------
+# ----------------- باقي مسارات الـ API الأساسية -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
