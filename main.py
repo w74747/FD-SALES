@@ -106,7 +106,7 @@ async def query_perplexity_intelligence(system_prompt: str, search_query: str) -
     }
 
     user_content = (
-        f"المطلوب: إجراء استقصاء وبحث حي عبر الإنترنت ومصادر الأعمال والأخبار حول:\n"
+        f"المطلوب: إجراء بحث واستقصاء حي عبر الإنترنت ومصادر الأعمال والأخبار حول:\n"
         f"الموضوع / الشركات المستهدفة: {search_query}\n\n"
         f"قم بصياغة تقرير تنفيذي رسمي وموجز باللغة العربية يوضح:\n"
         f"1. أحدث الأخبار والتحركات خلال الأيام الأخيرة.\n"
@@ -434,6 +434,8 @@ def init_database():
             CREATE TABLE IF NOT EXISTS ai_agents (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(150) NOT NULL,
+                category VARCHAR(50) DEFAULT 'UNIFIED',
+                role_type VARCHAR(100) DEFAULT 'UNIFIED',
                 listen_scope VARCHAR(50) DEFAULT 'ALL_GROUPS',
                 dispatch_channel VARCHAR(100) DEFAULT '',
                 enable_web_search BOOLEAN DEFAULT FALSE,
@@ -450,6 +452,10 @@ def init_database():
     finally:
         conn.close()
 
+    # تعديل أي قيود سابقة قديمة برمجياً لضمان استقرار الإدخال 100%
+    run_isolated_ddl("ALTER TABLE ai_agents ALTER COLUMN role_type DROP NOT NULL;")
+    run_isolated_ddl("ALTER TABLE ai_agents ALTER COLUMN role_type SET DEFAULT 'UNIFIED';")
+    run_isolated_ddl("ALTER TABLE ai_agents ALTER COLUMN category SET DEFAULT 'UNIFIED';")
     run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS listen_scope VARCHAR(50) DEFAULT 'ALL_GROUPS';")
     run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS dispatch_channel VARCHAR(100) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS enable_web_search BOOLEAN DEFAULT FALSE;")
@@ -477,7 +483,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="20.2.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="20.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -540,7 +546,7 @@ class SystemConfigPayload(BaseModel):
     logistics_group_id: Optional[str] = ""
     management_group_id: Optional[str] = ""
 
-# ----------------- التحقق الأمني 2FA الصارم النظيف -----------------
+# ----------------- التحقق الأمني الصارم 2FA النظيف -----------------
 @app.post("/api/auth/2fa/verify")
 def verify_2fa(payload: Verify2FAPayload):
     conn = get_db_connection()
@@ -567,7 +573,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات الوكلاء الموحدين -----------------
+# ----------------- مسارات الوكلاء الموحدين (مع معالجة role_type) -----------------
 @app.get("/api/agents")
 def get_unified_agents():
     conn = get_db_connection()
@@ -594,8 +600,8 @@ def create_unified_agent(payload: UnifiedAgentPayload):
     try:
         with conn.cursor() as cur:
             cur.execute("""
-            INSERT INTO ai_agents (name, listen_scope, dispatch_channel, enable_web_search, search_keywords, system_prompt, is_active)
-            VALUES (%s, %s, %s, %s, %s, %s, TRUE) RETURNING id;
+            INSERT INTO ai_agents (name, category, role_type, listen_scope, dispatch_channel, enable_web_search, search_keywords, system_prompt, is_active)
+            VALUES (%s, 'UNIFIED', 'UNIFIED', %s, %s, %s, %s, %s, TRUE) RETURNING id;
             """, (
                 payload.name.strip(), payload.listen_scope or "ALL_GROUPS", 
                 payload.dispatch_channel or "", payload.enable_web_search or False, 
@@ -604,6 +610,10 @@ def create_unified_agent(payload: UnifiedAgentPayload):
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
+    except Exception as e:
+        logger.error(f"Error creating agent: {e}")
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -626,6 +636,10 @@ def update_unified_agent(agent_id: int, payload: UpdateUnifiedAgentPayload):
             ))
             conn.commit()
             return {"status": "SUCCESS"}
+    except Exception as e:
+        logger.error(f"Error updating agent: {e}")
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -695,7 +709,7 @@ async def test_unified_agent(payload: dict):
     finally:
         conn.close()
 
-# ----------------- مسار بوت مبيعات وتأهيل العملاء الجدد التفاعلي -----------------
+# ----------------- مسار بوت مبيعات العملاء الجدد التفاعلي البشري -----------------
 @app.post("/api/bot/inbound-sales")
 async def handle_inbound_sales_bot(msg: InboundBotMessage):
     conn = get_db_connection()
@@ -868,7 +882,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 else:
                     channel_name = f"مجموعة ({chat_id[:15]}...)"
 
-            # تسجيل الرادار المحمي مع صيغة تاريخ كاملة تتطابق مع TIMESTAMP WITH TIME ZONE
+            # استخدام NOW() المتوافق كلياً مع TIMESTAMP WITH TIME ZONE
             try:
                 cur.execute("""
                 INSERT INTO whatsapp_logs (created_at, sender_name, channel_name, is_external_call, message_body)
@@ -888,7 +902,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     finally:
         conn.close()
 
-# ----------------- باقي المسارات الأساسية للـ API -----------------
+# ----------------- باقي مسارات الـ API الأساسية -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
