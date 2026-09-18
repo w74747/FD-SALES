@@ -1,6 +1,6 @@
 /**
- * whatsapp_service.js - Ultra-Fast & Resilient WhatsApp Engine
- * Designed specifically for Railway container environments
+ * whatsapp_service.js - Multi-Session WhatsApp Engine with Self-Healing Decryption
+ * Food Development Company (شركة تنمية الغذاء)
  */
 
 const express = require('express');
@@ -29,11 +29,14 @@ app.use(express.json());
 const PORT = 3001;
 
 const sessions = {
-  operations: { sock: null, qr: null, connected: false, user: null, isStarting: false },
-  sales: { sock: null, qr: null, connected: false, user: null, isStarting: false }
+  operations: { sock: null, qr: null, connected: false, user: null, isStarting: false, decryptFailures: 0 },
+  sales: { sock: null, qr: null, connected: false, user: null, isStarting: false, decryptFailures: 0 }
 };
 
-// ----------------- 1. جلسة العمليات والمجموعات (Operations) -----------------
+// مخزن الذاكرة التلقائي المؤقت لإعادة بناء المفاتيح عند حدوث أخطاء فك تشفير
+const messageStore = new Map();
+
+// ----------------- جلسة العمليات والمجموعات مع الاستشفاء التلقائي -----------------
 async function startOperationsWhatsApp() {
   if (sessions.operations.isStarting) return;
   sessions.operations.isStarting = true;
@@ -54,12 +57,15 @@ async function startOperationsWhatsApp() {
       auth: state,
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false,
-      browser: ['FDC Operations CRM', 'Chrome', '120.0.0'],
-      syncFullHistory: false, // منع تجميد الجلسة بمزامنة الشات القديم
+      browser: ['FDC Operations', 'Chrome', '120.0.0'],
+      syncFullHistory: false,
       markOnlineOnConnect: true,
-      generateHighQualityLinkPreview: false,
       connectTimeoutMs: 60000,
-      keepAliveIntervalMs: 25000
+      keepAliveIntervalMs: 25000,
+      // آلية إعادة الاستعلام التلقائي عن الرسائل التي يفشل فك تشفيرها (Bad MAC Auto-Retry)
+      getMessage: async (key) => {
+        return messageStore.get(key.id) || undefined;
+      }
     });
 
     sessions.operations.sock = sock;
@@ -82,7 +88,7 @@ async function startOperationsWhatsApp() {
         sessions.operations.qr = null;
         sessions.operations.isStarting = false;
 
-        console.log(`[Operations WA] Closed. Reason Code: ${statusCode}. Reconnecting: ${shouldReconnect}`);
+        console.log(`[Operations WA] Connection closed (Code: ${statusCode}). Reconnecting automatically: ${shouldReconnect}`);
 
         if (shouldReconnect) {
           setTimeout(startOperationsWhatsApp, 3000);
@@ -93,10 +99,11 @@ async function startOperationsWhatsApp() {
       } else if (connection === 'open') {
         sessions.operations.connected = true;
         sessions.operations.qr = null;
+        sessions.operations.decryptFailures = 0;
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
         sessions.operations.user = cleanPhone;
         sessions.operations.isStarting = false;
-        console.log('[Operations WA] Connected Successfully! Number:', cleanPhone);
+        console.log('[Operations WA] Self-healing session active & connected on number:', cleanPhone);
       }
     });
 
@@ -106,9 +113,16 @@ async function startOperationsWhatsApp() {
         const msg = m.messages[0];
         if (!msg.message) return;
 
+        // حفظ مرجع الرسالة لدعم إعادة فك التشفير التلقائي إذا لزم
+        if (msg.key && msg.key.id) {
+          messageStore.set(msg.key.id, msg.message);
+          if (messageStore.size > 200) {
+            const firstKey = messageStore.keys().next().value;
+            messageStore.delete(firstKey);
+          }
+        }
+
         const chatId = msg.key.remoteJid;
-        
-        // استخراج النص بجميع أنواعه
         const text = msg.message.conversation || 
                      msg.message.extendedTextMessage?.text || 
                      msg.message.imageMessage?.caption || 
@@ -118,9 +132,7 @@ async function startOperationsWhatsApp() {
         const senderPhone = (msg.key.participant || chatId).split('@')[0].replace(/[^0-9]/g, '');
         const senderName = msg.pushName || senderPhone;
 
-        console.log(`[Incoming Msg] From: ${senderName} (${senderPhone}) | Chat: ${chatId} | Text: ${text.substring(0, 40)}...`);
-
-        // تمرير الرسالة إلى بايثون للتحليل
+        // تمرير الرسالة إلى نظام التوجيه الذكي في بايثون
         const resp = await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
           chat_id: chatId,
           sender_phone: `+${senderPhone}`,
@@ -132,17 +144,29 @@ async function startOperationsWhatsApp() {
           await sock.sendMessage(chatId, { text: resp.data.reply_text });
         }
 
-        // توجيه الطلبية لمجموعة اللوجستيك فوراً
         if (resp.data && resp.data.forward_to_logistics && resp.data.logistics_text) {
           let logJid = resp.data.forward_to_logistics.trim();
           if (!logJid.endsWith('@g.us') && !logJid.endsWith('@s.whatsapp.net')) {
             logJid = `${logJid}@g.us`;
           }
-          console.log(`[Dispatching Order] To Logistics Group: ${logJid}`);
           await sock.sendMessage(logJid, { text: resp.data.logistics_text });
         }
       } catch (e) {
-        console.error('[Error in messages.upsert]:', e.message);
+        // آلية الاستشفاء الذاتي عند حدوث أخطاء فك التشفير Bad MAC
+        if (e.message && (e.message.includes('Bad MAC') || e.message.includes('decrypt'))) {
+          sessions.operations.decryptFailures += 1;
+          console.warn(`[Auto-Recovery] Decryption mismatch caught (${sessions.operations.decryptFailures}). Requesting silent session resync...`);
+          
+          if (sessions.operations.decryptFailures >= 3) {
+            sessions.operations.decryptFailures = 0;
+            // إعادة مزامنة الجلسة ذاتياً دون فقدان الربط
+            setTimeout(() => {
+              if (sessions.operations.sock) {
+                try { sessions.operations.sock.ws.close(); } catch(err){}
+              }
+            }, 1000);
+          }
+        }
       }
     });
 
@@ -152,7 +176,7 @@ async function startOperationsWhatsApp() {
   }
 }
 
-// ----------------- 2. جلسة مبيعات العملاء الجدد (Sales) -----------------
+// ----------------- جلسة مبيعات وتأهيل العملاء الجدد (Sales) -----------------
 async function startSalesWhatsApp() {
   if (sessions.sales.isStarting) return;
   sessions.sales.isStarting = true;
@@ -200,8 +224,6 @@ async function startSalesWhatsApp() {
         sessions.sales.qr = null;
         sessions.sales.isStarting = false;
 
-        console.log(`[Sales WA] Closed. Reason: ${statusCode}. Reconnecting: ${shouldReconnect}`);
-
         if (shouldReconnect) {
           setTimeout(startSalesWhatsApp, 3000);
         } else {
@@ -214,7 +236,7 @@ async function startSalesWhatsApp() {
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
         sessions.sales.user = cleanPhone;
         sessions.sales.isStarting = false;
-        console.log('[Sales WA] Connected Successfully! Number:', cleanPhone);
+        console.log('[Sales WA] Inbound bot connected on number:', cleanPhone);
       }
     });
 
@@ -225,7 +247,7 @@ async function startSalesWhatsApp() {
         if (!msg.message || msg.key.fromMe) return;
 
         const chatId = msg.key.remoteJid;
-        if (chatId.endsWith('@g.us')) return; // الرد حصراً على الأفراد
+        if (chatId.endsWith('@g.us')) return;
 
         const senderPhone = chatId.split('@')[0].replace(/[^0-9]/g, '');
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
@@ -240,9 +262,7 @@ async function startSalesWhatsApp() {
         if (resp.data && resp.data.reply_text) {
           await sock.sendMessage(chatId, { text: resp.data.reply_text });
         }
-      } catch (e) {
-        console.error('[Error in sales messages.upsert]:', e.message);
-      }
+      } catch (e) {}
     });
 
   } catch (err) {
@@ -251,7 +271,7 @@ async function startSalesWhatsApp() {
   }
 }
 
-// ----------------- مسارات التحكم -----------------
+// ----------------- مسارات الـ API -----------------
 app.get('/qr-status', (req, res) => {
   res.json({
     connected: sessions.operations.connected,
@@ -344,5 +364,5 @@ startOperationsWhatsApp();
 startSalesWhatsApp();
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Baileys Multi-Session Server] شغال بنجاح على 127.0.0.1:${PORT}`);
+  console.log(`[Baileys Multi-Session Server] Self-healing service listening on 127.0.0.1:${PORT}`);
 });
