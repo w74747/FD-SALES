@@ -1,7 +1,7 @@
 /**
- * whatsapp_service.js - Multi-Session WhatsApp Engine with Batch Database Auth
+ * whatsapp_service.js - High-Speed WhatsApp Engine with Database Snapshot Persistence
  * Food Development Company (شركة تنمية الغذاء)
- * Solves Connection Timeout & Ephemeral Container Storage via In-Memory Cache + Batch DB Upsert
+ * Uses native ultra-fast local auth state for instant pairing + Auto DB Snapshot on Postgres
  */
 
 const express = require('express');
@@ -9,12 +9,13 @@ const {
   default: makeWASocket, 
   DisconnectReason, 
   fetchLatestBaileysVersion,
-  BufferJSON,
-  initAuthCreds
+  useMultiFileAuthState
 } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const axios = require('axios');
 const pino = require('pino');
+const fs = require('fs');
+const path = require('path');
 
 process.on('uncaughtException', (err) => {
   console.error('[Baileys UncaughtException]:', err.message);
@@ -24,82 +25,66 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const app = express();
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 const PORT = 3001;
 
-// ----------------- محول تخزين الجلسة المجمّع السريع في PostgreSQL -----------------
-async function useDatabaseAuthState(sessionId) {
-  const memoryCache = new Map();
-
-  // قراءة المفتاح: من الذاكرة أولاً ثم قاعدة البيانات
-  const readData = async (keyId) => {
-    if (memoryCache.has(keyId)) return memoryCache.get(keyId);
+// ----------------- دوال المزامنة التلقائية مع PostgreSQL -----------------
+// قراءة وتصدير ملفات المجلد كنسخة مجمعة Snapshot
+function snapshotFolder(folderPath) {
+  const snapshot = {};
+  if (!fs.existsSync(folderPath)) return snapshot;
+  const files = fs.readdirSync(folderPath);
+  for (const file of files) {
+    const fullPath = path.join(folderPath, file);
     try {
-      const res = await axios.get(`http://127.0.0.1:8000/api/internal/auth-store/${sessionId}/${encodeURIComponent(keyId)}`, { timeout: 3000 });
-      if (res.data && res.data.key_data) {
-        const parsed = JSON.parse(res.data.key_data, BufferJSON.reviver);
-        memoryCache.set(keyId, parsed);
-        return parsed;
+      if (fs.statSync(fullPath).isFile()) {
+        snapshot[file] = fs.readFileSync(fullPath, 'utf8');
       }
     } catch (e) {}
-    return null;
-  };
+  }
+  return snapshot;
+}
 
-  const creds = (await readData('creds')) || initAuthCreds();
+// استعادة المجلد من الـ Snapshot
+function restoreFolder(folderPath, snapshot) {
+  if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
+  for (const [file, content] of Object.entries(snapshot)) {
+    try {
+      fs.writeFileSync(path.join(folderPath, file), content, 'utf8');
+    } catch (e) {}
+  }
+}
 
-  return {
-    state: {
-      creds,
-      keys: {
-        get: async (type, ids) => {
-          const data = {};
-          await Promise.all(
-            ids.map(async (id) => {
-              const val = await readData(`${type}-${id}`);
-              if (val) data[id] = val;
-            })
-          );
-          return data;
-        },
-        set: async (data) => {
-          const batchItems = [];
-          for (const category in data) {
-            for (const id in data[category]) {
-              const val = data[category][id];
-              const key = `${category}-${id}`;
-              if (val) {
-                memoryCache.set(key, val);
-                batchItems.push({
-                  key_id: key,
-                  key_data: JSON.stringify(val, BufferJSON.replacer)
-                });
-              } else {
-                memoryCache.delete(key);
-                // حذف غير متزامن بدون تعطيل العملية
-                axios.delete(`http://127.0.0.1:8000/api/internal/auth-store/${sessionId}/${encodeURIComponent(key)}`, { timeout: 3000 }).catch(() => {});
-              }
-            }
-          }
-          // حفظ دفعة المفاتيح في استعلام واحد وسريع بقاعدة البيانات
-          if (batchItems.length > 0) {
-            axios.post('http://127.0.0.1:8000/api/internal/auth-store/batch', {
-              session_id: sessionId,
-              items: batchItems
-            }, { timeout: 6000 }).catch(() => {});
-          }
-        }
-      }
-    },
-    saveCreds: () => {
-      memoryCache.set('creds', creds);
-      return axios.post('http://127.0.0.1:8000/api/internal/auth-store', {
-        session_id: sessionId,
-        key_id: 'creds',
-        key_data: JSON.stringify(creds, BufferJSON.replacer)
-      }, { timeout: 4000 }).catch(() => {});
+// استرجاع الجلسة من قاعدة البيانات قبل بدء التشغيل
+async function restoreSessionFromDB(sessionName, folderPath) {
+  try {
+    const res = await axios.get(`http://127.0.0.1:8000/api/internal/session-snapshot/${sessionName}`, { timeout: 4000 });
+    if (res.data && res.data.snapshot && Object.keys(res.data.snapshot).length > 0) {
+      restoreFolder(folderPath, res.data.snapshot);
+      console.log(`[DB Restore] Successfully restored session '${sessionName}' from PostgreSQL.`);
+      return true;
     }
-  };
+  } catch (e) {}
+  return false;
+}
+
+// حفظ الجلسة في قاعدة البيانات
+let saveTimeout = null;
+function debouncedSaveSessionToDB(sessionName, folderPath) {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    try {
+      const snapshot = snapshotFolder(folderPath);
+      if (Object.keys(snapshot).length > 0) {
+        await axios.post('http://127.0.0.1:8000/api/internal/session-snapshot', {
+          session_name: sessionName,
+          snapshot: snapshot
+        }, { timeout: 6000 });
+        console.log(`[DB Backup] Session '${sessionName}' securely synced to PostgreSQL.`);
+      }
+    } catch (e) {}
+  }, 2000);
 }
 
 const sessions = {
@@ -109,13 +94,16 @@ const sessions = {
 
 const messageStore = new Map();
 
-// ----------------- 1. جلسة العمليات الرئيسية -----------------
+// ----------------- 1. تشغيل واتساب العمليات الرئيسي -----------------
 async function startOperationsWhatsApp() {
   if (sessions.operations.isStarting) return;
   sessions.operations.isStarting = true;
 
+  const authFolder = path.join(__dirname, 'auth_info');
+  await restoreSessionFromDB('operations_main', authFolder);
+
   try {
-    const { state, saveCreds } = await useDatabaseAuthState('operations_main');
+    const { state, saveCreds } = await useMultiFileAuthState(authFolder);
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] }));
 
     if (sessions.operations.sock) {
@@ -136,7 +124,11 @@ async function startOperationsWhatsApp() {
     });
 
     sessions.operations.sock = sock;
-    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('creds.update', () => {
+      saveCreds();
+      debouncedSaveSessionToDB('operations_main', authFolder);
+    });
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -161,7 +153,8 @@ async function startOperationsWhatsApp() {
           setTimeout(startOperationsWhatsApp, 3000);
         } else {
           try {
-            await axios.delete('http://127.0.0.1:8000/api/internal/auth-store/operations_main');
+            fs.rmSync(authFolder, { recursive: true, force: true });
+            await axios.delete('http://127.0.0.1:8000/api/internal/session-snapshot/operations_main');
           } catch (e) {}
           setTimeout(startOperationsWhatsApp, 3000);
         }
@@ -171,7 +164,8 @@ async function startOperationsWhatsApp() {
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
         sessions.operations.user = cleanPhone;
         sessions.operations.isStarting = false;
-        console.log('[Operations WA] Persistent Session Restored & Active on:', cleanPhone);
+        console.log('[Operations WA] Successfully Connected & Active on:', cleanPhone);
+        debouncedSaveSessionToDB('operations_main', authFolder);
       }
     });
 
@@ -226,13 +220,16 @@ async function startOperationsWhatsApp() {
   }
 }
 
-// ----------------- 2. جلسة مبيعات العملاء الجدد -----------------
+// ----------------- 2. تشغيل واتساب مبيعات العملاء الجدد -----------------
 async function startSalesWhatsApp() {
   if (sessions.sales.isStarting) return;
   sessions.sales.isStarting = true;
 
+  const authFolder = path.join(__dirname, 'auth_sales');
+  await restoreSessionFromDB('sales_inbound', authFolder);
+
   try {
-    const { state, saveCreds } = await useDatabaseAuthState('sales_inbound');
+    const { state, saveCreds } = await useMultiFileAuthState(authFolder);
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] }));
 
     if (sessions.sales.sock) {
@@ -252,7 +249,11 @@ async function startSalesWhatsApp() {
     });
 
     sessions.sales.sock = sock;
-    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('creds.update', () => {
+      saveCreds();
+      debouncedSaveSessionToDB('sales_inbound', authFolder);
+    });
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -275,7 +276,8 @@ async function startSalesWhatsApp() {
           setTimeout(startSalesWhatsApp, 3000);
         } else {
           try {
-            await axios.delete('http://127.0.0.1:8000/api/internal/auth-store/sales_inbound');
+            fs.rmSync(authFolder, { recursive: true, force: true });
+            await axios.delete('http://127.0.0.1:8000/api/internal/session-snapshot/sales_inbound');
           } catch (e) {}
           setTimeout(startSalesWhatsApp, 3000);
         }
@@ -285,7 +287,8 @@ async function startSalesWhatsApp() {
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
         sessions.sales.user = cleanPhone;
         sessions.sales.isStarting = false;
-        console.log('[Sales WA] Inbound Bot Active on Number:', cleanPhone);
+        console.log('[Sales WA] Inbound Bot Connected on:', cleanPhone);
+        debouncedSaveSessionToDB('sales_inbound', authFolder);
       }
     });
 
@@ -320,7 +323,7 @@ async function startSalesWhatsApp() {
   }
 }
 
-// ----------------- مسارات التحكم -----------------
+// ----------------- مسارات الـ API -----------------
 app.get('/qr-status', (req, res) => {
   res.json({
     connected: sessions.operations.connected,
@@ -359,7 +362,7 @@ app.post('/send-message', async (req, res) => {
     : sessions.operations;
 
   if (!activeSession.connected || !activeSession.sock) {
-    return res.status(503).json({ error: 'خدمة الواتساب المطلوبة غير متصلة حالياً' });
+    return res.status(503).json({ error: 'خدمة الواتساب غير متصلة' });
   }
 
   try {
@@ -382,9 +385,9 @@ app.post('/disconnect', async (req, res) => {
       try { await sessions.operations.sock.logout(); } catch (e) {}
       try { sessions.operations.sock.end(); } catch (e) {}
     }
-    try {
-      await axios.delete('http://127.0.0.1:8000/api/internal/auth-store/operations_main');
-    } catch (e) {}
+    const authFolder = path.join(__dirname, 'auth_info');
+    try { fs.rmSync(authFolder, { recursive: true, force: true }); } catch (e) {}
+    try { await axios.delete('http://127.0.0.1:8000/api/internal/session-snapshot/operations_main'); } catch (e) {}
     setTimeout(startOperationsWhatsApp, 2000);
     return res.json({ status: 'DISCONNECTED' });
   } catch (e) {
@@ -401,9 +404,9 @@ app.post('/sales/disconnect', async (req, res) => {
       try { await sessions.sales.sock.logout(); } catch (e) {}
       try { sessions.sales.sock.end(); } catch (e) {}
     }
-    try {
-      await axios.delete('http://127.0.0.1:8000/api/internal/auth-store/sales_inbound');
-    } catch (e) {}
+    const authFolder = path.join(__dirname, 'auth_sales');
+    try { fs.rmSync(authFolder, { recursive: true, force: true }); } catch (e) {}
+    try { await axios.delete('http://127.0.0.1:8000/api/internal/session-snapshot/sales_inbound'); } catch (e) {}
     setTimeout(startSalesWhatsApp, 2000);
     return res.json({ status: 'DISCONNECTED' });
   } catch (e) {
@@ -411,11 +414,12 @@ app.post('/sales/disconnect', async (req, res) => {
   }
 });
 
+// بدء التشغيل
 setTimeout(() => {
   startOperationsWhatsApp();
   startSalesWhatsApp();
-}, 2000);
+}, 2500);
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Baileys Multi-Session Server] PostgreSQL-backed engine listening on 127.0.0.1:${PORT}`);
+  console.log(`[Baileys Multi-Session Server] Instant pairing engine listening on 127.0.0.1:${PORT}`);
 });
