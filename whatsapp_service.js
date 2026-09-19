@@ -30,7 +30,6 @@ app.use(express.json({ limit: '50mb' }));
 const PORT = 3001;
 
 // ----------------- دوال المزامنة التلقائية مع PostgreSQL -----------------
-// قراءة وتصدير ملفات المجلد كنسخة مجمعة Snapshot
 function snapshotFolder(folderPath) {
   const snapshot = {};
   if (!fs.existsSync(folderPath)) return snapshot;
@@ -46,7 +45,6 @@ function snapshotFolder(folderPath) {
   return snapshot;
 }
 
-// استعادة المجلد من الـ Snapshot
 function restoreFolder(folderPath, snapshot) {
   if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
   for (const [file, content] of Object.entries(snapshot)) {
@@ -56,7 +54,6 @@ function restoreFolder(folderPath, snapshot) {
   }
 }
 
-// استرجاع الجلسة من قاعدة البيانات قبل بدء التشغيل
 async function restoreSessionFromDB(sessionName, folderPath) {
   try {
     const res = await axios.get(`http://127.0.0.1:8000/api/internal/session-snapshot/${sessionName}`, { timeout: 4000 });
@@ -69,7 +66,6 @@ async function restoreSessionFromDB(sessionName, folderPath) {
   return false;
 }
 
-// حفظ الجلسة في قاعدة البيانات
 let saveTimeout = null;
 function debouncedSaveSessionToDB(sessionName, folderPath) {
   clearTimeout(saveTimeout);
@@ -414,7 +410,6 @@ app.post('/sales/disconnect', async (req, res) => {
   }
 });
 
-// بدء التشغيل
 setTimeout(() => {
   startOperationsWhatsApp();
   startSalesWhatsApp();
