@@ -1,7 +1,7 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Unified Agent Model, PostgreSQL-Backed Sessions & Full Reps Management
+Unified Agent Model, PostgreSQL-Backed Sessions, Full Reps & Calendar Route Engine
 """
 
 import os
@@ -376,6 +376,18 @@ def init_database():
             """)
 
             cur.execute("""
+            CREATE TABLE IF NOT EXISTS expenses_log (
+                id SERIAL PRIMARY KEY,
+                rep_id INT,
+                rep_name VARCHAR(150) NOT NULL,
+                expense_type VARCHAR(100) NOT NULL,
+                amount NUMERIC(12, 2) NOT NULL,
+                notes TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            cur.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_logs (
                 id SERIAL PRIMARY KEY,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -415,6 +427,8 @@ def init_database():
     run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS dispatch_channel VARCHAR(100) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS enable_web_search BOOLEAN DEFAULT FALSE;")
     run_isolated_ddl("ALTER TABLE ai_agents ADD COLUMN IF NOT EXISTS search_keywords TEXT DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS route_code VARCHAR(50) DEFAULT 'R-01';")
+    run_isolated_ddl("ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS execution_status VARCHAR(50) DEFAULT 'PENDING';")
 
 def start_whatsapp_service():
     global whatsapp_process
@@ -437,7 +451,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="20.8.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="20.9.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -477,6 +491,18 @@ class SampleConvertPOPayload(BaseModel):
 class SampleUpdatePayload(BaseModel):
     qty_free: int
     product_name: str
+
+class CalendarEventPayload(BaseModel):
+    customer_id: Optional[int] = None
+    customer_name: str
+    rep_id: Optional[int] = None
+    rep_name: str
+    task_type: str
+    scheduled_at: str
+    reminder_at: Optional[str] = ""
+    location: Optional[str] = ""
+    change_notes: Optional[str] = ""
+    route_code: Optional[str] = "R-01"
 
 class UnifiedAgentPayload(BaseModel):
     name: str
@@ -523,7 +549,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات فريق المبيعات الكاملة (عرض، تعديل، حذف) -----------------
+# ----------------- مسارات فريق المبيعات الكاملة -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -586,7 +612,58 @@ def delete_sales_rep(rep_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات العينات (تعديل، تقييم الشيف، تحويل لـ PO) -----------------
+# ----------------- مسارات التقويم والعمليات الميدانية -----------------
+@app.get("/api/calendar")
+def get_calendar():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM calendar_events ORDER BY id DESC;")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/calendar")
+def create_calendar_event(payload: CalendarEventPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO calendar_events (customer_id, customer_name, rep_id, rep_name, task_type, scheduled_at, reminder_at, location, change_notes, route_code, execution_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'PENDING') RETURNING id;
+            """, (
+                payload.customer_id, payload.customer_name, payload.rep_id, payload.rep_name,
+                payload.task_type, payload.scheduled_at, payload.reminder_at or "",
+                payload.location or "", payload.change_notes or "", payload.route_code or "R-01"
+            ))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    except Exception as e:
+        logger.error(f"Error creating calendar event: {e}")
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/calendar/{cal_id}")
+def delete_calendar_event(cal_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM calendar_events WHERE id = %s;", (cal_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+# ----------------- مسارات العينات -----------------
 @app.get("/api/samples")
 def get_samples():
     conn = get_db_connection()
@@ -676,7 +753,7 @@ def delete_sample(sample_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات الوكلاء ومحاكاة اللوجستيك الرسمية -----------------
+# ----------------- مسارات الوكلاء ومحاكاة اللوجستيك -----------------
 @app.get("/api/agents")
 def get_unified_agents():
     conn = get_db_connection()
@@ -798,12 +875,12 @@ async def test_unified_agent(payload: dict):
     finally:
         conn.close()
 
-# ----------------- رادار الواتساب المحمي مع حجب الإعلانات وقنوات البث -----------------
+# ----------------- رادار الواتساب المحمي -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
     
-    # 1. استبعاد قنوات البث الإخبارية والطقس والحالات لمنع حشو الرادار
+    # استبعاد قنوات البث الإخبارية والطقس والحالات لمنع حشو الرادار
     if "@newsletter" in chat_id or "status@broadcast" in chat_id:
         return {"status": "IGNORED_BROADCAST"}
 
@@ -812,7 +889,6 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         return {"status": "ERROR"}
 
     try:
-        clean_phone = msg.sender_phone.replace("+", "").strip()
         text = msg.message_text.strip()
         channel_name = "محادثة مباشرة"
         reply_text = None
@@ -861,7 +937,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     finally:
         conn.close()
 
-# ----------------- مسارات الـ Snapshot للجلسة الدائمة -----------------
+# ----------------- مسارات استرجاع وحفظ الجلسات الدائمة -----------------
 @app.get("/api/internal/session-snapshot/{session_name}")
 def get_session_snapshot(session_name: str):
     conn = get_db_connection()
@@ -965,31 +1041,6 @@ def delete_target(target_id: int):
     finally:
         conn.close()
 
-@app.get("/api/calendar")
-def get_calendar():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM calendar_events ORDER BY id DESC;")
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.delete("/api/calendar/{cal_id}")
-def delete_calendar(cal_id: int):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database error")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM calendar_events WHERE id = %s;", (cal_id,))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
 @app.get("/api/products")
 def get_products():
     conn = get_db_connection()
@@ -1029,27 +1080,6 @@ async def get_whatsapp_status():
     except Exception:
         pass
     return {"connected": False, "phone": None}
-
-@app.get("/api/whatsapp/qr")
-async def get_whatsapp_qr():
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=3.0)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("connected"):
-                    return {"connected": True, "user": data.get("user")}
-                qr_base64 = data.get("qr")
-                if qr_base64:
-                    clean_b64 = qr_base64.split(",")[-1].strip()
-                    return Response(
-                        content=base64.b64decode(clean_b64),
-                        media_type="image/png",
-                        headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
-                    )
-    except Exception:
-        pass
-    raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب...")
 
 @app.get("/api/whatsapp/logs")
 def get_whatsapp_logs():
