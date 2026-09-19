@@ -504,6 +504,14 @@ class CalendarEventPayload(BaseModel):
     change_notes: Optional[str] = ""
     route_code: Optional[str] = "R-01"
 
+class CalendarUpdatePayload(BaseModel):
+    task_type: str
+    route_code: Optional[str] = "R-01"
+    scheduled_at: str
+    location: Optional[str] = ""
+    change_notes: Optional[str] = ""
+    execution_status: Optional[str] = "PENDING"
+
 class UnifiedAgentPayload(BaseModel):
     name: str
     listen_scope: Optional[str] = "ALL_GROUPS"
@@ -645,6 +653,33 @@ def create_calendar_event(payload: CalendarEventPayload):
             return {"status": "SUCCESS", "id": new_id}
     except Exception as e:
         logger.error(f"Error creating calendar event: {e}")
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.post("/api/calendar/{cal_id}/update")
+def update_calendar_event(cal_id: int, payload: CalendarUpdatePayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE calendar_events
+            SET task_type = %s, route_code = %s, scheduled_at = %s, 
+                location = %s, change_notes = %s, execution_status = %s
+            WHERE id = %s;
+            """, (
+                payload.task_type.strip(), payload.route_code or "R-01",
+                payload.scheduled_at, payload.location or "",
+                payload.change_notes or "", payload.execution_status or "PENDING",
+                cal_id
+            ))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    except Exception as e:
+        logger.error(f"Error updating calendar event: {e}")
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
