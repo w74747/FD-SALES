@@ -47,7 +47,7 @@
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- شاشة التحقق 2FA -->
+    <!-- شاشة التحقق الأمني 2FA -->
     <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
@@ -56,7 +56,7 @@
                 </div>
             </div>
             <h2 class="text-base font-bold text-gray-800">التحقق الأمني لتسجيل الدخول</h2>
-            <p class="text-xs text-gray-500">أدخل رمز التحقق المكون من 6 أرقام</p>
+            <p class="text-xs text-gray-500">أدخل رمز التحقق المكون من 6 أرقام من تطبيق Authenticator</p>
             <div>
                 <input type="text" id="auth-otp-code" maxlength="6" placeholder="000000" 
                        class="text-center tracking-widest text-2xl font-black w-48 p-2 border-2 border-purple-300 rounded-xl focus:border-[#3A056A] outline-none">
@@ -97,7 +97,7 @@
                     <span>العينات</span>
                 </button>
                 <button onclick="switchTab('calendar')" id="nav-calendar" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>التقويم</span>
+                    <span>التقويم والعمليات</span>
                 </button>
                 <button onclick="switchTab('agents')" id="nav-agents" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>منظومة الوكلاء الأذكياء</span>
@@ -128,7 +128,7 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border" id="top-bar-wa-btn">
+                <button onclick="checkWhatsAppLiveStatus()" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border" id="top-bar-wa-btn">
                     <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" id="top-bar-wa-dot"></span>
                     <span id="top-bar-wa-text">واتساب: فحص الاتصال...</span>
                 </button>
@@ -258,19 +258,31 @@
                 </div>
             </div>
 
-            <!-- 7. التقويم -->
+            <!-- 7. التقويم والعمليات الميدانية النشط بالكامل -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
-                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <h3 class="font-bold text-sm brand-primary-text mb-4">تقويم العمليات والزيارات الميدانية</h3>
+                <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
+                    <div class="flex justify-between items-center no-print">
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">تقويم العمليات والزيارات الميدانية وخطوط السير</h3>
+                            <div class="text-xs text-gray-500">جدولة مواعيد تذوق العينات للشيفات، زيارات المندوبين، ومتابعة الفروع</div>
+                        </div>
+                        <button onclick="openNewCalendarModal()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95">
+                            + جدولة مهمة / زيارة جديدة
+                        </button>
+                    </div>
+
                     <div class="space-y-3" id="calendar-events-list"></div>
                 </div>
             </div>
 
-            <!-- 8. منظومة الوكلاء -->
+            <!-- 8. منظومة الوكلاء الموحدين -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-sm brand-primary-text">منظومة الوكلاء الأذكياء الموحدة (Unified Agents)</h3>
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">منظومة الوكلاء الأذكياء الموحدة (Unified Agents)</h3>
+                            <div class="text-xs text-gray-500">وكلاء لرصد الطلبيات واستخبارات الويب والتوجيه المباشر لمجموعات العمل</div>
+                        </div>
                         <button onclick="openModal('new-agent-modal')" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                             + إضافة وكيل ذكي جديد
                         </button>
@@ -321,6 +333,56 @@
 
         </div>
     </main>
+
+    <!-- مودال جدولة مهمة جديدة في التقويم -->
+    <div id="calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة مهمة / زيارة ميدانية جديدة</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block font-bold mb-1">العميل المستهدف:</label>
+                    <select id="cal-customer-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">المندوب المسؤول:</label>
+                    <select id="cal-rep-select" class="w-full p-2 border rounded-lg bg-gray-50"></select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block font-bold mb-1">نوع المهمة / الزيارة:</label>
+                    <select id="cal-task-type" class="w-full p-2 border rounded-lg bg-gray-50">
+                        <option value="تسليم وتذوق عينات للشيف">تسليم وتذوق عينات للشيف</option>
+                        <option value="متابعة اعتماد أمر شراء (PO)">متابعة اعتماد أمر شراء (PO)</option>
+                        <option value="زيارة دورية ومراجعة المخزون">زيارة دورية ومراجعة المخزون</option>
+                        <option value="معالجة ملاحظات الجودة والتوريد">معالجة ملاحظات الجودة والتوريد</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">كود خط السير (Route Code):</label>
+                    <input type="text" id="cal-route-code" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="R-01 مسقط">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block font-bold mb-1">تاريخ ووقت الموعد:</label>
+                    <input type="datetime-local" id="cal-scheduled-at" class="w-full p-2 border rounded-lg font-mono">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">الموقع / اسم الفرع:</label>
+                    <input type="text" id="cal-location" class="w-full p-2 border rounded-lg" placeholder="اسم الفرع أو رابط خرائط جوجل">
+                </div>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">ملاحظات المهمة:</label>
+                <textarea id="cal-notes" rows="2" class="w-full p-2 border rounded-lg" placeholder="الأصناف المستهدفة بالتذوق أو تفاصيل الاتفاق..."></textarea>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="closeModal('calendar-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitNewCalendarEvent()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ وجدولة المهمة</button>
+            </div>
+        </div>
+    </div>
 
     <!-- مودال تعديل بيانات عضو فريق المبيعات -->
     <div id="rep-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
@@ -459,7 +521,7 @@
         </div>
     </div>
 
-    <!-- كود الجافاسكربت الشامل -->
+    <!-- كود الجافاسكربت الشامل والمكتمل -->
     <script>
         function switchTab(tabId) {
             let cleanId = tabId.replace(/^tab-/, '');
@@ -485,7 +547,7 @@
 
             const titles = {
                 'overview': 'لوحة التحكم', 'products-catalog': 'المنتجات', 'targets': 'الأهداف والفرص',
-                'reps': 'فريق المبيعات', 'customers': 'العملاء', 'samples': 'العينات', 'calendar': 'التقويم',
+                'reps': 'فريق المبيعات', 'customers': 'العملاء', 'samples': 'العينات', 'calendar': 'التقويم والعمليات',
                 'agents': 'منظومة الوكلاء الأذكياء', 'expenses-log': 'المصاريف', 'whatsapp-feed': 'رادار المحادثات'
             };
             const currentTitle = document.getElementById('current-tab-title');
@@ -541,7 +603,60 @@
             location.reload();
         };
 
-        // دوال تعديل المندوب
+        // ---------------- دوال التقويم والعمليات ----------------
+        window.openNewCalendarModal = async function() {
+            try {
+                const [cRes, rRes] = await Promise.all([fetch('/api/customers'), fetch('/api/reps')]);
+                const custs = await cRes.json();
+                const reps = await rRes.json();
+
+                const cSel = document.getElementById('cal-customer-select');
+                const rSel = document.getElementById('cal-rep-select');
+
+                if (cSel) cSel.innerHTML = custs.map(c => `<option value="${c.id}" data-name="${c.company_name}">${c.company_name}</option>`).join('');
+                if (rSel) rSel.innerHTML = reps.map(r => `<option value="${r.id}" data-name="${r.name}">${r.name} (${r.region})</option>`).join('');
+
+                openModal('calendar-modal');
+            } catch (e) {
+                alert("تعذر فتح نافذة الجدولة");
+            }
+        };
+
+        window.submitNewCalendarEvent = async function() {
+            const cSel = document.getElementById('cal-customer-select');
+            const rSel = document.getElementById('cal-rep-select');
+            const customer_id = parseInt(cSel.value) || null;
+            const customer_name = cSel.options[cSel.selectedIndex]?.getAttribute('data-name') || '';
+            const rep_id = parseInt(rSel.value) || null;
+            const rep_name = rSel.options[rSel.selectedIndex]?.getAttribute('data-name') || '';
+
+            const task_type = document.getElementById('cal-task-type').value;
+            const route_code = document.getElementById('cal-route-code').value.trim() || 'R-01';
+            const scheduled_at = document.getElementById('cal-scheduled-at').value.replace('T', ' ');
+            const location = document.getElementById('cal-location').value.trim();
+            const change_notes = document.getElementById('cal-notes').value.trim();
+
+            if (!scheduled_at) return alert("يرجى تحديد وقت وتاريخ الموعد");
+
+            const res = await fetch('/api/calendar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_id, customer_name, rep_id, rep_name,
+                    task_type, route_code, scheduled_at, location, change_notes
+                })
+            });
+
+            if (res.ok) {
+                closeModal('calendar-modal');
+                await loadAllData();
+                alert("تمت جدولة المهمة بنجاح ✓");
+            } else {
+                alert("فشل حفظ الموعد");
+            }
+        };
+
+        // ---------------- دوال تعديل المندوب ----------------
         window.openEditRepModal = function(id, name, region, phone, target, status) {
             document.getElementById('edit-rep-id').value = id;
             document.getElementById('edit-rep-name').value = name || '';
@@ -578,7 +693,7 @@
             }
         };
 
-        // دوال العينات
+        // ---------------- دوال العينات ----------------
         window.openFeedbackModal = function(id, status, notes) {
             document.getElementById('feedback-sample-id').value = id;
             document.getElementById('feedback-status-select').value = status || 'قيد التجربة';
@@ -713,7 +828,7 @@
             } catch (e) {}
         };
 
-        // دالة الجلب والتحميل الشاملة لكافة البيانات
+        // ---------------- دالة الجلب والتحميل الشاملة ----------------
         window.loadAllData = async function() {
             const savedPhone = localStorage.getItem('fdc_global_test_phone');
             if (savedPhone) document.getElementById('global-test-phone').value = savedPhone;
@@ -810,7 +925,33 @@
                 }
             } catch(e) {}
 
-            // 3. الأهداف
+            // 3. التقويم والعمليات الميدانية
+            try {
+                const calRes = await fetch('/api/calendar');
+                const cal = await calRes.json();
+                const list = document.getElementById('calendar-events-list');
+                if (list) {
+                    list.innerHTML = cal.map(e => `
+                        <div class="p-4 bg-white border brand-border rounded-xl flex justify-between items-center text-xs shadow-xs">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-900 text-sm">${e.task_type}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-[#3A056A]">${e.route_code || 'R-01'}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${e.execution_status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${e.execution_status === 'COMPLETED' ? 'تمت الزيارة ✓' : 'قيد المتابعة'}</span>
+                                </div>
+                                <div class="text-gray-600">العميل: <strong>${e.customer_name}</strong> | المندوب المسؤول: <strong>${e.rep_name}</strong></div>
+                                <div class="text-gray-500 font-mono text-[11px]">الموعد المحدد: ${e.scheduled_at} ${e.location ? `| الموقع: ${e.location}` : ''}</div>
+                                ${e.change_notes ? `<div class="text-gray-700 bg-gray-50 p-2 rounded text-[11px] border border-dashed">${e.change_notes}</div>` : ''}
+                            </div>
+                            <div class="flex items-center gap-2 no-print">
+                                <button onclick="deleteItem('/api/calendar/${e.id}')" class="text-red-600 hover:text-red-800 font-bold px-2 py-1">حذف</button>
+                            </div>
+                        </div>
+                    `).join('') || '<div class="text-center text-gray-400 p-6 border rounded-xl bg-gray-50/50">لا توجد مهام أو مواعيد مجدولة حالياً. انقر على زر "+ جدولة مهمة / زيارة جديدة" لإضافة موعد.</div>';
+                }
+            } catch(e) {}
+
+            // 4. الأهداف
             try {
                 const tRes = await fetch('/api/targets');
                 const targets = await tRes.json();
@@ -833,7 +974,7 @@
                 }
             } catch(e) {}
 
-            // 4. العملاء
+            // 5. العملاء
             try {
                 const cRes = await fetch('/api/customers');
                 const custs = await cRes.json();
@@ -855,7 +996,7 @@
                 }
             } catch(e) {}
 
-            // 5. الوكلاء
+            // 6. الوكلاء
             try {
                 const aRes = await fetch('/api/agents');
                 const agents = await aRes.json();
@@ -885,7 +1026,7 @@
                 }
             } catch(e) {}
 
-            // 6. المنتجات
+            // 7. المنتجات
             try {
                 const pRes = await fetch('/api/products');
                 const prods = await pRes.json();
@@ -903,7 +1044,7 @@
                 }
             } catch(e) {}
 
-            // 7. المصاريف
+            // 8. المصاريف
             try {
                 const expRes = await fetch('/api/expenses');
                 const expenses = await expRes.json();
