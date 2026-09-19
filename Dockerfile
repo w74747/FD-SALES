@@ -2,7 +2,7 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-# تثبيت git وبايثون وأدوات التجميع اللازمة لحزم Baileys و PostgreSQL
+# تثبيت git وبايثون وأدوات التجميع لحزم Baileys و PostgreSQL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     python3 \
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# تثبيت حزم Node.js للواتساب (أصبح git متوفراً الآن ولن يفشل)
+# تثبيت حزم Node.js
 COPY package*.json ./
 RUN npm install --production
 
