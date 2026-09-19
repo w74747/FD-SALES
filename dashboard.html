@@ -108,9 +108,6 @@
                 <button onclick="switchTab('whatsapp-feed')" id="nav-whatsapp-feed" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>رادار المحادثات</span>
                 </button>
-                <button onclick="switchTab('whatsapp-settings')" id="nav-whatsapp-settings" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
-                    <span>اعداد الواتساب</span>
-                </button>
             </div>
 
             <div class="p-3 border-t border-[#52128e]">
@@ -121,7 +118,7 @@
         </div>
     </aside>
 
-    <!-- منطقة المحتوى -->
+    <!-- منطقة المحتوى الرئيسي -->
     <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
         <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs no-print">
             <div class="flex items-center gap-3">
@@ -185,9 +182,7 @@
             <!-- 2. المنتجات -->
             <div id="tab-products-catalog" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
-                    <div class="flex justify-between items-center no-print">
-                        <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة</h3>
-                    </div>
+                    <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة</h3>
                     <table class="w-full text-right text-xs border border-[#E4D9F5]">
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
                             <tr>
@@ -203,32 +198,26 @@
                 </div>
             </div>
 
-            <!-- 3. الأهداف والفرص -->
+            <!-- 3. الأهداف -->
             <div id="tab-targets" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4 no-print">
-                        <h3 class="font-bold text-sm brand-primary-text">الأهداف والفرص البيعية (Pipeline Stages)</h3>
-                    </div>
+                    <h3 class="font-bold text-sm brand-primary-text mb-4">الأهداف والفرص البيعية (Pipeline Stages)</h3>
                     <div id="targets-cards-container" class="grid grid-cols-2 gap-4"></div>
                 </div>
             </div>
 
-            <!-- 4. الفريق -->
+            <!-- 4. الفريق (مع إمكانية التعديل والحذف) -->
             <div id="tab-reps" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4 no-print">
-                        <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
-                    </div>
+                    <h3 class="font-bold text-sm brand-primary-text mb-4">دليل أعضاء فريق المبيعات</h3>
                     <div id="reps-grid-cards" class="grid grid-cols-3 gap-4"></div>
                 </div>
             </div>
 
-            <!-- 5. العملاء والفروع -->
+            <!-- 5. العملاء -->
             <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4 no-print">
-                        <h3 class="font-bold text-sm brand-primary-text">دليل حسابات العملاء والفروع المعتمدة</h3>
-                    </div>
+                    <h3 class="font-bold text-sm brand-primary-text mb-4">دليل حسابات العملاء والفروع المعتمدة</h3>
                     <table class="w-full text-right text-xs border border-[#E4D9F5]">
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
                             <tr>
@@ -237,7 +226,7 @@
                                 <th class="p-3">المنطقة</th>
                                 <th class="p-3">رقم التواصل</th>
                                 <th class="p-3">المندوب</th>
-                                <th class="p-3">المجموعة</th>
+                                <th class="p-3">معرف المجموعة</th>
                                 <th class="p-3 no-print">إجراءات</th>
                             </tr>
                         </thead>
@@ -246,12 +235,10 @@
                 </div>
             </div>
 
-            <!-- 6. العينات مع كامل أزرار الإجراءات -->
+            <!-- 6. العينات (مع أزرار التعديل والتقييم والتحويل لـ PO) -->
             <div id="tab-samples" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
-                    <div class="flex justify-between items-center no-print">
-                        <h3 class="font-bold text-sm brand-primary-text">سجل جرد العينات المجانية وتقييمات الشيف</h3>
-                    </div>
+                    <h3 class="font-bold text-sm brand-primary-text">سجل جرد العينات المجانية وتقييمات الشيف</h3>
                     <table class="w-full text-right text-xs border border-[#E4D9F5]">
                         <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
                             <tr>
@@ -274,32 +261,24 @@
             <!-- 7. التقويم -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4 no-print">
-                        <h3 class="font-bold text-sm brand-primary-text">تقويم العمليات والزيارات الميدانية</h3>
-                    </div>
+                    <h3 class="font-bold text-sm brand-primary-text mb-4">تقويم العمليات والزيارات الميدانية</h3>
                     <div class="space-y-3" id="calendar-events-list"></div>
                 </div>
             </div>
 
-            <!-- 8. الوكلاء الأذكياء الموحدون -->
+            <!-- 8. منظومة الوكلاء -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
-                        <div>
-                            <h3 class="font-bold text-sm brand-primary-text">منظومة الوكلاء الأذكياء الموحدة (Unified Agents)</h3>
-                        </div>
+                        <h3 class="font-bold text-sm brand-primary-text">منظومة الوكلاء الأذكياء الموحدة (Unified Agents)</h3>
                         <button onclick="openModal('new-agent-modal')" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">
                             + إضافة وكيل ذكي جديد
                         </button>
                     </div>
-
                     <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <span class="text-base">📱</span>
-                            <div>
-                                <div class="font-bold text-xs text-[#3A056A]">رقم هاتف الاختبار المعتمد:</div>
-                                <div class="text-[10px] text-gray-500">تُرسل نماذج التجارب الفورية لهذا الرقم فور الضغط على زر الاختبار.</div>
-                            </div>
+                            <span>📱</span>
+                            <div class="font-bold text-xs text-[#3A056A]">رقم هاتف الاختبار المعتمد:</div>
                         </div>
                         <div class="flex items-center gap-2">
                             <input type="text" id="global-test-phone" onchange="saveGlobalTestPhone()" class="p-2 border rounded-lg font-mono font-bold text-purple-900 w-44 text-center" placeholder="+968XXXXXXXX">
@@ -313,9 +292,7 @@
             <!-- 9. المصاريف -->
             <div id="tab-expenses-log" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <div class="flex justify-between items-center mb-4 no-print">
-                        <h3 class="font-bold text-sm text-amber-800">سجل المصاريف الميدانية والتشغيلية</h3>
-                    </div>
+                    <h3 class="font-bold text-sm text-amber-800 mb-4">سجل المصاريف الميدانية والتشغيلية</h3>
                     <table class="w-full text-right text-xs border border-[#E4D9F5]">
                         <thead class="bg-amber-50 text-amber-900 font-bold">
                             <tr>
@@ -342,24 +319,51 @@
                 </div>
             </div>
 
-            <!-- 11. إعدادات الواتساب -->
-            <div id="tab-whatsapp-settings" class="tab-content hidden space-y-6">
-                <div class="p-5 bg-white border brand-border rounded-2xl shadow-xs space-y-3">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h3 class="font-bold text-sm text-[#3A056A]">رقم واتساب العمليات الرئيسي</h3>
-                            <div class="text-[11px] text-gray-500">الجلسة محفوظة في قاعدة البيانات الدائمة</div>
-                        </div>
-                        <button onclick="openWhatsAppModal()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg text-xs">ربط الرقم (QR)</button>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </main>
 
+    <!-- مودال تعديل بيانات عضو فريق المبيعات -->
+    <div id="rep-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
+        <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
+            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
+            <input type="hidden" id="edit-rep-id">
+            <div>
+                <label class="block font-bold mb-1">الاسم الكامل:</label>
+                <input type="text" id="edit-rep-name" class="w-full p-2 border rounded-lg">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">المنطقة:</label>
+                    <input type="text" id="edit-rep-region" class="w-full p-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">رقم الهاتف:</label>
+                    <input type="text" id="edit-rep-phone" class="w-full p-2 border rounded-lg font-mono">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block font-bold mb-1">المستهدف الشهري (ر.ع):</label>
+                    <input type="number" id="edit-rep-target" class="w-full p-2 border rounded-lg font-bold">
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">الحالة:</label>
+                    <select id="edit-rep-status" class="w-full p-2 border rounded-lg bg-gray-50">
+                        <option value="نشط">نشط</option>
+                        <option value="في إجازة">في إجازة</option>
+                        <option value="غير نشط">غير نشط</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="closeModal('rep-edit-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
+                <button onclick="submitRepEdit()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ التعديلات</button>
+            </div>
+        </div>
+    </div>
+
     <!-- مودال تقييم العينة وتسجيل رأي الشيف -->
-    <div id="sample-feedback-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4">
+    <div id="sample-feedback-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تقييم وملاحظات الشيف الفنية</h3>
             <input type="hidden" id="feedback-sample-id">
@@ -373,7 +377,7 @@
             </div>
             <div>
                 <label class="block font-bold mb-1">ملاحظات ورأي الشيف بالتفصيل:</label>
-                <textarea id="feedback-notes-input" rows="3" class="w-full p-2 border rounded-lg" placeholder="سجل رأي الشيف في الهشاشة، التقطيع، التحميص، السعر..."></textarea>
+                <textarea id="feedback-notes-input" rows="3" class="w-full p-2 border rounded-lg" placeholder="سجل رأي الشيف في الهشاشة، التقطيع، التحميص..."></textarea>
             </div>
             <div class="flex justify-end gap-2 pt-2 border-t">
                 <button onclick="closeModal('sample-feedback-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
@@ -383,13 +387,13 @@
     </div>
 
     <!-- مودال تحويل العينة لأمر شراء رسمي (PO) -->
-    <div id="sample-convert-po-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4">
+    <div id="sample-convert-po-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
-            <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">تحويل العينة إلى أمر شراء رسمي (PO) 🎯</h3>
+            <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">تحويل العينة إلى أمر شراء رسمي (PO)</h3>
             <input type="hidden" id="convert-sample-id">
             <div>
                 <label class="block font-bold mb-1">رقم أمر الشراء الصادر من العميل:</label>
-                <input type="text" id="convert-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="مثال: PO-2026-994">
+                <input type="text" id="convert-po-number" class="w-full p-2 border rounded-lg font-mono font-bold" placeholder="PO-2026-994">
             </div>
             <div>
                 <label class="block font-bold mb-1">القيمة الإجمالية للطلبية (ر.ع):</label>
@@ -403,7 +407,7 @@
     </div>
 
     <!-- مودال تعديل بيانات العينة -->
-    <div id="sample-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4">
+    <div id="sample-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات العينة المسلمة</h3>
             <input type="hidden" id="edit-sample-id">
@@ -428,7 +432,7 @@
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة وكيل ذكي جديد (Unified Agent)</h3>
             <div>
                 <label class="block font-bold mb-1">اسم الوكيل ومهمته:</label>
-                <input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg" placeholder="مثال: راصد طلبيات اللوجستيك والتوريد">
+                <input type="text" id="agent-name-input" class="w-full p-2 border rounded-lg" placeholder="راصد طلبيات اللوجستيك والتوريد">
             </div>
             <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -446,7 +450,7 @@
             </div>
             <div>
                 <label class="block font-bold mb-1">البرومبت ومهمة الوكيل المحددة:</label>
-                <textarea id="agent-prompt-input" rows="4" class="w-full p-2.5 border rounded-lg leading-relaxed" placeholder="حدد بوضوح دور الوكيل، وطريقة صياغة التقرير أو الإجراء المطلوب منه..."></textarea>
+                <textarea id="agent-prompt-input" rows="4" class="w-full p-2.5 border rounded-lg leading-relaxed"></textarea>
             </div>
             <div class="flex justify-end gap-2 pt-2 border-t">
                 <button onclick="closeModal('new-agent-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
@@ -455,7 +459,7 @@
         </div>
     </div>
 
-    <!-- كود الجافاسكربت الشامل والمكتمل -->
+    <!-- كود الجافاسكربت الشامل -->
     <script>
         function switchTab(tabId) {
             let cleanId = tabId.replace(/^tab-/, '');
@@ -482,7 +486,7 @@
             const titles = {
                 'overview': 'لوحة التحكم', 'products-catalog': 'المنتجات', 'targets': 'الأهداف والفرص',
                 'reps': 'فريق المبيعات', 'customers': 'العملاء', 'samples': 'العينات', 'calendar': 'التقويم',
-                'agents': 'منظومة الوكلاء الأذكياء', 'expenses-log': 'المصاريف', 'whatsapp-feed': 'رادار المحادثات', 'whatsapp-settings': 'إعدادات الواتساب'
+                'agents': 'منظومة الوكلاء الأذكياء', 'expenses-log': 'المصاريف', 'whatsapp-feed': 'رادار المحادثات'
             };
             const currentTitle = document.getElementById('current-tab-title');
             if (currentTitle) currentTitle.innerText = titles[cleanId] || titles[targetId.replace('tab-', '')] || 'لوحة التحكم';
@@ -537,7 +541,44 @@
             location.reload();
         };
 
-        // فتح نوافذ عمليات العينات
+        // دوال تعديل المندوب
+        window.openEditRepModal = function(id, name, region, phone, target, status) {
+            document.getElementById('edit-rep-id').value = id;
+            document.getElementById('edit-rep-name').value = name || '';
+            document.getElementById('edit-rep-region').value = region || '';
+            document.getElementById('edit-rep-phone').value = phone || '';
+            document.getElementById('edit-rep-target').value = target || 0;
+            document.getElementById('edit-rep-status').value = status || 'نشط';
+            openModal('rep-edit-modal');
+        };
+
+        window.submitRepEdit = async function() {
+            const id = document.getElementById('edit-rep-id').value;
+            const name = document.getElementById('edit-rep-name').value.trim();
+            const region = document.getElementById('edit-rep-region').value.trim();
+            const phone_number = document.getElementById('edit-rep-phone').value.trim();
+            const monthly_target = parseFloat(document.getElementById('edit-rep-target').value) || 0.0;
+            const status = document.getElementById('edit-rep-status').value;
+
+            if (!name || !phone_number) return alert("يرجى إدخال الاسم ورقم الهاتف");
+
+            const res = await fetch(`/api/reps/${id}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, region, phone_number, monthly_target, status })
+            });
+
+            if (res.ok) {
+                closeModal('rep-edit-modal');
+                await loadAllData();
+                alert("تم تحديث بيانات المندوب بنجاح ✓");
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert("فشل التحديث: " + (err.detail || "خطأ غير متوقع"));
+            }
+        };
+
+        // دوال العينات
         window.openFeedbackModal = function(id, status, notes) {
             document.getElementById('feedback-sample-id').value = id;
             document.getElementById('feedback-status-select').value = status || 'قيد التجربة';
@@ -611,6 +652,28 @@
             if (res.ok) await loadAllData();
         };
 
+        window.saveGlobalTestPhone = function(show = false) {
+            const val = document.getElementById('global-test-phone').value.trim();
+            localStorage.setItem('fdc_global_test_phone', val);
+            if (show) alert("تم حفظ رقم الاختبار بنجاح ✓");
+        };
+
+        window.testAgentNowGlobal = async function(id) {
+            const phone = document.getElementById('global-test-phone').value.trim();
+            if (!phone) return alert("يرجى إدخال رقم هاتف الاختبار بالأعلى أولاً");
+            const res = await fetch('/api/agents/test-global', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ agent_id: id, test_phone: phone })
+            });
+            if (res.ok) {
+                alert("تم إرسال نموذج الطلبية التجريبية بنجاح إلى هاتفك عبر الواتساب ✓");
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert("تعذر تشغيل الوكيل: " + (err.detail || "خطأ غير متوقع"));
+            }
+        };
+
         window.checkWhatsAppLiveStatus = async function() {
             try {
                 const res = await fetch('/api/whatsapp/status?t=' + new Date().getTime());
@@ -631,14 +694,33 @@
             } catch(e) {}
         };
 
-        // دالة الجلب والتحميل الشاملة لكافة الجداول والأزرار
+        window.loadWhatsAppLogs = async function() {
+            try {
+                const res = await fetch('/api/whatsapp/logs');
+                const logs = await res.json();
+                const list = document.getElementById('whatsapp-feed-list');
+                if (list) {
+                    list.innerHTML = logs.map(l => `
+                        <div class="p-3 bg-white border brand-border rounded-xl space-y-1 shadow-xs">
+                            <div class="flex justify-between items-center text-gray-500 text-[11px]">
+                                <span class="font-bold text-[#3A056A]">${l.sender_name} <span class="text-gray-400 font-normal">(${l.channel_name})</span></span>
+                                <span>${l.created_at}</span>
+                            </div>
+                            <div class="text-gray-800 leading-relaxed font-sans">${l.message_body}</div>
+                        </div>
+                    `).join('') || '<div class="text-center text-gray-400 p-4">لا توجد رسائل مسجلة بالرادار</div>';
+                }
+            } catch (e) {}
+        };
+
+        // دالة الجلب والتحميل الشاملة لكافة البيانات
         window.loadAllData = async function() {
             const savedPhone = localStorage.getItem('fdc_global_test_phone');
             if (savedPhone) document.getElementById('global-test-phone').value = savedPhone;
 
             checkWhatsAppLiveStatus();
 
-            // 1. الفريق ولوحة التحكم
+            // 1. الفريق
             try {
                 const rRes = await fetch('/api/reps');
                 const reps = await rRes.json();
@@ -669,19 +751,24 @@
                         <div class="p-4 bg-white border brand-border rounded-xl space-y-2 shadow-xs">
                             <div class="flex justify-between items-center font-bold text-sm text-[#3A056A]">
                                 <span>${r.name}</span>
-                                <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">${r.status}</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded ${r.status === 'نشط' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}">${r.status}</span>
                             </div>
                             <div class="text-xs text-gray-500">${r.region} | ${r.phone_number}</div>
-                            <div class="text-xs font-bold text-emerald-700">المبيعات: ${(r.achieved_sales||0).toLocaleString()} ر.ع</div>
-                            <div class="pt-2 border-t flex justify-end">
-                                <button onclick="deleteItem('/api/reps/${r.id}')" class="text-xs text-red-600 font-bold">حذف</button>
+                            <div class="text-xs font-bold text-emerald-700">المبيعات: ${(r.achieved_sales||0).toLocaleString()} ر.ع / المستهدف: ${(r.monthly_target||0).toLocaleString()} ر.ع</div>
+                            <div class="pt-2 border-t flex justify-end gap-2">
+                                <button onclick="openEditRepModal(${r.id}, '${r.name}', '${r.region}', '${r.phone_number}', ${r.monthly_target||0}, '${r.status}')" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-xs font-bold border border-purple-200">
+                                    تعديل
+                                </button>
+                                <button onclick="deleteItem('/api/reps/${r.id}')" class="text-xs text-red-600 hover:text-red-800 font-bold px-1">
+                                    حذف
+                                </button>
                             </div>
                         </div>
                     `).join('') || '<div class="col-span-3 text-center text-gray-400 p-4">لا يوجد أعضاء في الفريق</div>';
                 }
             } catch(e) {}
 
-            // 2. العينات متضمنة كامل خيارات التعديل والإجراءات
+            // 2. العينات
             try {
                 const sRes = await fetch('/api/samples');
                 const samples = await sRes.json();
@@ -723,7 +810,7 @@
                 }
             } catch(e) {}
 
-            // 3. الأهداف والـ Pipeline
+            // 3. الأهداف
             try {
                 const tRes = await fetch('/api/targets');
                 const targets = await tRes.json();
@@ -768,21 +855,33 @@
                 }
             } catch(e) {}
 
-            // 5. التقويم
+            // 5. الوكلاء
             try {
-                const calRes = await fetch('/api/calendar');
-                const cal = await calRes.json();
-                const list = document.getElementById('calendar-events-list');
-                if (list) {
-                    list.innerHTML = cal.map(e => `
-                        <div class="p-3.5 bg-white border brand-border rounded-xl flex justify-between items-center text-xs shadow-xs">
-                            <div>
-                                <div class="font-bold text-gray-800 text-sm">${e.task_type}</div>
-                                <div class="text-gray-600 mt-0.5">العميل: <strong>${e.customer_name}</strong> | الموعد: ${e.scheduled_at}</div>
+                const aRes = await fetch('/api/agents');
+                const agents = await aRes.json();
+                const container = document.getElementById('unified-agents-grid');
+                if (container) {
+                    container.innerHTML = agents.map(a => `
+                    <div class="p-4 rounded-xl border brand-border bg-white shadow-xs space-y-3 flex flex-col justify-between">
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="font-bold text-sm text-gray-900">${a.name}</span>
+                                    <div class="text-[10px] text-purple-700 font-bold mt-0.5">نطاق الاستماع: ${a.listen_scope}</div>
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">نشط ✓</span>
                             </div>
-                            <button onclick="deleteItem('/api/calendar/${e.id}')" class="text-red-600 font-bold">حذف</button>
+                            <div class="p-2.5 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-24 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
+                                ${a.system_prompt}
+                            </div>
                         </div>
-                    `).join('') || '<div class="text-center text-gray-400 p-4">لا توجد مواعيد مجدولة</div>';
+                        <div class="pt-2 border-t flex justify-between items-center no-print">
+                            <button onclick="testAgentNowGlobal(${a.id})" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px]">
+                                إرسال تجربة
+                            </button>
+                            <button onclick="deleteItem('/api/agents/${a.id}')" class="text-red-600 font-bold text-xs px-1">حذف</button>
+                        </div>
+                    </div>`).join('') || '<div class="col-span-3 p-4 text-center text-gray-400">لا يوجد وكلاء مسجلين</div>';
                 }
             } catch(e) {}
 
