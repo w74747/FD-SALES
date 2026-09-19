@@ -236,7 +236,6 @@ def init_database():
 
     try:
         with conn.cursor() as cur:
-            # جدول حفظ النسخ الاحتياطية المجمعة للجلسات Snapshots
             cur.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_session_snapshots (
                 session_name VARCHAR(50) PRIMARY KEY,
@@ -491,7 +490,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="20.6.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="20.7.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -609,7 +608,7 @@ def delete_session_snapshot(session_name: str):
     finally:
         conn.close()
 
-# ----------------- التحقق الأمني الصارم 2FA النظيف -----------------
+# ----------------- التحقق الأمني 2FA -----------------
 @app.post("/api/auth/2fa/verify")
 def verify_2fa(payload: Verify2FAPayload):
     conn = get_db_connection()
@@ -732,13 +731,14 @@ def toggle_unified_agent_status(agent_id: int, payload: ToggleAgentPayload):
     finally:
         conn.close()
 
+# ----------------- فحص وتجربة الوكلاء الذكية المحدثة -----------------
 @app.post("/api/agents/test-global")
 async def test_unified_agent(payload: dict):
     agent_id = payload.get("agent_id")
     test_target = payload.get("test_phone", "").strip()
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متصلة")
+        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متصلة، يرجى فحص متغير DATABASE_URL في Railway")
 
     try:
         with conn.cursor() as cur:
@@ -751,6 +751,7 @@ async def test_unified_agent(payload: dict):
             if not destination:
                 raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار أو تحديد قناة الإرسال")
 
+            # 1. وكيل استخبارات وبحث الويب
             if agent.get("enable_web_search"):
                 keywords = agent.get("search_keywords") or agent["name"]
                 intelligence_summary = await query_perplexity_intelligence(agent["system_prompt"], keywords)
@@ -761,18 +762,47 @@ async def test_unified_agent(payload: dict):
                     f"----------------------------------------\n"
                     f"نظام المبيعات الذكي | شركة تنمية الغذاء"
                 )
+            
+            # 2. وكيل رصد طلبيات اللوجستيك (إرسال نموذج طلبية حقيقية بالإنجليزية المعتمدة)
+            elif "لوجستيك" in agent["name"] or "طلب" in agent["name"]:
+                message_text = (
+                    f"*DISPATCH & DELIVERY ORDER (TEST SIMULATION)*\n"
+                    f"----------------------------------------\n"
+                    f"*Company:* Yummies Burgers & Bakery\n"
+                    f"*Brand:* Yummies\n"
+                    f"*Branch:* Boshar Branch\n"
+                    f"*Order Received Date:* {datetime.now().strftime('%d/%m/%Y')}\n"
+                    f"*Target Delivery Date:* Tomorrow 08:00 AM\n"
+                    f"----------------------------------------\n"
+                    f"*Ordered Items & Quantities:*\n"
+                    f"- Brioche Burger Bun 75g: 10 Cartons\n"
+                    f"- Potato Roll Bread 65g: 8 Cartons\n"
+                    f"----------------------------------------\n"
+                    f"*Branch Contact:* +96894987936\n"
+                    f"*Sender Contact:* +96896899696 (Store Manager)\n"
+                    f"*Delivery Location:*\n"
+                    f"https://maps.google.com/?q=23.5880,58.3829\n"
+                    f"----------------------------------------\n"
+                    f"Food Development Co. | Logistics & Operations"
+                )
+
+            # 3. باقي الوكلاء
             else:
-                message_text = f"*{agent['name']}*\n\n«{agent['system_prompt']}»\n\nشركة تنمية الغذاء (Food Development Company)"
+                message_text = (
+                    f"*{agent['name']} | تقرير تجريبي*\n\n"
+                    f"تم تشغيل وتأكيد جاهزية الوكيل بنجاح للعمل ضمن نطاق: {agent.get('listen_scope', 'المجموعات')}.\n\n"
+                    f"شركة تنمية الغذاء (Food Development Company)"
+                )
 
         sent = await send_whatsapp_direct(destination, message_text)
         if sent:
             return {"status": "SUCCESS", "to": destination, "message_preview": message_text}
         else:
-            raise HTTPException(status_code=400, detail="فشل الإرسال عبر الواتساب")
+            raise HTTPException(status_code=400, detail="فشل الإرسال عبر محرك الواتساب")
     finally:
         conn.close()
 
-# ----------------- مسار بوت مبيعات العملاء الجدد التفاعلي -----------------
+# ----------------- مسار بوت مبيعات وتأهيل العملاء الجدد التفاعلي -----------------
 @app.post("/api/bot/inbound-sales")
 async def handle_inbound_sales_bot(msg: InboundBotMessage):
     conn = get_db_connection()
@@ -945,6 +975,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 else:
                     channel_name = f"مجموعة ({chat_id[:15]}...)"
 
+            # استخدام NOW() المتوافق كلياً مع TIMESTAMP WITH TIME ZONE
             try:
                 cur.execute("""
                 INSERT INTO whatsapp_logs (created_at, sender_name, channel_name, is_external_call, message_body)
