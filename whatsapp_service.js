@@ -1,6 +1,7 @@
 /**
  * whatsapp_service.js - Multi-Session WhatsApp Engine with Smart Media & Image Detection
  * Food Development Company (شركة تنمية الغذاء)
+ * Solves 'Waiting for this message' by caching outgoing messages & using presenceSubscribe
  */
 
 const express = require('express');
@@ -49,6 +50,7 @@ async function restoreSessionFromDB(sessionName, folderPath) {
     const res = await axios.get(`http://127.0.0.1:8000/api/internal/session-snapshot/${sessionName}`, { timeout: 4000 });
     if (res.data && res.data.snapshot && Object.keys(res.data.snapshot).length > 0) {
       restoreFolder(folderPath, res.data.snapshot);
+      console.log(`[DB Restore] Successfully restored '${sessionName}' from PostgreSQL.`);
       return true;
     }
   } catch (e) {}
@@ -75,6 +77,8 @@ const sessions = {
   operations: { sock: null, qr: null, connected: false, user: null, isStarting: false }
 };
 
+const messageStore = new Map();
+
 async function startOperationsWhatsApp() {
   if (sessions.operations.isStarting) return;
   sessions.operations.isStarting = true;
@@ -99,7 +103,8 @@ async function startOperationsWhatsApp() {
       syncFullHistory: false,
       markOnlineOnConnect: true,
       connectTimeoutMs: 60000,
-      keepAliveIntervalMs: 25000
+      keepAliveIntervalMs: 25000,
+      getMessage: async (key) => messageStore.get(key.id) || undefined
     });
 
     sessions.operations.sock = sock;
@@ -125,6 +130,8 @@ async function startOperationsWhatsApp() {
         sessions.operations.qr = null;
         sessions.operations.isStarting = false;
 
+        console.log(`[Operations WA] Closed. Code: ${statusCode}. Reconnect: ${shouldReconnect}`);
+
         if (shouldReconnect) {
           setTimeout(startOperationsWhatsApp, 3000);
         } else {
@@ -140,6 +147,7 @@ async function startOperationsWhatsApp() {
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
         sessions.operations.user = cleanPhone;
         sessions.operations.isStarting = false;
+        console.log(`[Operations WA] Active & Persistent on: ${cleanPhone}`);
         debouncedSaveSessionToDB('operations_main', authFolder);
       }
     });
@@ -148,6 +156,16 @@ async function startOperationsWhatsApp() {
       try {
         if (!m.messages || m.messages.length === 0) return;
         const msg = m.messages[0];
+
+        // تخزين أي رسالة (واردة أو صادرة) في الذاكرة لتلبية طلبات فك التشفير التلقائية
+        if (msg.key && msg.key.id && msg.message) {
+          messageStore.set(msg.key.id, msg.message);
+          if (messageStore.size > 500) {
+            const firstKey = messageStore.keys().next().value;
+            messageStore.delete(firstKey);
+          }
+        }
+
         if (!msg.message || msg.key.fromMe) return;
 
         const chatId = msg.key.remoteJid;
@@ -168,17 +186,19 @@ async function startOperationsWhatsApp() {
         }, { timeout: 8000 });
 
         if (resp.data && resp.data.reply_text) {
-          await sock.sendMessage(chatId, { text: resp.data.reply_text });
+          const sent = await sock.sendMessage(chatId, { text: resp.data.reply_text });
+          if (sent && sent.key && sent.message) messageStore.set(sent.key.id, sent.message);
         }
 
         if (resp.data && resp.data.send_catalog && resp.data.catalog_path && fs.existsSync(resp.data.catalog_path)) {
           const fileBuffer = fs.readFileSync(resp.data.catalog_path);
-          await sock.sendMessage(chatId, {
+          const sentDoc = await sock.sendMessage(chatId, {
             document: fileBuffer,
             mimetype: 'application/pdf',
             fileName: 'Food_Development_Catalog.pdf',
             caption: 'كتالوج منتجات شركة تنمية الغذاء'
           });
+          if (sentDoc && sentDoc.key && sentDoc.message) messageStore.set(sentDoc.key.id, sentDoc.message);
         }
 
         if (resp.data && resp.data.forward_to_logistics && resp.data.logistics_text) {
@@ -205,6 +225,21 @@ app.get('/qr-status', (req, res) => {
   });
 });
 
+app.get('/groups', async (req, res) => {
+  if (!sessions.operations.connected || !sessions.operations.sock) return res.json([]);
+  try {
+    const groups = await sessions.operations.sock.groupFetchAllParticipating();
+    const result = Object.values(groups).map(g => ({
+      id: g.id,
+      subject: g.subject,
+      participants_count: g.participants?.length || 0
+    }));
+    res.json(result);
+  } catch (e) {
+    res.json([]);
+  }
+});
+
 app.post('/send-message', async (req, res) => {
   const { phone_or_group, message } = req.body;
   if (!sessions.operations.connected || !sessions.operations.sock) {
@@ -214,14 +249,19 @@ app.post('/send-message', async (req, res) => {
   try {
     let cleanTarget = phone_or_group.replace(/[^0-9@a-z._-]/gi, '');
     let jid = cleanTarget.endsWith('@g.us') ? cleanTarget : `${cleanTarget.replace(/^\+/, '')}@s.whatsapp.net`;
-    await sessions.operations.sock.sendMessage(jid, { text: message });
+
+    try { await sessions.operations.sock.presenceSubscribe(jid); } catch (e) {}
+
+    const sent = await sessions.operations.sock.sendMessage(jid, { text: message });
+    if (sent && sent.key && sent.message) {
+      messageStore.set(sent.key.id, sent.message);
+    }
     return res.json({ status: 'SENT', to: jid });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
 });
 
-// معالج إرسال الوسائط المتطور: يكتشف تلقائياً هل الملف صورة أم PDF
 app.post('/send-document', async (req, res) => {
   const { phone_or_group, caption, file_base64, file_name } = req.body;
   if (!sessions.operations.connected || !sessions.operations.sock) {
@@ -234,23 +274,32 @@ app.post('/send-document', async (req, res) => {
     const docBuffer = Buffer.from(file_base64, 'base64');
     const fname = (file_name || 'attachment.pdf').toLowerCase();
 
-    // 1. إذا كان الملف صورة: إرساله كصورة طبيعية قابلة للمعاينة
+    // تهيئة الجلسة التشفيرية مع المستلم أولاً لتفادي "في انتظار هذه الرسالة"
+    try { await sessions.operations.sock.presenceSubscribe(jid); } catch (e) {}
+
+    let sent;
+    // إذا كان المرفق صورة
     if (fname.endsWith('.png') || fname.endsWith('.jpg') || fname.endsWith('.jpeg') || fname.endsWith('.webp')) {
       const mime = fname.endsWith('.png') ? 'image/png' : 'image/jpeg';
-      await sessions.operations.sock.sendMessage(jid, {
+      sent = await sessions.operations.sock.sendMessage(jid, {
         image: docBuffer,
         mimetype: mime,
         caption: caption || ''
       });
     } 
-    // 2. إذا كان ملف PDF أو مستند آخر: إرساله كمستند رسمي
+    // إذا كان المرفق مستند أو PDF
     else {
-      await sessions.operations.sock.sendMessage(jid, {
+      sent = await sessions.operations.sock.sendMessage(jid, {
         document: docBuffer,
         mimetype: 'application/pdf',
         fileName: file_name || 'Document.pdf',
         caption: caption || ''
       });
+    }
+
+    // حفظ مفتاح الرسالة الصادرة للرد على طلبات فك التشفير تلقائياً
+    if (sent && sent.key && sent.message) {
+      messageStore.set(sent.key.id, sent.message);
     }
 
     return res.json({ status: 'SENT', to: jid });
