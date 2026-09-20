@@ -1065,19 +1065,14 @@
                 const samples = await sRes.json();
                 const tbody = document.getElementById('samples-table-body');
                 if (tbody) {
-                    tbody.innerHTML = samples.map(s => {
-                        let statusColor = 'bg-amber-100 text-amber-800';
-                        if (s.status.includes('نالت الإعجاب') || s.status === 'CONVERTED_PO') statusColor = 'bg-emerald-100 text-emerald-800 font-bold';
-                        if (s.status.includes('مرفوضة')) statusColor = 'bg-red-100 text-red-800';
-
-                        return `
+                    tbody.innerHTML = samples.map(s => `
                         <tr>
                             <td class="p-3 font-bold text-gray-900">${s.customer_name || '—'}</td>
                             <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name || '—'}</td>
                             <td class="p-3 font-bold text-gray-800">${s.product_name || '—'}</td>
                             <td class="p-3 font-mono">${s.qty_free} وحدة</td>
                             <td class="p-3 text-gray-500 font-mono text-[11px]">${s.delivery_date}</td>
-                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] ${statusColor}">${s.status}</span></td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800">${s.status}</span></td>
                             <td class="p-3 text-gray-700 max-w-xs text-[11px]">${s.feedback_notes || '—'}</td>
                             <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id || '—'}</td>
                             <td class="p-3 no-print">
@@ -1085,8 +1080,8 @@
                                     حذف
                                 </button>
                             </td>
-                        </tr>`;
-                    }).join('') || '<tr><td colspan="9" class="p-4 text-center text-gray-400">لا توجد عينات مسجلة</td></tr>';
+                        </tr>
+                    `).join('') || '<tr><td colspan="9" class="p-4 text-center text-gray-400">لا توجد عينات مسجلة</td></tr>';
                 }
             } catch(e) {}
 
