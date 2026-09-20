@@ -410,6 +410,7 @@ app.post('/sales/disconnect', async (req, res) => {
   }
 });
 
+// بدء التشغيل
 setTimeout(() => {
   startOperationsWhatsApp();
   startSalesWhatsApp();
