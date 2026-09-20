@@ -24,64 +24,85 @@
         }
     </style>
 
-    <!-- 1. سكربت التحقق الأمني المستقل والمعزول كلياً لضمان عدم توقفه -->
+    <!-- كتلة الأمان والتحكم بالقائمة الجانبية (تعمل بشكل فوري ومستقل) -->
     <script>
-        function checkSessionPersisted() {
-            return localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED' || document.cookie.includes('fdc_auth=AUTHENTICATED');
-        }
+        window.switchTab = function(tabId) {
+            let cleanId = String(tabId).replace(/^tab-/, '');
+            const tabMapping = {
+                'expenses': 'tab-expenses-log',
+                'expenses-log': 'tab-expenses-log',
+                'products': 'tab-products-catalog',
+                'products-catalog': 'tab-products-catalog'
+            };
+            let targetId = tabMapping[cleanId] || ('tab-' + cleanId);
+            let targetElem = document.getElementById(targetId) || document.getElementById(cleanId);
 
-        async function submit2FAVerification() {
-            const codeInput = document.getElementById('auth-otp-code');
-            const errorEl = document.getElementById('auth-error-msg');
-            const code = codeInput ? codeInput.value.trim() : '';
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            if (targetElem) targetElem.classList.remove('hidden');
 
-            if (code.length !== 6) {
-                if (errorEl) {
-                    errorEl.innerText = "يرجى إدخال 6 أرقام كاملة";
-                    errorEl.classList.remove('hidden');
+            document.querySelectorAll('aside button').forEach(btn => {
+                if (btn.id && btn.id.startsWith('nav-')) {
+                    btn.classList.remove('bg-[#52128e]', 'font-semibold', 'text-white');
+                    btn.classList.add('font-medium', 'text-purple-200');
                 }
-                return;
+            });
+
+            const activeBtn = document.getElementById('nav-' + cleanId) || document.getElementById('nav-' + targetId.replace('tab-', ''));
+            if (activeBtn) {
+                activeBtn.classList.add('bg-[#52128e]', 'font-semibold', 'text-white');
+                activeBtn.classList.remove('font-medium', 'text-purple-200');
             }
+
+            const titles = {
+                'overview': 'لوحة التحكم', 'products-catalog': 'المنتجات', 'targets': 'الأهداف والفرص',
+                'reps': 'فريق المبيعات', 'customers': 'العملاء', 'samples': 'العينات', 'calendar': 'التقويم والعمليات',
+                'agents': 'منظومة الوكلاء الأذكياء', 'expenses-log': 'المصاريف', 'whatsapp-feed': 'رادار المحادثات واستقطاب العملاء'
+            };
+            const currentTitle = document.getElementById('current-tab-title');
+            if (currentTitle) currentTitle.innerText = titles[cleanId] || titles[targetId.replace('tab-', '')] || 'لوحة التحكم';
+
+            if (cleanId === 'whatsapp-feed') {
+                if (typeof window.loadWhatsAppLogs === 'function') window.loadWhatsAppLogs();
+                if (typeof window.loadExhibitionConfig === 'function') window.loadExhibitionConfig();
+            }
+        };
+
+        window.openModal = function(id) { const m = document.getElementById(id); if (m) m.classList.remove('hidden'); };
+        window.closeModal = function(id) { const m = document.getElementById(id); if (m) m.classList.add('hidden'); };
+
+        window.checkSessionPersisted = function() {
+            return localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED' || document.cookie.includes('fdc_auth=AUTHENTICATED');
+        };
+
+        window.submit2FAVerification = async function() {
+            const codeInput = document.getElementById('auth-otp-code');
+            const code = codeInput ? codeInput.value.trim() : '';
+            if (code.length !== 6) return alert("يرجى إدخال 6 أرقام كاملة");
 
             try {
                 const res = await fetch('/api/auth/2fa/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: code })
+                    body: JSON.stringify({ code })
                 });
-
                 if (res.ok) {
                     localStorage.setItem('fdc_auth_token', 'AUTHENTICATED');
                     document.cookie = "fdc_auth=AUTHENTICATED; path=/; max-age=31536000";
-                    document.getElementById('auth-overlay').classList.add('hidden');
-                    if (window.loadAllData) window.loadAllData();
+                    document.getElementById('auth-overlay')?.classList.add('hidden');
+                    if (typeof window.loadAllData === 'function') window.loadAllData();
                 } else {
-                    const data = await res.json().catch(() => ({}));
-                    if (errorEl) {
-                        errorEl.innerText = data.detail || "رمز التحقق غير صحيح أو انتهت صلاحيته";
-                        errorEl.classList.remove('hidden');
-                    }
+                    alert("رمز التحقق غير صحيح");
                 }
             } catch (err) {
-                if (errorEl) {
-                    errorEl.innerText = "تعذر الاتصال بالخادم، تحقق من الاتصال";
-                    errorEl.classList.remove('hidden');
-                }
+                alert("تعذر الاتصال بالخادم");
             }
-        }
+        };
 
-        function logoutSession() {
+        window.logoutSession = function() {
             localStorage.removeItem('fdc_auth_token');
             document.cookie = "fdc_auth=; path=/; max-age=0";
             location.reload();
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            if (checkSessionPersisted()) {
-                const overlay = document.getElementById('auth-overlay');
-                if (overlay) overlay.classList.add('hidden');
-            }
-        });
+        };
     </script>
 </head>
 <body class="flex h-screen overflow-hidden">
@@ -319,7 +340,7 @@
                 </div>
             </div>
 
-            <!-- 8. منظومة الوكلاء الموحدين -->
+            <!-- 8. منظومة الوكلاء الموحدين (مع شريط الاختبار وزر الإضافة والتعديل) -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
@@ -414,7 +435,7 @@
                     </div>
                 </div>
 
-                <!-- ب. وحدة حملات الإرسال الجماعي لقوائم العملاء -->
+                <!-- ب. وحدة حملات الإرسال الجماعي لقوائم العملاء (مع رفع مرفق خاص وتحميل نموذج الإكسل) -->
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center border-b pb-3">
                         <div class="flex items-center gap-2">
@@ -819,7 +840,7 @@
         </div>
     </div>
 
-    <!-- 2. سكربت واجهة المستخدم الأساسي المحصن بالكامل بنظام البحث بالمعرفات (ID-Lookup) -->
+    <!-- كود الجافاسكربت الشامل والآمن (Safe Data Lookup + Smart Excel Parser) -->
     <script>
         window.appState = {
             reps: [],
@@ -834,16 +855,14 @@
         let campaignCustomAttachmentB64 = null;
         let campaignCustomAttachmentName = null;
 
-        function openModal(id) { const m = document.getElementById(id); if (m) m.classList.remove('hidden'); }
-        function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.add('hidden'); }
-
-        function saveGlobalTestPhone(showNotice = false) {
+        // ---------------- دوال رقم هاتف الاختبار للوكلاء ----------------
+        window.saveGlobalTestPhone = function(showNotice = false) {
             const val = document.getElementById('global-test-phone').value.trim();
             localStorage.setItem('fdc_global_test_phone', val);
             if (showNotice) alert("تم حفظ رقم هاتف الاختبار المعتمد بنجاح ✓");
-        }
+        };
 
-        async function testAgentNowGlobal(id) {
+        window.testAgentNowGlobal = async function(id) {
             const phone = document.getElementById('global-test-phone').value.trim();
             if (!phone) return alert("يرجى إدخال رقم هاتف الاختبار المعتمد بالأعلى أولاً");
 
@@ -858,9 +877,10 @@
             } else {
                 alert("تعذر تشغيل واختبار الوكيل");
             }
-        }
+        };
 
-        async function loadExhibitionConfig() {
+        // ---------------- دوال وضع الرد الترحيبي والكتالوج ----------------
+        window.loadExhibitionConfig = async function() {
             try {
                 const res = await fetch('/api/exhibition/config');
                 const data = await res.json();
@@ -877,13 +897,13 @@
                 if (greetingInput && data.greeting_text) greetingInput.value = data.greeting_text;
                 if (catalogStatus) {
                     catalogStatus.innerHTML = data.has_catalog 
-                        ? '<span class="text-emerald-700 font-bold">✓ الكتالوج مرفوع وجاهز للإرسال التلقائي</span>' 
-                        : '<span class="text-amber-700 font-bold">⚠️ لم يتم رفع ملف كتالوج PDF حتى الآن</span>';
+                        ? `<span class="text-emerald-700 font-bold">✓ الكتالوج مرفوع وجاهز للإرسال التلقائي</span>` 
+                        : `<span class="text-amber-700 font-bold">⚠️ لم يتم رفع ملف كتالوج PDF حتى الآن</span>`;
                 }
             } catch (e) {}
-        }
+        };
 
-        async function saveExhibitionSettings(showNotice = false) {
+        window.saveExhibitionSettings = async function(showNotice = false) {
             const is_enabled = document.getElementById('exhibition-mode-toggle').checked;
             const greeting_text = document.getElementById('exhibition-greeting-input').value.trim();
             const statusText = document.getElementById('exhibition-toggle-status-text');
@@ -896,15 +916,15 @@
             const res = await fetch('/api/exhibition/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_enabled: is_enabled, greeting_text: greeting_text })
+                body: JSON.stringify({ is_enabled, greeting_text })
             });
 
             if (res.ok && showNotice) {
                 alert("تم حفظ إعدادات الرد الترحيبي بنجاح ✓");
             }
-        }
+        };
 
-        async function uploadCatalogFile() {
+        window.uploadCatalogFile = async function() {
             const fileInput = document.getElementById('catalog-upload-file');
             if (!fileInput.files || fileInput.files.length === 0) return alert("يرجى اختيار ملف PDF أولاً");
             const formData = new FormData();
@@ -921,9 +941,10 @@
             } else {
                 alert("فشل رفع الملف، يرجى التأكد من اختيار ملف PDF");
             }
-        }
+        };
 
-        function downloadExcelTemplate() {
+        // ---------------- دوال الإرسال الجماعي الآمن + تنزيل القالب النموذجي ----------------
+        window.downloadExcelTemplate = function() {
             const wsData = [
                 ["اسم العميل", "رقم الهاتف"],
                 ["مطعم برجر هاوس", "96891234567"],
@@ -935,9 +956,9 @@
             ws['!cols'] = [{ wch: 25 }, { wch: 20 }];
             XLSX.utils.book_append_sheet(wb, ws, "العملاء");
             XLSX.writeFile(wb, "نموذج_حملات_تنمية_الغذاء.xlsx");
-        }
+        };
 
-        function handleCampaignCustomFile(e) {
+        window.handleCampaignCustomFile = function(e) {
             const file = e.target.files[0];
             const statusEl = document.getElementById('campaign-custom-file-status');
             if (!file) {
@@ -950,13 +971,14 @@
             campaignCustomAttachmentName = file.name;
             const reader = new FileReader();
             reader.onload = function(evt) {
-                campaignCustomAttachmentB64 = evt.target.result.split(',')[1];
-                if (statusEl) statusEl.innerHTML = '<span class="text-emerald-700 font-bold">✓ تم اعتماد المرفق الخاص: ' + file.name + ' (' + Math.round(file.size/1024) + ' KB)</span>';
+                const base64Content = evt.target.result.split(',')[1];
+                campaignCustomAttachmentB64 = base64Content;
+                if (statusEl) statusEl.innerHTML = `<span class="text-emerald-700 font-bold">✓ تم اعتماد المرفق الخاص: ${file.name} (${Math.round(file.size/1024)} KB)</span>`;
             };
             reader.readAsDataURL(file);
-        }
+        };
 
-        function handleExcelFileUpload(e) {
+        window.handleExcelFileUpload = function(e) {
             const file = e.target.files[0];
             const summaryEl = document.getElementById('excel-parse-summary');
             if (!file) return;
@@ -1004,9 +1026,9 @@
 
                     if (summaryEl) {
                         if (parsedBulkContacts.length > 0) {
-                            summaryEl.innerHTML = '<span class="text-emerald-700">✓ تم بنجاح التعرف على <strong>' + parsedBulkContacts.length + '</strong> جهة اتصال جاهزة للإرسال.</span>';
+                            summaryEl.innerHTML = `<span class="text-emerald-700">✓ تم بنجاح التعرف على <strong>${parsedBulkContacts.length}</strong> جهة اتصال جاهزة للإرسال.</span>`;
                         } else {
-                            summaryEl.innerHTML = '<span class="text-red-600 font-bold">⚠️ لم يتم العثور على أرقام هواتف صالحة. يرجى استخدام "تحميل نموذج إكسل جاهز" للتعبئة.</span>';
+                            summaryEl.innerHTML = `<span class="text-red-600 font-bold">⚠️ لم يتم العثور على أرقام هواتف صالحة. يرجى استخدام "تحميل نموذج إكسل جاهز" للتعبئة.</span>`;
                         }
                         summaryEl.classList.remove('hidden');
                     }
@@ -1015,9 +1037,9 @@
                 }
             };
             reader.readAsArrayBuffer(file);
-        }
+        };
 
-        async function startBulkCampaign() {
+        window.startBulkCampaign = async function() {
             if (!parsedBulkContacts || parsedBulkContacts.length === 0) {
                 return alert("يرجى رفع ملف Excel يحتوي على الأرقام أولاً. يمكنك تنزيل النموذج الجاهز للتعبئة.");
             }
@@ -1025,33 +1047,34 @@
             if (!message_template) return alert("يرجى كتابة نص الرسالة");
             const include_catalog = document.getElementById('bulk-include-catalog').checked;
 
-            if (!confirm("هل أنت متأكد من بدء إرسال الحملة إلى " + parsedBulkContacts.length + " جهة اتصال مع تطبيق الحماية من الحظر؟")) return;
+            if (!confirm(`هل أنت متأكد من بدء إرسال الحملة إلى ${parsedBulkContacts.length} جهة اتصال مع تطبيق الحماية من الحظر؟`)) return;
 
             const progressBox = document.getElementById('campaign-progress-box');
             const progressText = document.getElementById('campaign-progress-text');
             progressBox.classList.remove('hidden');
-            progressText.innerText = "جاري جدولة الحملة لـ " + parsedBulkContacts.length + " عميل...";
+            progressText.innerText = `جاري جدولة الحملة لـ ${parsedBulkContacts.length} عميل...`;
 
             const res = await fetch('/api/campaigns/send-bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contacts: parsedBulkContacts,
-                    message_template: message_template,
-                    include_catalog: include_catalog,
+                    message_template,
+                    include_catalog,
                     custom_attachment_b64: campaignCustomAttachmentB64,
                     custom_attachment_name: campaignCustomAttachmentName
                 })
             });
 
             if (res.ok) {
-                progressText.innerHTML = "✓ <strong>الحملة قيد التنفيذ بأمان:</strong> تم بدء الإرسال المتتابع في الخلفية (مع فاصل أمني ذكي 18-32 ثانية). يمكنك استخدام النظام أو إغلاق الصفحة بأمان.";
+                progressText.innerHTML = `✓ <strong>الحملة قيد التنفيذ بأمان:</strong> تم بدء الإرسال المتتابع في الخلفية (مع فاصل أمني ذكي 18-32 ثانية). يمكنك استخدام النظام أو إغلاق الصفحة بأمان.`;
             } else {
                 alert("تعذر بدء الحملة");
             }
-        }
+        };
 
-        function openNewCustomerModal(prefillPhone = '', prefillCompany = '') {
+        // ---------------- دوال إدارة العملاء ----------------
+        window.openNewCustomerModal = function(prefillPhone = '', prefillCompany = '') {
             document.getElementById('customer-modal-title').innerText = "إضافة وحفظ عميل جديد";
             document.getElementById('cust-id-input').value = "";
             document.getElementById('cust-company-input').value = prefillCompany || "";
@@ -1062,14 +1085,14 @@
 
             const sel = document.getElementById('cust-rep-select');
             if (sel) {
-                sel.innerHTML = '<option value="">بدون مندوب محدد</option>' + window.appState.reps.map(r => 
-                    '<option value="' + r.id + '" data-name="' + r.name + '">' + r.name + ' (' + r.region + ')</option>'
-                ).join('');
+                sel.innerHTML = '<option value="">بدون مندوب محدد</option>' + window.appState.reps.map(r => `
+                    <option value="${r.id}" data-name="${r.name}">${r.name} (${r.region})</option>
+                `).join('');
             }
             openModal('customer-modal');
-        }
+        };
 
-        function openEditCustomerModal(id) {
+        window.openEditCustomerModal = function(id) {
             const c = window.appState.customers.find(x => x.id === id);
             if (!c) return;
 
@@ -1083,14 +1106,14 @@
 
             const sel = document.getElementById('cust-rep-select');
             if (sel) {
-                sel.innerHTML = '<option value="">بدون مندوب محدد</option>' + window.appState.reps.map(r => 
-                    '<option value="' + r.id + '" data-name="' + r.name + '" ' + (r.id === c.assigned_rep_id ? 'selected' : '') + '>' + r.name + ' (' + r.region + ')</option>'
-                ).join('');
+                sel.innerHTML = '<option value="">بدون مندوب محدد</option>' + window.appState.reps.map(r => `
+                    <option value="${r.id}" data-name="${r.name}" ${r.id === c.assigned_rep_id ? 'selected' : ''}>${r.name} (${r.region})</option>
+                `).join('');
             }
             openModal('customer-modal');
-        }
+        };
 
-        async function submitCustomerSave() {
+        window.submitCustomerSave = async function() {
             const id = document.getElementById('cust-id-input').value;
             const company_name = document.getElementById('cust-company-input').value.trim();
             const brand_name = document.getElementById('cust-brand-input').value.trim();
@@ -1104,19 +1127,11 @@
 
             if (!company_name || !phone) return alert("يرجى إدخال اسم العميل ورقم الهاتف");
 
-            const url = id ? '/api/customers/' + id + '/update' : '/api/customers';
+            const url = id ? `/api/customers/${id}/update` : '/api/customers';
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    company_name: company_name,
-                    brand_name: brand_name,
-                    region: region,
-                    phone: phone,
-                    assigned_rep_id: assigned_rep_id,
-                    assigned_rep_name: assigned_rep_name,
-                    whatsapp_group_id: whatsapp_group_id
-                })
+                body: JSON.stringify({ company_name, brand_name, region, phone, assigned_rep_id, assigned_rep_name, whatsapp_group_id })
             });
 
             if (res.ok) {
@@ -1126,9 +1141,10 @@
             } else {
                 alert("فشل حفظ بيانات العميل");
             }
-        }
+        };
 
-        function openNewTargetModal() {
+        // ---------------- دوال الأهداف البيعية ----------------
+        window.openNewTargetModal = function() {
             document.getElementById('target-modal-title').innerText = "إضافة فرصة بيعية جديدة";
             document.getElementById('target-id-input').value = "";
             document.getElementById('target-title-input').value = "";
@@ -1137,12 +1153,12 @@
             document.getElementById('target-stage-select').value = "LEAD_CONTACT";
 
             const rSel = document.getElementById('target-rep-select');
-            if (rSel) rSel.innerHTML = window.appState.reps.map(r => '<option value="' + r.id + '" data-name="' + r.name + '">' + r.name + ' (' + r.region + ')</option>').join('');
+            if (rSel) rSel.innerHTML = window.appState.reps.map(r => `<option value="${r.id}" data-name="${r.name}">${r.name} (${r.region})</option>`).join('');
 
             openModal('target-modal');
-        }
+        };
 
-        function openEditTargetModal(id) {
+        window.openEditTargetModal = function(id) {
             const t = window.appState.targets.find(x => x.id === id);
             if (!t) return;
 
@@ -1154,12 +1170,12 @@
             document.getElementById('target-stage-select').value = t.pipeline_stage || 'LEAD_CONTACT';
 
             const rSel = document.getElementById('target-rep-select');
-            if (rSel) rSel.innerHTML = window.appState.reps.map(r => '<option value="' + r.id + '" data-name="' + r.name + '" ' + (r.name === t.rep_name ? 'selected' : '') + '>' + r.name + ' (' + r.region + ')</option>').join('');
+            if (rSel) rSel.innerHTML = window.appState.reps.map(r => `<option value="${r.id}" data-name="${r.name}" ${r.name === t.rep_name ? 'selected' : ''}>${r.name} (${r.region})</option>`).join('');
 
             openModal('target-modal');
-        }
+        };
 
-        async function submitTargetSave() {
+        window.submitTargetSave = async function() {
             const id = document.getElementById('target-id-input').value;
             const title = document.getElementById('target-title-input').value.trim();
             const customer_name = document.getElementById('target-cust-input').value.trim();
@@ -1172,18 +1188,11 @@
 
             if (!title || !customer_name) return alert("يرجى إدخال عنوان الفرصة واسم العميل");
 
-            const url = id ? '/api/targets/' + id + '/update' : '/api/targets';
+            const url = id ? `/api/targets/${id}/update` : '/api/targets';
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: title,
-                    customer_name: customer_name,
-                    rep_id: rep_id,
-                    rep_name: rep_name,
-                    target_value: target_value,
-                    pipeline_stage: pipeline_stage
-                })
+                body: JSON.stringify({ title, customer_name, rep_id, rep_name, target_value, pipeline_stage })
             });
 
             if (res.ok) {
@@ -1193,16 +1202,17 @@
             } else {
                 alert("فشل حفظ الهدف");
             }
-        }
+        };
 
-        function openNewAgentModal() {
+        // ---------------- دوال إدارة وتعديل الوكلاء ----------------
+        window.openNewAgentModal = function() {
             document.getElementById('agent-name-input').value = "";
             document.getElementById('agent-dispatch-input').value = "";
             document.getElementById('agent-prompt-input').value = "";
             openModal('new-agent-modal');
-        }
+        };
 
-        async function submitNewAgent() {
+        window.submitNewAgent = async function() {
             const name = document.getElementById('agent-name-input').value.trim();
             const listen_scope = document.getElementById('agent-scope-select').value;
             const dispatch_channel = document.getElementById('agent-dispatch-input').value.trim();
@@ -1213,12 +1223,7 @@
             const res = await fetch('/api/agents', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: name,
-                    listen_scope: listen_scope,
-                    dispatch_channel: dispatch_channel,
-                    system_prompt: system_prompt
-                })
+                body: JSON.stringify({ name, listen_scope, dispatch_channel, system_prompt })
             });
 
             if (res.ok) {
@@ -1228,9 +1233,9 @@
             } else {
                 alert("فشل إضافة الوكيل");
             }
-        }
+        };
 
-        function openEditAgentModal(id) {
+        window.openEditAgentModal = function(id) {
             const a = window.appState.agents.find(x => x.id === id);
             if (!a) return;
 
@@ -1240,9 +1245,9 @@
             document.getElementById('edit-agent-dispatch').value = a.dispatch_channel || '';
             document.getElementById('edit-agent-prompt').value = a.system_prompt || '';
             openModal('agent-edit-modal');
-        }
+        };
 
-        async function submitAgentEdit() {
+        window.submitAgentEdit = async function() {
             const id = document.getElementById('edit-agent-id').value;
             const name = document.getElementById('edit-agent-name').value.trim();
             const listen_scope = document.getElementById('edit-agent-scope').value;
@@ -1251,15 +1256,10 @@
 
             if (!name || !system_prompt) return alert("يرجى إدخال اسم ومهمة الوكيل");
 
-            const res = await fetch('/api/agents/' + id + '/update', {
+            const res = await fetch(`/api/agents/${id}/update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: name,
-                    listen_scope: listen_scope,
-                    dispatch_channel: dispatch_channel,
-                    system_prompt: system_prompt
-                })
+                body: JSON.stringify({ name, listen_scope, dispatch_channel, system_prompt })
             });
 
             if (res.ok) {
@@ -1269,19 +1269,20 @@
             } else {
                 alert("فشل تحديث الوكيل");
             }
-        }
+        };
 
-        function openNewCalendarModal() {
+        // ---------------- دوال التقويم ----------------
+        window.openNewCalendarModal = function() {
             const cSel = document.getElementById('cal-customer-select');
             const rSel = document.getElementById('cal-rep-select');
 
-            if (cSel) cSel.innerHTML = window.appState.customers.map(c => '<option value="' + c.id + '" data-name="' + c.company_name + '">' + c.company_name + '</option>').join('');
-            if (rSel) rSel.innerHTML = window.appState.reps.map(r => '<option value="' + r.id + '" data-name="' + r.name + '">' + r.name + ' (' + r.region + ')</option>').join('');
+            if (cSel) cSel.innerHTML = window.appState.customers.map(c => `<option value="${c.id}" data-name="${c.company_name}">${c.company_name}</option>`).join('');
+            if (rSel) rSel.innerHTML = window.appState.reps.map(r => `<option value="${r.id}" data-name="${r.name}">${r.name} (${r.region})</option>`).join('');
 
             openModal('calendar-modal');
-        }
+        };
 
-        async function submitNewCalendarEvent() {
+        window.submitNewCalendarEvent = async function() {
             const cSel = document.getElementById('cal-customer-select');
             const rSel = document.getElementById('cal-rep-select');
             const customer_name = cSel.options[cSel.selectedIndex]?.getAttribute('data-name') || '';
@@ -1299,13 +1300,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    customer_name: customer_name,
-                    rep_name: rep_name,
-                    task_type: task_type,
-                    route_code: route_code,
-                    scheduled_at: scheduled_at,
-                    location: location,
-                    change_notes: change_notes
+                    customer_name, rep_name, task_type, route_code, scheduled_at, location, change_notes
                 })
             });
 
@@ -1316,9 +1311,9 @@
             } else {
                 alert("فشل حفظ الموعد");
             }
-        }
+        };
 
-        function openEditCalendarModal(id) {
+        window.openEditCalendarModal = function(id) {
             const e = window.appState.calendar.find(x => x.id === id);
             if (!e) return;
 
@@ -1330,9 +1325,9 @@
             document.getElementById('edit-cal-notes').value = e.change_notes || '';
             document.getElementById('edit-cal-status').value = e.execution_status || 'PENDING';
             openModal('calendar-edit-modal');
-        }
+        };
 
-        async function submitCalendarEdit() {
+        window.submitCalendarEdit = async function() {
             const id = document.getElementById('edit-cal-id').value;
             const task_type = document.getElementById('edit-cal-task-type').value;
             const route_code = document.getElementById('edit-cal-route-code').value.trim() || 'R-01';
@@ -1343,17 +1338,10 @@
 
             if (!scheduled_at) return alert("يرجى تحديد الموعد");
 
-            const res = await fetch('/api/calendar/' + id + '/update', {
+            const res = await fetch(`/api/calendar/${id}/update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    task_type: task_type,
-                    route_code: route_code,
-                    scheduled_at: scheduled_at,
-                    location: location,
-                    change_notes: change_notes,
-                    execution_status: execution_status
-                })
+                body: JSON.stringify({ task_type, route_code, scheduled_at, location, change_notes, execution_status })
             });
 
             if (res.ok) {
@@ -1363,14 +1351,14 @@
             } else {
                 alert("فشل تحديث المهمة");
             }
-        }
+        };
 
-        async function toggleCalendarComplete(id) {
+        window.toggleCalendarComplete = async function(id) {
             const e = window.appState.calendar.find(x => x.id === id);
             if (!e) return;
 
             const newStatus = e.execution_status === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
-            const res = await fetch('/api/calendar/' + id + '/update', {
+            const res = await fetch(`/api/calendar/${id}/update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1385,9 +1373,10 @@
             if (res.ok) {
                 await loadAllData();
             }
-        }
+        };
 
-        function openEditRepModal(id) {
+        // ---------------- دوال المندوب ----------------
+        window.openEditRepModal = function(id) {
             const r = window.appState.reps.find(x => x.id === id);
             if (!r) return;
 
@@ -1398,9 +1387,9 @@
             document.getElementById('edit-rep-target').value = r.monthly_target || 0;
             document.getElementById('edit-rep-status').value = r.status || 'نشط';
             openModal('rep-edit-modal');
-        }
+        };
 
-        async function submitRepEdit() {
+        window.submitRepEdit = async function() {
             const id = document.getElementById('edit-rep-id').value;
             const name = document.getElementById('edit-rep-name').value.trim();
             const region = document.getElementById('edit-rep-region').value.trim();
@@ -1408,16 +1397,10 @@
             const monthly_target = parseFloat(document.getElementById('edit-rep-target').value) || 0.0;
             const status = document.getElementById('edit-rep-status').value;
 
-            const res = await fetch('/api/reps/' + id + '/update', {
+            const res = await fetch(`/api/reps/${id}/update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: name,
-                    region: region,
-                    phone_number: phone_number,
-                    monthly_target: monthly_target,
-                    status: status
-                })
+                body: JSON.stringify({ name, region, phone_number, monthly_target, status })
             });
 
             if (res.ok) {
@@ -1425,62 +1408,63 @@
                 await loadAllData();
                 alert("تم تحديث بيانات المندوب بنجاح ✓");
             }
-        }
+        };
 
-        function openFeedbackModal(id) {
+        // ---------------- دوال العينات ----------------
+        window.openFeedbackModal = function(id) {
             const s = window.appState.samples.find(x => x.id === id);
             if (!s) return;
             document.getElementById('feedback-sample-id').value = s.id;
             document.getElementById('feedback-status-select').value = s.status || 'قيد التجربة';
             document.getElementById('feedback-notes-input').value = s.feedback_notes || '';
             openModal('sample-feedback-modal');
-        }
+        };
 
-        async function submitSampleFeedback() {
+        window.submitSampleFeedback = async function() {
             const id = document.getElementById('feedback-sample-id').value;
             const status = document.getElementById('feedback-status-select').value;
             const notes = document.getElementById('feedback-notes-input').value;
-            const res = await fetch('/api/samples/' + id + '/feedback', {
+            const res = await fetch(`/api/samples/${id}/feedback`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: status, feedback_notes: notes })
+                body: JSON.stringify({ status, feedback_notes: notes })
             });
             if (res.ok) {
                 closeModal('sample-feedback-modal');
                 await loadAllData();
             }
-        }
+        };
 
-        function openConvertToPOModal(id) {
+        window.openConvertToPOModal = function(id) {
             document.getElementById('convert-sample-id').value = id;
             document.getElementById('convert-po-number').value = '';
             document.getElementById('convert-po-value').value = '';
             openModal('sample-convert-po-modal');
-        }
+        };
 
-        async function submitSampleConvertToPO() {
+        window.submitSampleConvertToPO = async function() {
             const id = document.getElementById('convert-sample-id').value;
             const po_number = document.getElementById('convert-po-number').value.trim();
             const po_value = parseFloat(document.getElementById('convert-po-value').value) || 0;
             if (!po_number) return alert("يرجى إدخال رقم أمر الشراء");
-            const res = await fetch('/api/samples/' + id + '/convert-po', {
+            const res = await fetch(`/api/samples/${id}/convert-po`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ po_number: po_number, po_value: po_value })
+                body: JSON.stringify({ po_number, po_value })
             });
             if (res.ok) {
                 closeModal('sample-convert-po-modal');
                 await loadAllData();
             }
-        }
+        };
 
-        async function deleteItem(url) {
+        window.deleteItem = async function(url) {
             if (!confirm("هل أنت متأكد من الحذف؟")) return;
             const res = await fetch(url, { method: 'DELETE' });
             if (res.ok) await loadAllData();
-        }
+        };
 
-        async function checkWhatsAppLiveStatus() {
+        window.checkWhatsAppLiveStatus = async function() {
             try {
                 const res = await fetch('/api/whatsapp/status?t=' + new Date().getTime());
                 const data = await res.json();
@@ -1491,16 +1475,16 @@
                 if (data.connected) {
                     if (btn) btn.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-emerald-50 text-emerald-800 border-emerald-300";
                     if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
-                    if (text) text.innerText = "واتساب: متصل (" + (data.phone || 'نشط') + ")";
+                    if (text) text.innerText = `واتساب: متصل (${data.phone || 'نشط'})`;
                 } else {
                     if (btn) btn.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition border bg-amber-50 text-amber-800 border-amber-300";
                     if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
                     if (text) text.innerText = "واتساب: بانتظار المسح";
                 }
             } catch(e) {}
-        }
+        };
 
-        async function loadWhatsAppLogs() {
+        window.loadWhatsAppLogs = async function() {
             try {
                 const res = await fetch('/api/whatsapp/logs');
                 const logs = await res.json();
@@ -1508,26 +1492,28 @@
                 if (list) {
                     list.innerHTML = logs.map(l => {
                         const senderPhone = (l.sender_phone || l.sender_name || '').replace(/[^0-9]/g, '');
-                        return '<div class="p-3.5 bg-white border brand-border rounded-xl space-y-1 shadow-xs flex justify-between items-start">' +
-                            '<div class="space-y-1 flex-1">' +
-                                '<div class="flex justify-between items-center text-gray-500 text-[11px]">' +
-                                    '<span class="font-bold text-[#3A056A]">' + l.sender_name + ' <span class="text-gray-400 font-normal">(' + l.channel_name + ')</span></span>' +
-                                    '<span>' + l.created_at + '</span>' +
-                                '</div>' +
-                                '<div class="text-gray-800 leading-relaxed font-sans">' + l.message_body + '</div>' +
-                            '</div>' +
-                            '<div class="mr-3 no-print">' +
-                                '<button onclick="openNewCustomerModal(\'' + senderPhone + '\', \'\')" class="px-3 py-1.5 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded-lg text-xs font-bold border border-purple-200 whitespace-nowrap shadow-xs flex items-center gap-1">' +
-                                    '<span>+</span> <span>حفظ كعميل</span>' +
-                                '</button>' +
-                            '</div>' +
-                        '</div>';
+                        return `
+                        <div class="p-3.5 bg-white border brand-border rounded-xl space-y-1 shadow-xs flex justify-between items-start">
+                            <div class="space-y-1 flex-1">
+                                <div class="flex justify-between items-center text-gray-500 text-[11px]">
+                                    <span class="font-bold text-[#3A056A]">${l.sender_name} <span class="text-gray-400 font-normal">(${l.channel_name})</span></span>
+                                    <span>${l.created_at}</span>
+                                </div>
+                                <div class="text-gray-800 leading-relaxed font-sans">${l.message_body}</div>
+                            </div>
+                            <div class="mr-3 no-print">
+                                <button onclick="openNewCustomerModal('${senderPhone}', '')" class="px-3 py-1.5 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded-lg text-xs font-bold border border-purple-200 whitespace-nowrap shadow-xs flex items-center gap-1">
+                                    <span>+</span> <span>حفظ كعميل</span>
+                                </button>
+                            </div>
+                        </div>`;
                     }).join('') || '<div class="text-center text-gray-400 p-4">لا توجد رسائل مسجلة بالرادار</div>';
                 }
             } catch (e) {}
-        }
+        };
 
-        async function loadAllData() {
+        // ---------------- دالة الجلب والتحميل الشاملة ----------------
+        window.loadAllData = async function() {
             const savedPhone = localStorage.getItem('fdc_global_test_phone');
             if (savedPhone && document.getElementById('global-test-phone')) {
                 document.getElementById('global-test-phone').value = savedPhone;
@@ -1546,14 +1532,15 @@
                     tbody.innerHTML = window.appState.reps.map(r => {
                         sales += (r.achieved_sales || 0);
                         exp += (r.total_expenses || 0);
-                        return '<tr>' +
-                            '<td class="p-3 font-bold">' + r.name + '</td>' +
-                            '<td class="p-3">' + r.region + '</td>' +
-                            '<td class="p-3 font-bold text-emerald-700">' + (r.achieved_sales||0).toLocaleString() + ' ر.ع</td>' +
-                            '<td class="p-3">' + (r.monthly_target||0).toLocaleString() + ' ر.ع</td>' +
-                            '<td class="p-3 font-bold text-amber-700">' + (r.total_expenses||0).toLocaleString() + ' ر.ع</td>' +
-                            '<td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">' + r.status + '</span></td>' +
-                        '</tr>';
+                        return `
+                        <tr>
+                            <td class="p-3 font-bold">${r.name}</td>
+                            <td class="p-3">${r.region}</td>
+                            <td class="p-3 font-bold text-emerald-700">${(r.achieved_sales||0).toLocaleString()} ر.ع</td>
+                            <td class="p-3">${(r.monthly_target||0).toLocaleString()} ر.ع</td>
+                            <td class="p-3 font-bold text-amber-700">${(r.total_expenses||0).toLocaleString()} ر.ع</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">${r.status}</span></td>
+                        </tr>`;
                     }).join('');
                 }
                 document.getElementById('kpi-total-sales').innerText = sales.toLocaleString() + ' ر.ع';
@@ -1561,20 +1548,24 @@
 
                 const grid = document.getElementById('reps-grid-cards');
                 if (grid) {
-                    grid.innerHTML = window.appState.reps.map(r => 
-                        '<div class="p-4 bg-white border brand-border rounded-xl space-y-2 shadow-xs">' +
-                            '<div class="flex justify-between items-center font-bold text-sm text-[#3A056A]">' +
-                                '<span>' + r.name + '</span>' +
-                                '<span class="text-[10px] px-2 py-0.5 rounded ' + (r.status === 'نشط' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600') + '">' + r.status + '</span>' +
-                            '</div>' +
-                            '<div class="text-xs text-gray-500">' + r.region + ' | ' + r.phone_number + '</div>' +
-                            '<div class="text-xs font-bold text-emerald-700">المبيعات: ' + (r.achieved_sales||0).toLocaleString() + ' ر.ع / المستهدف: ' + (r.monthly_target||0).toLocaleString() + ' ر.ع</div>' +
-                            '<div class="pt-2 border-t flex justify-end gap-2">' +
-                                '<button onclick="openEditRepModal(' + r.id + ')" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-xs font-bold border border-purple-200">تعديل</button>' +
-                                '<button onclick="deleteItem(\'/api/reps/' + r.id + '\')" class="text-xs text-red-600 hover:text-red-800 font-bold px-1">حذف</button>' +
-                            '</div>' +
-                        '</div>'
-                    ).join('') || '<div class="col-span-3 text-center text-gray-400 p-4">لا يوجد أعضاء في الفريق</div>';
+                    grid.innerHTML = window.appState.reps.map(r => `
+                        <div class="p-4 bg-white border brand-border rounded-xl space-y-2 shadow-xs">
+                            <div class="flex justify-between items-center font-bold text-sm text-[#3A056A]">
+                                <span>${r.name}</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded ${r.status === 'نشط' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}">${r.status}</span>
+                            </div>
+                            <div class="text-xs text-gray-500">${r.region} | ${r.phone_number}</div>
+                            <div class="text-xs font-bold text-emerald-700">المبيعات: ${(r.achieved_sales||0).toLocaleString()} ر.ع / المستهدف: ${(r.monthly_target||0).toLocaleString()} ر.ع</div>
+                            <div class="pt-2 border-t flex justify-end gap-2">
+                                <button onclick="openEditRepModal(${r.id})" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-xs font-bold border border-purple-200">
+                                    تعديل
+                                </button>
+                                <button onclick="deleteItem('/api/reps/${r.id}')" class="text-xs text-red-600 hover:text-red-800 font-bold px-1">
+                                    حذف
+                                </button>
+                            </div>
+                        </div>
+                    `).join('') || '<div class="col-span-3 text-center text-gray-400 p-4">لا يوجد أعضاء في الفريق</div>';
                 }
             } catch(e) {}
 
@@ -1585,20 +1576,24 @@
                 document.getElementById('kpi-active-targets').innerText = window.appState.targets.filter(t => t.status === 'IN_PROGRESS').length;
                 const container = document.getElementById('targets-cards-container');
                 if (container) {
-                    container.innerHTML = window.appState.targets.map(t => 
-                        '<div class="p-4 bg-white border brand-border rounded-xl space-y-2 shadow-xs">' +
-                            '<div class="flex justify-between items-center">' +
-                                '<span class="font-bold text-sm text-gray-900">' + t.title + '</span>' +
-                                '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-[#3A056A]">' + t.pipeline_stage + '</span>' +
-                            '</div>' +
-                            '<div class="text-xs text-gray-600">العميل: <strong>' + t.customer_name + '</strong> | المندوب: <strong>' + t.rep_name + '</strong></div>' +
-                            '<div class="text-xs font-bold text-[#3A056A]">القيمة المستهدفة: ' + (t.target_value||0).toLocaleString() + ' ر.ع</div>' +
-                            '<div class="pt-2 border-t flex justify-end gap-2">' +
-                                '<button onclick="openEditTargetModal(' + t.id + ')" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-xs font-bold border border-purple-200">تعديل</button>' +
-                                '<button onclick="deleteItem(\'/api/targets/' + t.id + '\')" class="text-xs text-red-600 font-bold px-1">حذف</button>' +
-                            '</div>' +
-                        '</div>'
-                    ).join('') || '<div class="col-span-2 text-center text-gray-400 p-4">لا توجد أهداف نشطة</div>';
+                    container.innerHTML = window.appState.targets.map(t => `
+                        <div class="p-4 bg-white border brand-border rounded-xl space-y-2 shadow-xs">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sm text-gray-900">${t.title}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-[#3A056A]">${t.pipeline_stage}</span>
+                            </div>
+                            <div class="text-xs text-gray-600">العميل: <strong>${t.customer_name}</strong> | المندوب: <strong>${t.rep_name}</strong></div>
+                            <div class="text-xs font-bold text-[#3A056A]">القيمة المستهدفة: ${(t.target_value||0).toLocaleString()} ر.ع</div>
+                            <div class="pt-2 border-t flex justify-end gap-2">
+                                <button onclick="openEditTargetModal(${t.id})" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-xs font-bold border border-purple-200">
+                                    تعديل
+                                </button>
+                                <button onclick="deleteItem('/api/targets/${t.id}')" class="text-xs text-red-600 font-bold px-1">
+                                    حذف
+                                </button>
+                            </div>
+                        </div>
+                    `).join('') || '<div class="col-span-2 text-center text-gray-400 p-4">لا توجد أهداف نشطة</div>';
                 }
             } catch(e) {}
 
@@ -1608,22 +1603,26 @@
                 window.appState.customers = await cRes.json();
                 const tbody = document.getElementById('customers-table-body');
                 if (tbody) {
-                    tbody.innerHTML = window.appState.customers.map(c => 
-                        '<tr>' +
-                            '<td class="p-3 font-bold">' + c.company_name + '</td>' +
-                            '<td class="p-3">' + (c.brand_name || '—') + '</td>' +
-                            '<td class="p-3">' + (c.region || 'مسقط') + '</td>' +
-                            '<td class="p-3 font-mono">' + c.phone + '</td>' +
-                            '<td class="p-3 font-bold text-[#3A056A]">' + (c.assigned_rep_name || '—') + '</td>' +
-                            '<td class="p-3 font-mono text-[10px] text-purple-700">' + (c.whatsapp_group_id || 'غير مربوط') + '</td>' +
-                            '<td class="p-3 no-print">' +
-                                '<div class="flex items-center justify-center gap-1.5 whitespace-nowrap">' +
-                                    '<button onclick="openEditCustomerModal(' + c.id + ')" class="px-2 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-[10px] font-bold border border-purple-200">تعديل</button>' +
-                                    '<button onclick="deleteItem(\'/api/customers/' + c.id + '\')" class="text-red-600 font-bold text-[10px] px-1">حذف</button>' +
-                                '</div>' +
-                            '</td>' +
-                        '</tr>'
-                    ).join('') || '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا يوجد عملاء مسجلين</td></tr>';
+                    tbody.innerHTML = window.appState.customers.map(c => `
+                        <tr>
+                            <td class="p-3 font-bold">${c.company_name}</td>
+                            <td class="p-3">${c.brand_name || '—'}</td>
+                            <td class="p-3">${c.region || 'مسقط'}</td>
+                            <td class="p-3 font-mono">${c.phone}</td>
+                            <td class="p-3 font-bold text-[#3A056A]">${c.assigned_rep_name || '—'}</td>
+                            <td class="p-3 font-mono text-[10px] text-purple-700">${c.whatsapp_group_id || 'غير مربوط'}</td>
+                            <td class="p-3 no-print">
+                                <div class="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                    <button onclick="openEditCustomerModal(${c.id})" class="px-2 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-[10px] font-bold border border-purple-200">
+                                        تعديل
+                                    </button>
+                                    <button onclick="deleteItem('/api/customers/${c.id}')" class="text-red-600 font-bold text-[10px] px-1">
+                                        حذف
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="7" class="p-4 text-center text-gray-400">لا يوجد عملاء مسجلين</td></tr>';
                 }
             } catch(e) {}
 
@@ -1633,28 +1632,28 @@
                 window.appState.samples = await sRes.json();
                 const tbody = document.getElementById('samples-table-body');
                 if (tbody) {
-                    tbody.innerHTML = window.appState.samples.map(s => {
-                        let statusColor = 'bg-amber-100 text-amber-800';
-                        if (s.status && (s.status.includes('نالت الإعجاب') || s.status === 'CONVERTED_PO')) statusColor = 'bg-emerald-100 text-emerald-800 font-bold';
-                        if (s.status && s.status.includes('مرفوضة')) statusColor = 'bg-red-100 text-red-800';
-
-                        return '<tr>' +
-                            '<td class="p-3 font-bold text-gray-900">' + (s.customer_name || '—') + '</td>' +
-                            '<td class="p-3 text-[#3A056A] font-semibold">' + (s.rep_name || '—') + '</td>' +
-                            '<td class="p-3 font-bold text-gray-800">' + (s.product_name || '—') + '</td>' +
-                            '<td class="p-3 font-mono">' + s.qty_free + ' وحدة</td>' +
-                            '<td class="p-3 text-gray-500 font-mono text-[11px]">' + s.delivery_date + '</td>' +
-                            '<td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] ' + statusColor + '">' + s.status + '</span></td>' +
-                            '<td class="p-3 text-gray-700 max-w-xs text-[11px]">' + (s.feedback_notes || '—') + '</td>' +
-                            '<td class="p-3 font-mono font-bold text-emerald-800">' + (s.converted_po_id || '—') + '</td>' +
-                            '<td class="p-3 no-print">' +
-                                '<div class="flex items-center justify-center gap-1.5 whitespace-nowrap">' +
-                                    '<button onclick="openFeedbackModal(' + s.id + ')" class="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[10px] font-bold shadow-xs">تقييم</button>' +
-                                    '<button onclick="openConvertToPOModal(' + s.id + ')" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-bold shadow-xs">تحويل لـ PO</button>' +
-                                    '<button onclick="deleteItem(\'/api/samples/' + s.id + '\')" class="text-red-600 hover:text-red-800 rounded text-[10px] font-bold px-1">حذف</button>' +
-                                '</div>' +
-                            '</td>' +
-                        '</tr>';
+                    tbody.innerHTML = window.appState.samples.map(s => `
+                        <tr>
+                            <td class="p-3 font-bold text-gray-900">${s.customer_name || '—'}</td>
+                            <td class="p-3 text-[#3A056A] font-semibold">${s.rep_name || '—'}</td>
+                            <td class="p-3 font-bold text-gray-800">${s.product_name || '—'}</td>
+                            <td class="p-3 font-mono">${s.qty_free} وحدة</td>
+                            <td class="p-3 text-gray-500 font-mono text-[11px]">${s.delivery_date}</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800">${s.status}</span></td>
+                            <td class="p-3 text-gray-700 max-w-xs text-[11px]">${s.feedback_notes || '—'}</td>
+                            <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id || '—'}</td>
+                            <td class="p-3 no-print">
+                                <button onclick="openFeedbackModal(${s.id})" class="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[10px] font-bold shadow-xs">
+                                    تقييم
+                                </button>
+                                <button onclick="openConvertToPOModal(${s.id})" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-bold shadow-xs">
+                                    تحويل لـ PO
+                                </button>
+                                <button onclick="deleteItem('/api/samples/${s.id}')" class="text-red-600 hover:text-red-800 rounded text-[10px] font-bold px-1">
+                                    حذف
+                                </button>
+                            </td>
+                        </tr>`;
                     }).join('') || '<tr><td colspan="9" class="p-4 text-center text-gray-400">لا توجد عينات مسجلة</td></tr>';
                 }
             } catch(e) {}
@@ -1665,24 +1664,32 @@
                 window.appState.calendar = await calRes.json();
                 const list = document.getElementById('calendar-events-list');
                 if (list) {
-                    list.innerHTML = window.appState.calendar.map(e => 
-                        '<div class="p-4 bg-white border brand-border rounded-xl flex justify-between items-center text-xs shadow-xs">' +
-                            '<div class="space-y-1">' +
-                                '<div class="flex items-center gap-2">' +
-                                    '<span class="font-bold text-gray-900 text-sm">' + e.task_type + '</span>' +
-                                    '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-[#3A056A]">' + (e.route_code || 'R-01') + '</span>' +
-                                    '<span class="px-2 py-0.5 rounded text-[10px] font-bold ' + (e.execution_status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800') + '">' + (e.execution_status === 'COMPLETED' ? 'تمت الزيارة ✓' : 'قيد المتابعة') + '</span>' +
-                                '</div>' +
-                                '<div class="text-gray-600">العميل: <strong>' + e.customer_name + '</strong> | المندوب: <strong>' + e.rep_name + '</strong></div>' +
-                                '<div class="text-gray-500 font-mono text-[11px]">الموعد: ' + e.scheduled_at + ' ' + (e.location ? '| الموقع: ' + e.location : '') + '</div>' +
-                            '</div>' +
-                            '<div class="flex items-center gap-1.5 no-print whitespace-nowrap">' +
-                                '<button onclick="toggleCalendarComplete(' + e.id + ')" class="px-2.5 py-1 ' + (e.execution_status === 'COMPLETED' ? 'bg-gray-100 text-gray-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white') + ' rounded text-xs font-bold transition shadow-xs">' + (e.execution_status === 'COMPLETED' ? 'إعادة للمتابعة' : 'إنجاز ✓') + '</button>' +
-                                '<button onclick="openEditCalendarModal(' + e.id + ')" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-xs font-bold border border-purple-200">تعديل</button>' +
-                                '<button onclick="deleteItem(\'/api/calendar/' + e.id + '\')" class="text-red-600 hover:text-red-800 rounded text-xs font-bold px-1">حذف</button>' +
-                            '</div>' +
-                        '</div>'
-                    ).join('') || '<div class="text-center text-gray-400 p-4">لا توجد مواعيد مجدولة</div>';
+                    list.innerHTML = window.appState.calendar.map(e => `
+                        <div class="p-4 bg-white border brand-border rounded-xl flex justify-between items-center text-xs shadow-xs">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-900 text-sm">${e.task_type}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-[#3A056A]">${e.route_code || 'R-01'}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${e.execution_status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                                        ${e.execution_status === 'COMPLETED' ? 'تمت الزيارة ✓' : 'قيد المتابعة'}
+                                    </span>
+                                </div>
+                                <div class="text-gray-600">العميل: <strong>${e.customer_name}</strong> | المندوب: <strong>${e.rep_name}</strong></div>
+                                <div class="text-gray-500 font-mono text-[11px]">الموعد: ${e.scheduled_at} ${e.location ? `| الموقع: ${e.location}` : ''}</div>
+                            </div>
+                            <div class="flex items-center gap-1.5 no-print whitespace-nowrap">
+                                <button onclick="toggleCalendarComplete(${e.id})" class="px-2.5 py-1 ${e.execution_status === 'COMPLETED' ? 'bg-gray-100 text-gray-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} rounded text-xs font-bold transition shadow-xs">
+                                    ${e.execution_status === 'COMPLETED' ? 'إعادة للمتابعة' : 'إنجاز ✓'}
+                                </button>
+                                <button onclick="openEditCalendarModal(${e.id})" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-xs font-bold border border-purple-200">
+                                    تعديل
+                                </button>
+                                <button onclick="deleteItem('/api/calendar/${e.id}')" class="text-red-600 hover:text-red-800 rounded text-xs font-bold px-1">
+                                    حذف
+                                </button>
+                            </div>
+                        </div>
+                    `).join('') || '<div class="text-center text-gray-400 p-4">لا توجد مواعيد مجدولة</div>';
                 }
             } catch(e) {}
 
@@ -1692,28 +1699,33 @@
                 window.appState.agents = await aRes.json();
                 const container = document.getElementById('unified-agents-grid');
                 if (container) {
-                    container.innerHTML = window.appState.agents.map(a => 
-                        '<div class="p-4 rounded-xl border brand-border bg-white shadow-xs space-y-3 flex flex-col justify-between">' +
-                            '<div class="space-y-2">' +
-                                '<div class="flex justify-between items-start">' +
-                                    '<div>' +
-                                        '<span class="font-bold text-sm text-gray-900">' + a.name + '</span>' +
-                                        '<div class="text-[10px] text-purple-700 font-bold mt-0.5">نطاق الاستماع: ' + a.listen_scope + '</div>' +
-                                    '</div>' +
-                                    '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">نشط ✓</span>' +
-                                '</div>' +
-                                '<div class="p-2.5 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-24 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">' + a.system_prompt + '</div>' +
-                                (a.dispatch_channel ? '<div class="text-[10px] text-purple-900 font-mono"><strong>القناة:</strong> ' + a.dispatch_channel + '</div>' : '') +
-                            '</div>' +
-                            '<div class="pt-2 border-t flex justify-between items-center no-print">' +
-                                '<div class="flex items-center gap-1.5">' +
-                                    '<button onclick="testAgentNowGlobal(' + a.id + ')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] shadow-xs">إرسال تجربة</button>' +
-                                    '<button onclick="openEditAgentModal(' + a.id + ')" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-[10px] font-bold border border-purple-200">تعديل</button>' +
-                                '</div>' +
-                                '<button onclick="deleteItem(\'/api/agents/' + a.id + '\')" class="text-red-600 font-bold text-xs px-1">حذف</button>' +
-                            '</div>' +
-                        '</div>'
-                    ).join('') || '<div class="col-span-3 p-4 text-center text-gray-400">لا يوجد وكلاء مسجلين</div>';
+                    container.innerHTML = window.appState.agents.map(a => `
+                    <div class="p-4 rounded-xl border brand-border bg-white shadow-xs space-y-3 flex flex-col justify-between">
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="font-bold text-sm text-gray-900">${a.name}</span>
+                                    <div class="text-[10px] text-purple-700 font-bold mt-0.5">نطاق الاستماع: ${a.listen_scope}</div>
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">نشط ✓</span>
+                            </div>
+                            <div class="p-2.5 bg-purple-50/60 rounded-lg text-[11px] text-gray-700 max-h-24 overflow-y-auto border border-dashed border-purple-200 leading-relaxed">
+                                ${a.system_prompt}
+                            </div>
+                            ${a.dispatch_channel ? `<div class="text-[10px] text-purple-900 font-mono"><strong>القناة:</strong> ${a.dispatch_channel}</div>` : ''}
+                        </div>
+                        <div class="pt-2 border-t flex justify-between items-center no-print">
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="testAgentNowGlobal(${a.id})" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] shadow-xs">
+                                    إرسال تجربة
+                                </button>
+                                <button onclick="openEditAgentModal(${a.id})" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-[10px] font-bold border border-purple-200">
+                                    تعديل
+                                </button>
+                            </div>
+                            <button onclick="deleteItem('/api/agents/${a.id}')" class="text-red-600 font-bold text-xs px-1">حذف</button>
+                        </div>
+                    </div>`).join('') || '<div class="col-span-3 p-4 text-center text-gray-400">لا يوجد وكلاء مسجلين</div>';
                 }
             } catch(e) {}
 
@@ -1723,15 +1735,15 @@
                 const prods = await pRes.json();
                 const tbody = document.getElementById('products-catalog-tbody');
                 if (tbody) {
-                    tbody.innerHTML = prods.map(p => 
-                        '<tr>' +
-                            '<td class="p-3 font-mono font-bold">' + p.sku + '</td>' +
-                            '<td class="p-3 font-bold text-[#3A056A]">' + p.name_ar + '</td>' +
-                            '<td class="p-3">' + (p.weight_spec || '—') + '</td>' +
-                            '<td class="p-3">' + (p.primary_packaging || '—') + '</td>' +
-                            '<td class="p-3">' + (p.carton_pack_spec || '—') + '</td>' +
-                        '</tr>'
-                    ).join('') || '<tr><td colspan="5" class="p-4 text-center text-gray-400">لا توجد منتجات مسجلة</td></tr>';
+                    tbody.innerHTML = prods.map(p => `
+                        <tr>
+                            <td class="p-3 font-mono font-bold">${p.sku}</td>
+                            <td class="p-3 font-bold text-[#3A056A]">${p.name_ar}</td>
+                            <td class="p-3">${p.weight_spec || '—'}</td>
+                            <td class="p-3">${p.primary_packaging || '—'}</td>
+                            <td class="p-3">${p.carton_pack_spec || '—'}</td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="5" class="p-4 text-center text-gray-400">لا توجد منتجات مسجلة</td></tr>';
                 }
             } catch(e) {}
 
@@ -1741,26 +1753,22 @@
                 const expenses = await expRes.json();
                 const tbody = document.getElementById('expenses-log-table-body');
                 if (tbody) {
-                    tbody.innerHTML = expenses.map(x => 
-                        '<tr>' +
-                            '<td class="p-3 font-mono">#EXP-' + x.id + '</td>' +
-                            '<td class="p-3 font-bold">' + x.rep_name + '</td>' +
-                            '<td class="p-3 font-bold text-amber-800">' + (x.amount||0).toLocaleString() + ' ر.ع</td>' +
-                            '<td class="p-3">' + (x.notes || '—') + '</td>' +
-                            '<td class="p-3 text-gray-400 font-mono">' + x.created_at_str + '</td>' +
-                        '</tr>'
-                    ).join('') || '<tr><td colspan="5" class="p-4 text-center text-gray-400">لا توجد مصاريف مسجلة</td></tr>';
+                    tbody.innerHTML = expenses.map(x => `
+                        <tr>
+                            <td class="p-3 font-mono">#EXP-${x.id}</td>
+                            <td class="p-3 font-bold">${x.rep_name}</td>
+                            <td class="p-3 font-bold text-amber-800">${x.amount.toLocaleString()} ر.ع</td>
+                            <td class="p-3">${x.notes || '—'}</td>
+                            <td class="p-3 text-gray-400 font-mono">${x.created_at_str}</td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="5" class="p-4 text-center text-gray-400">لا توجد مصاريف مسجلة</td></tr>';
                 }
             } catch(e) {}
-        }
-
-        window.loadAllData = loadAllData;
-        window.switchTab = switchTab;
+        };
 
         window.addEventListener('DOMContentLoaded', () => {
             if (checkSessionPersisted()) {
-                const overlay = document.getElementById('auth-overlay');
-                if (overlay) overlay.classList.add('hidden');
+                document.getElementById('auth-overlay')?.classList.add('hidden');
                 loadAllData();
                 loadExhibitionConfig();
             }
