@@ -24,7 +24,6 @@
         }
     </style>
 
-    <!-- كتلة الأمان والتحكم بالقائمة الجانبية (تعمل بشكل فوري ومستقل) -->
     <script>
         window.switchTab = function(tabId) {
             let cleanId = String(tabId).replace(/^tab-/, '');
@@ -107,7 +106,6 @@
 </head>
 <body class="flex h-screen overflow-hidden">
 
-    <!-- شاشة التحقق الأمني 2FA -->
     <div id="auth-overlay" class="fixed inset-0 bg-[#3A056A] z-50 flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-center space-y-4">
             <div class="w-full flex justify-center mb-4">
@@ -128,7 +126,6 @@
         </div>
     </div>
 
-    <!-- القائمة الجانبية -->
     <aside class="w-64 bg-[#3A056A] text-white flex flex-col justify-between flex-shrink-0 z-20 shadow-xl no-print">
         <div class="flex flex-col h-full overflow-hidden">
             <div class="w-full h-20 px-3 py-2 flex items-center justify-center border-b border-[#52128e]">
@@ -178,7 +175,6 @@
         </div>
     </aside>
 
-    <!-- المحتوى الرئيسي -->
     <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
         <header class="h-16 bg-white border-b brand-border flex items-center justify-between px-6 flex-shrink-0 z-10 shadow-xs no-print">
             <div class="flex items-center gap-3">
@@ -201,7 +197,6 @@
 
         <div class="flex-1 overflow-y-auto p-6 space-y-6">
 
-            <!-- 1. لوحة التحكم -->
             <div id="tab-overview" class="tab-content space-y-6">
                 <div class="grid grid-cols-3 gap-4 no-print">
                     <div class="bg-white p-4 rounded-xl border brand-border shadow-xs">
@@ -239,7 +234,6 @@
                 </div>
             </div>
 
-            <!-- 2. المنتجات -->
             <div id="tab-products-catalog" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة</h3>
@@ -258,7 +252,6 @@
                 </div>
             </div>
 
-            <!-- 3. الأهداف -->
             <div id="tab-targets" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -269,7 +262,6 @@
                 </div>
             </div>
 
-            <!-- 4. الفريق -->
             <div id="tab-reps" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <h3 class="font-bold text-sm brand-primary-text mb-4">دليل أعضاء فريق المبيعات</h3>
@@ -277,7 +269,6 @@
                 </div>
             </div>
 
-            <!-- 5. العملاء -->
             <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -301,7 +292,6 @@
                 </div>
             </div>
 
-            <!-- 6. العينات -->
             <div id="tab-samples" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <h3 class="font-bold text-sm brand-primary-text">سجل جرد العينات المجانية وتقييمات الشيف</h3>
@@ -324,7 +314,6 @@
                 </div>
             </div>
 
-            <!-- 7. التقويم والعمليات -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
@@ -340,7 +329,6 @@
                 </div>
             </div>
 
-            <!-- 8. منظومة الوكلاء الموحدين (مع شريط الاختبار وزر الإضافة والتعديل) -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
@@ -353,7 +341,6 @@
                         </button>
                     </div>
 
-                    <!-- شريط رقم هاتف الاختبار المعتمد للوكلاء -->
                     <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-base">📱</span>
@@ -372,7 +359,6 @@
                 <div id="unified-agents-grid" class="grid grid-cols-3 gap-4"></div>
             </div>
 
-            <!-- 9. المصاريف -->
             <div id="tab-expenses-log" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <h3 class="font-bold text-sm text-amber-800 mb-4">سجل المصاريف الميدانية والتشغيلية</h3>
@@ -391,10 +377,8 @@
                 </div>
             </div>
 
-            <!-- 10. رادار المحادثات + نظام الرد الترحيبي التلقائي للعملاء الجدد -->
             <div id="tab-whatsapp-feed" class="tab-content hidden space-y-6">
 
-                <!-- أ. وحدة الرد الترحيبي التلقائي للعملاء الجدد والكتالوج -->
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center border-b pb-3">
                         <div class="flex items-center gap-2">
@@ -435,7 +419,6 @@
                     </div>
                 </div>
 
-                <!-- ب. وحدة حملات الإرسال الجماعي لقوائم العملاء (مع رفع مرفق خاص وتحميل نموذج الإكسل) -->
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center border-b pb-3">
                         <div class="flex items-center gap-2">
@@ -487,7 +470,6 @@
                     </div>
                 </div>
 
-                <!-- ج. رادار المحادثات الحية + زر حفظ كعميل المباشر -->
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-3">
                     <div class="flex justify-between items-center no-print">
                         <div>
@@ -504,7 +486,6 @@
         </div>
     </main>
 
-    <!-- مودال إضافة وحفظ عميل جديد -->
     <div id="customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2" id="customer-modal-title">إضافة وحفظ عميل جديد</h3>
@@ -544,7 +525,6 @@
         </div>
     </div>
 
-    <!-- مودال تعديل وإضافة الهدف والفرصة البيعية -->
     <div id="target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2" id="target-modal-title">بيانات الفرصة البيعية</h3>
@@ -586,7 +566,6 @@
         </div>
     </div>
 
-    <!-- مودال إضافة وكيل جديد -->
     <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة وكيل ذكي جديد (Unified Agent)</h3>
@@ -619,7 +598,6 @@
         </div>
     </div>
 
-    <!-- مودال تعديل الوكيل الذكي -->
     <div id="agent-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات وبرومبت الوكيل</h3>
@@ -653,7 +631,6 @@
         </div>
     </div>
 
-    <!-- مودال جدولة مهمة جديدة في التقويم -->
     <div id="calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة مهمة / زيارة ميدانية جديدة</h3>
@@ -703,7 +680,6 @@
         </div>
     </div>
 
-    <!-- مودال تعديل بيانات مهمة التقويم -->
     <div id="calendar-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات المهمة / الزيارة</h3>
@@ -756,7 +732,6 @@
         </div>
     </div>
 
-    <!-- مودال تعديل بيانات عضو فريق المبيعات -->
     <div id="rep-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
@@ -796,7 +771,6 @@
         </div>
     </div>
 
-    <!-- مودال تقييم العينة وتسجيل رأي الشيف -->
     <div id="sample-feedback-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تقييم وملاحظات الشيف الفنية</h3>
@@ -820,7 +794,6 @@
         </div>
     </div>
 
-    <!-- مودال تحويل العينة لأمر شراء رسمي (PO) -->
     <div id="sample-convert-po-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">تحويل العينة إلى أمر شراء رسمي (PO)</h3>
@@ -840,7 +813,6 @@
         </div>
     </div>
 
-    <!-- كود الجافاسكربت الشامل والآمن (Safe Data Lookup + Smart Excel Parser) -->
     <script>
         window.appState = {
             reps: [],
@@ -855,7 +827,6 @@
         let campaignCustomAttachmentB64 = null;
         let campaignCustomAttachmentName = null;
 
-        // ---------------- دوال رقم هاتف الاختبار للوكلاء ----------------
         window.saveGlobalTestPhone = function(showNotice = false) {
             const val = document.getElementById('global-test-phone').value.trim();
             localStorage.setItem('fdc_global_test_phone', val);
@@ -879,7 +850,6 @@
             }
         };
 
-        // ---------------- دوال وضع الرد الترحيبي والكتالوج ----------------
         window.loadExhibitionConfig = async function() {
             try {
                 const res = await fetch('/api/exhibition/config');
@@ -943,7 +913,6 @@
             }
         };
 
-        // ---------------- دوال الإرسال الجماعي الآمن + تنزيل القالب النموذجي ----------------
         window.downloadExcelTemplate = function() {
             const wsData = [
                 ["اسم العميل", "رقم الهاتف"],
@@ -1073,7 +1042,6 @@
             }
         };
 
-        // ---------------- دوال إدارة العملاء ----------------
         window.openNewCustomerModal = function(prefillPhone = '', prefillCompany = '') {
             document.getElementById('customer-modal-title').innerText = "إضافة وحفظ عميل جديد";
             document.getElementById('cust-id-input').value = "";
@@ -1143,7 +1111,6 @@
             }
         };
 
-        // ---------------- دوال الأهداف البيعية ----------------
         window.openNewTargetModal = function() {
             document.getElementById('target-modal-title').innerText = "إضافة فرصة بيعية جديدة";
             document.getElementById('target-id-input').value = "";
@@ -1204,7 +1171,6 @@
             }
         };
 
-        // ---------------- دوال إدارة وتعديل الوكلاء ----------------
         window.openNewAgentModal = function() {
             document.getElementById('agent-name-input').value = "";
             document.getElementById('agent-dispatch-input').value = "";
@@ -1271,7 +1237,6 @@
             }
         };
 
-        // ---------------- دوال التقويم ----------------
         window.openNewCalendarModal = function() {
             const cSel = document.getElementById('cal-customer-select');
             const rSel = document.getElementById('cal-rep-select');
@@ -1375,7 +1340,6 @@
             }
         };
 
-        // ---------------- دوال المندوب ----------------
         window.openEditRepModal = function(id) {
             const r = window.appState.reps.find(x => x.id === id);
             if (!r) return;
@@ -1410,7 +1374,6 @@
             }
         };
 
-        // ---------------- دوال العينات ----------------
         window.openFeedbackModal = function(id) {
             const s = window.appState.samples.find(x => x.id === id);
             if (!s) return;
@@ -1512,7 +1475,6 @@
             } catch (e) {}
         };
 
-        // ---------------- دالة الجلب والتحميل الشاملة ----------------
         window.loadAllData = async function() {
             const savedPhone = localStorage.getItem('fdc_global_test_phone');
             if (savedPhone && document.getElementById('global-test-phone')) {
@@ -1521,7 +1483,6 @@
 
             checkWhatsAppLiveStatus();
 
-            // 1. الفريق
             try {
                 const rRes = await fetch('/api/reps');
                 window.appState.reps = await rRes.json();
@@ -1569,7 +1530,6 @@
                 }
             } catch(e) {}
 
-            // 2. الأهداف
             try {
                 const tRes = await fetch('/api/targets');
                 window.appState.targets = await tRes.json();
@@ -1597,7 +1557,6 @@
                 }
             } catch(e) {}
 
-            // 3. العملاء
             try {
                 const cRes = await fetch('/api/customers');
                 window.appState.customers = await cRes.json();
@@ -1626,7 +1585,6 @@
                 }
             } catch(e) {}
 
-            // 4. العينات
             try {
                 const sRes = await fetch('/api/samples');
                 window.appState.samples = await sRes.json();
@@ -1643,13 +1601,7 @@
                             <td class="p-3 text-gray-700 max-w-xs text-[11px]">${s.feedback_notes || '—'}</td>
                             <td class="p-3 font-mono font-bold text-emerald-800">${s.converted_po_id || '—'}</td>
                             <td class="p-3 no-print">
-                                <button onclick="openFeedbackModal(${s.id})" class="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[10px] font-bold shadow-xs">
-                                    تقييم
-                                </button>
-                                <button onclick="openConvertToPOModal(${s.id})" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-bold shadow-xs">
-                                    تحويل لـ PO
-                                </button>
-                                <button onclick="deleteItem('/api/samples/${s.id}')" class="text-red-600 hover:text-red-800 rounded text-[10px] font-bold px-1">
+                                <button onclick="deleteItem('/api/samples/${s.id}')" class="text-red-600 hover:text-red-800 rounded text-[10px] font-bold">
                                     حذف
                                 </button>
                             </td>
@@ -1658,7 +1610,6 @@
                 }
             } catch(e) {}
 
-            // 5. التقويم
             try {
                 const calRes = await fetch('/api/calendar');
                 window.appState.calendar = await calRes.json();
@@ -1693,7 +1644,6 @@
                 }
             } catch(e) {}
 
-            // 6. منظومة الوكلاء الموحدين
             try {
                 const aRes = await fetch('/api/agents');
                 window.appState.agents = await aRes.json();
@@ -1729,7 +1679,6 @@
                 }
             } catch(e) {}
 
-            // 7. المنتجات
             try {
                 const pRes = await fetch('/api/products');
                 const prods = await pRes.json();
@@ -1747,7 +1696,6 @@
                 }
             } catch(e) {}
 
-            // 8. المصاريف
             try {
                 const expRes = await fetch('/api/expenses');
                 const expenses = await expRes.json();
