@@ -1,7 +1,8 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Unified Agent Model, PostgreSQL-Backed Sessions, Full Reps & Calendar Route Engine
+Unified Agent Model, Auto-Dispatch (Without Sender Contact), Full Edit for Targets/Customers/Agents,
+and Smart Exhibition WhatsApp Engine
 """
 
 import os
@@ -26,11 +27,6 @@ from psycopg2.extras import RealDictCursor
 import pyotp
 import qrcode
 import httpx
-
-try:
-    import openpyxl
-except ImportError:
-    openpyxl = None
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
@@ -135,6 +131,7 @@ async def query_perplexity_intelligence(system_prompt: str, search_query: str) -
     except Exception as e:
         return f"خطأ في الاتصال بمحرك Perplexity: {str(e)}"
 
+# دالة صياغة أمر التوريد بالإنجليزية بعد إزالة سطر Sender Contact تماماً
 def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sender_name: str, branches: list) -> str:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     loc_match = re.search(r'(https?://[^\s]+)', text)
@@ -196,8 +193,8 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
         cleaned_items = ["Items specified in customer communication"]
 
     items_formatted = "\n".join([f"- {it}" for it in cleaned_items])
-    sender_clean = f"{sender_phone} ({sender_name})"
 
+    # تم حذف سطر *Sender Contact:* نهائياً بناءً على طلبك
     msg_output = (
         f"*DISPATCH & DELIVERY ORDER*\n"
         f"----------------------------------------\n"
@@ -211,7 +208,6 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
         f"{items_formatted}\n"
         f"----------------------------------------\n"
         f"*Branch Contact:* {branch_contact if branch_contact else 'N/A'}\n"
-        f"*Sender Contact:* {sender_clean}\n"
         f"*Delivery Location:*\n"
         f"{location_url if location_url else 'Registered Branch Location'}\n"
         f"----------------------------------------\n"
@@ -451,7 +447,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="20.9.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="21.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -479,6 +475,40 @@ class UpdateRepPayload(BaseModel):
     phone_number: str
     monthly_target: Optional[float] = 0.0
     status: Optional[str] = "نشط"
+
+class UpdateCustomerPayload(BaseModel):
+    company_name: str
+    brand_name: Optional[str] = ""
+    sector: Optional[str] = "مطاعم"
+    region: Optional[str] = "مسقط"
+    contact_person: Optional[str] = ""
+    phone: str
+    assigned_rep_id: Optional[int] = None
+    assigned_rep_name: Optional[str] = ""
+    whatsapp_group_id: Optional[str] = ""
+
+class UpdateTargetPayload(BaseModel):
+    title: str
+    customer_id: Optional[int] = None
+    customer_name: str
+    rep_id: Optional[int] = None
+    rep_name: str
+    target_value: float
+    pipeline_stage: str
+
+class UpdateAgentPayload(BaseModel):
+    name: str
+    listen_scope: Optional[str] = "ALL_GROUPS"
+    dispatch_channel: Optional[str] = ""
+    system_prompt: str
+
+class UnifiedAgentPayload(BaseModel):
+    name: str
+    listen_scope: Optional[str] = "ALL_GROUPS"
+    dispatch_channel: Optional[str] = ""
+    enable_web_search: Optional[bool] = False
+    search_keywords: Optional[str] = ""
+    system_prompt: str
 
 class SampleFeedbackPayload(BaseModel):
     status: str
@@ -511,14 +541,6 @@ class CalendarUpdatePayload(BaseModel):
     location: Optional[str] = ""
     change_notes: Optional[str] = ""
     execution_status: Optional[str] = "PENDING"
-
-class UnifiedAgentPayload(BaseModel):
-    name: str
-    listen_scope: Optional[str] = "ALL_GROUPS"
-    dispatch_channel: Optional[str] = ""
-    enable_web_search: Optional[bool] = False
-    search_keywords: Optional[str] = ""
-    system_prompt: str
 
 class IncomingWhatsAppMessage(BaseModel):
     chat_id: str
@@ -557,7 +579,258 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات فريق المبيعات الكاملة -----------------
+# ----------------- مسارات العملاء (عرض، تعديل، حذف) -----------------
+@app.get("/api/customers")
+def get_customers():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM customer_accounts ORDER BY id ASC;")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/customers/{cust_id}/update")
+def update_customer(cust_id: int, payload: UpdateCustomerPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE customer_accounts
+            SET company_name = %s, brand_name = %s, sector = %s, region = %s,
+                contact_person = %s, phone = %s, assigned_rep_id = %s, 
+                assigned_rep_name = %s, whatsapp_group_id = %s
+            WHERE id = %s;
+            """, (
+                payload.company_name.strip(), payload.brand_name.strip(), payload.sector or "مطاعم",
+                payload.region or "مسقط", payload.contact_person or "", payload.phone.strip(),
+                payload.assigned_rep_id, payload.assigned_rep_name or "",
+                payload.whatsapp_group_id.strip() if payload.whatsapp_group_id else "",
+                cust_id
+            ))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    except Exception as e:
+        logger.error(f"Error updating customer: {e}")
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/customers/{cust_id}")
+def delete_customer(cust_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM customer_accounts WHERE id = %s;", (cust_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+# ----------------- مسارات الأهداف والـ Pipeline (عرض، تعديل، حذف) -----------------
+@app.get("/api/targets")
+def get_targets():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM sales_targets ORDER BY status DESC, id DESC;")
+            rows = cur.fetchall()
+            for r in rows:
+                r["target_value"] = float(r.get("target_value") or 0)
+            return rows
+    finally:
+        conn.close()
+
+@app.post("/api/targets/{target_id}/update")
+def update_sales_target(target_id: int, payload: UpdateTargetPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE sales_targets
+            SET title = %s, customer_id = %s, customer_name = %s,
+                rep_id = %s, rep_name = %s, target_value = %s, pipeline_stage = %s
+            WHERE id = %s;
+            """, (
+                payload.title.strip(), payload.customer_id, payload.customer_name,
+                payload.rep_id, payload.rep_name, payload.target_value or 0.0,
+                payload.pipeline_stage, target_id
+            ))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    except Exception as e:
+        logger.error(f"Error updating target: {e}")
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/targets/{target_id}")
+def delete_target(target_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM sales_targets WHERE id = %s;", (target_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+# ----------------- مسارات الوكلاء الموحدين (تعديل كامل متاح) -----------------
+@app.get("/api/agents")
+def get_unified_agents():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM ai_agents ORDER BY id ASC;")
+            rows = cur.fetchall()
+            for r in rows:
+                r["listen_scope"] = r.get("listen_scope") or "ALL_GROUPS"
+                r["dispatch_channel"] = r.get("dispatch_channel") or ""
+                r["enable_web_search"] = bool(r.get("enable_web_search", False))
+                r["search_keywords"] = r.get("search_keywords") or ""
+            return rows
+    finally:
+        conn.close()
+
+@app.post("/api/agents")
+def create_unified_agent(payload: UnifiedAgentPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO ai_agents (name, category, role_type, listen_scope, dispatch_channel, enable_web_search, search_keywords, system_prompt, is_active)
+            VALUES (%s, 'UNIFIED', 'UNIFIED', %s, %s, %s, %s, %s, TRUE) RETURNING id;
+            """, (
+                payload.name.strip(), payload.listen_scope or "ALL_GROUPS", 
+                payload.dispatch_channel or "", payload.enable_web_search or False, 
+                payload.search_keywords or "", payload.system_prompt.strip()
+            ))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/{agent_id}/update")
+def update_agent(agent_id: int, payload: UpdateAgentPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE ai_agents
+            SET name = %s, listen_scope = %s, dispatch_channel = %s, system_prompt = %s
+            WHERE id = %s;
+            """, (
+                payload.name.strip(), payload.listen_scope or "ALL_GROUPS",
+                payload.dispatch_channel.strip() if payload.dispatch_channel else "",
+                payload.system_prompt.strip(), agent_id
+            ))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.delete("/api/agents/{agent_id}")
+def delete_unified_agent(agent_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM ai_agents WHERE id = %s;", (agent_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/test-global")
+async def test_unified_agent(payload: dict):
+    agent_id = payload.get("agent_id")
+    test_target = payload.get("test_phone", "").strip()
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متصلة")
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM ai_agents WHERE id = %s;", (agent_id,))
+            agent = cur.fetchone()
+            if not agent:
+                raise HTTPException(status_code=404, detail="الوكيل غير موجود")
+
+            destination = agent.get("dispatch_channel") or test_target
+            if not destination:
+                raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار")
+
+            if agent.get("enable_web_search"):
+                keywords = agent.get("search_keywords") or agent["name"]
+                intelligence_summary = await query_perplexity_intelligence(agent["system_prompt"], keywords)
+                message_text = (
+                    f"*{agent['name']} | تقرير استخبارات الويب الحي*\n"
+                    f"----------------------------------------\n"
+                    f"{intelligence_summary}\n"
+                    f"----------------------------------------\n"
+                    f"نظام المبيعات الذكي | شركة تنمية الغذاء"
+                )
+            elif "لوجستيك" in agent["name"] or "طلب" in agent["name"]:
+                message_text = (
+                    f"*DISPATCH & DELIVERY ORDER (TEST SIMULATION)*\n"
+                    f"----------------------------------------\n"
+                    f"*Company:* Yummies Burgers & Bakery\n"
+                    f"*Brand:* Yummies\n"
+                    f"*Branch:* Boshar Branch\n"
+                    f"*Order Received Date:* {datetime.now().strftime('%d/%m/%Y')}\n"
+                    f"*Target Delivery Date:* Tomorrow 08:00 AM\n"
+                    f"----------------------------------------\n"
+                    f"*Ordered Items & Quantities:*\n"
+                    f"- Brioche Burger Bun 75g: 10 Cartons\n"
+                    f"- Potato Roll Bread 65g: 8 Cartons\n"
+                    f"----------------------------------------\n"
+                    f"*Branch Contact:* +96894987936\n"
+                    f"*Delivery Location:*\n"
+                    f"https://maps.google.com/?q=23.5880,58.3829\n"
+                    f"----------------------------------------\n"
+                    f"Food Development Co. | Logistics & Operations"
+                )
+            else:
+                message_text = (
+                    f"*{agent['name']} | تقرير تجريبي*\n\n"
+                    f"تم تشغيل وتأكيد جاهزية الوكيل بنجاح للعمل ضمن نطاق: {agent.get('listen_scope', 'المجموعات')}.\n\n"
+                    f"شركة تنمية الغذاء (Food Development Company)"
+                )
+
+        sent = await send_whatsapp_direct(destination, message_text)
+        if sent:
+            return {"status": "SUCCESS", "to": destination, "message_preview": message_text}
+        else:
+            raise HTTPException(status_code=400, detail="فشل الإرسال عبر محرك الواتساب")
+    finally:
+        conn.close()
+
+# ----------------- مسارات فريق المبيعات (تعديل كامل) -----------------
 @app.get("/api/reps")
 def get_reps():
     conn = get_db_connection()
@@ -620,7 +893,7 @@ def delete_sales_rep(rep_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات التقويم والعمليات الميدانية -----------------
+# ----------------- مسارات التقويم والعمليات -----------------
 @app.get("/api/calendar")
 def get_calendar():
     conn = get_db_connection()
@@ -651,10 +924,6 @@ def create_calendar_event(payload: CalendarEventPayload):
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
-    except Exception as e:
-        logger.error(f"Error creating calendar event: {e}")
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -678,10 +947,6 @@ def update_calendar_event(cal_id: int, payload: CalendarUpdatePayload):
             ))
             conn.commit()
             return {"status": "SUCCESS"}
-    except Exception as e:
-        logger.error(f"Error updating calendar event: {e}")
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
@@ -788,134 +1053,12 @@ def delete_sample(sample_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات الوكلاء ومحاكاة اللوجستيك -----------------
-@app.get("/api/agents")
-def get_unified_agents():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM ai_agents ORDER BY id ASC;")
-            rows = cur.fetchall()
-            for r in rows:
-                r["listen_scope"] = r.get("listen_scope") or "ALL_GROUPS"
-                r["dispatch_channel"] = r.get("dispatch_channel") or ""
-                r["enable_web_search"] = bool(r.get("enable_web_search", False))
-                r["search_keywords"] = r.get("search_keywords") or ""
-            return rows
-    finally:
-        conn.close()
-
-@app.post("/api/agents")
-def create_unified_agent(payload: UnifiedAgentPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            INSERT INTO ai_agents (name, category, role_type, listen_scope, dispatch_channel, enable_web_search, search_keywords, system_prompt, is_active)
-            VALUES (%s, 'UNIFIED', 'UNIFIED', %s, %s, %s, %s, %s, TRUE) RETURNING id;
-            """, (
-                payload.name.strip(), payload.listen_scope or "ALL_GROUPS", 
-                payload.dispatch_channel or "", payload.enable_web_search or False, 
-                payload.search_keywords or "", payload.system_prompt.strip()
-            ))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id}
-    except Exception as e:
-        logger.error(f"Error creating agent: {e}")
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.delete("/api/agents/{agent_id}")
-def delete_unified_agent(agent_id: int):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM ai_agents WHERE id = %s;", (agent_id,))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.post("/api/agents/test-global")
-async def test_unified_agent(payload: dict):
-    agent_id = payload.get("agent_id")
-    test_target = payload.get("test_phone", "").strip()
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متصلة")
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM ai_agents WHERE id = %s;", (agent_id,))
-            agent = cur.fetchone()
-            if not agent:
-                raise HTTPException(status_code=404, detail="الوكيل غير موجود")
-
-            destination = agent.get("dispatch_channel") or test_target
-            if not destination:
-                raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار")
-
-            if agent.get("enable_web_search"):
-                keywords = agent.get("search_keywords") or agent["name"]
-                intelligence_summary = await query_perplexity_intelligence(agent["system_prompt"], keywords)
-                message_text = (
-                    f"*{agent['name']} | تقرير استخبارات الويب الحي*\n"
-                    f"----------------------------------------\n"
-                    f"{intelligence_summary}\n"
-                    f"----------------------------------------\n"
-                    f"نظام المبيعات الذكي | شركة تنمية الغذاء"
-                )
-            elif "لوجستيك" in agent["name"] or "طلب" in agent["name"]:
-                message_text = (
-                    f"*DISPATCH & DELIVERY ORDER (TEST SIMULATION)*\n"
-                    f"----------------------------------------\n"
-                    f"*Company:* Yummies Burgers & Bakery\n"
-                    f"*Brand:* Yummies\n"
-                    f"*Branch:* Boshar Branch\n"
-                    f"*Order Received Date:* {datetime.now().strftime('%d/%m/%Y')}\n"
-                    f"*Target Delivery Date:* Tomorrow 08:00 AM\n"
-                    f"----------------------------------------\n"
-                    f"*Ordered Items & Quantities:*\n"
-                    f"- Brioche Burger Bun 75g: 10 Cartons\n"
-                    f"- Potato Roll Bread 65g: 8 Cartons\n"
-                    f"----------------------------------------\n"
-                    f"*Branch Contact:* +96894987936\n"
-                    f"*Sender Contact:* +96896899696 (Store Manager)\n"
-                    f"*Delivery Location:*\n"
-                    f"https://maps.google.com/?q=23.5880,58.3829\n"
-                    f"----------------------------------------\n"
-                    f"Food Development Co. | Logistics & Operations"
-                )
-            else:
-                message_text = (
-                    f"*{agent['name']} | تقرير تجريبي*\n\n"
-                    f"تم تشغيل وتأكيد جاهزية الوكيل بنجاح للعمل ضمن نطاق: {agent.get('listen_scope', 'المجموعات')}.\n\n"
-                    f"شركة تنمية الغذاء (Food Development Company)"
-                )
-
-        sent = await send_whatsapp_direct(destination, message_text)
-        if sent:
-            return {"status": "SUCCESS", "to": destination, "message_preview": message_text}
-        else:
-            raise HTTPException(status_code=400, detail="فشل الإرسال عبر محرك الواتساب")
-    finally:
-        conn.close()
-
 # ----------------- رادار الواتساب المحمي -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
     
-    # استبعاد قنوات البث الإخبارية والطقس والحالات لمنع حشو الرادار
+    # حجب قنوات البث الإخبارية والطقس والحالات
     if "@newsletter" in chat_id or "status@broadcast" in chat_id:
         return {"status": "IGNORED_BROADCAST"}
 
@@ -949,6 +1092,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 if any(k in text.lower() for k in trigger_keywords):
                     cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
                     branches = cur.fetchall()
+                    # استدعاء الدالة المنقحة (بدون Sender Contact)
                     logistics_msg = format_dispatch_order_en(text, customer, msg.sender_phone, msg.sender_name, branches)
                     if logistics_group:
                         forward_to_logistics = logistics_group
@@ -1023,59 +1167,6 @@ def delete_session_snapshot(session_name: str):
         conn.close()
 
 # ----------------- باقي المسارات الأساسية -----------------
-@app.get("/api/customers")
-def get_customers():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM customer_accounts ORDER BY id ASC;")
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.delete("/api/customers/{cust_id}")
-def delete_customer(cust_id: int):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database error")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM customer_accounts WHERE id = %s;", (cust_id,))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.get("/api/targets")
-def get_targets():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM sales_targets ORDER BY status DESC, id DESC;")
-            rows = cur.fetchall()
-            for r in rows:
-                r["target_value"] = float(r.get("target_value") or 0)
-            return rows
-    finally:
-        conn.close()
-
-@app.delete("/api/targets/{target_id}")
-def delete_target(target_id: int):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database error")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM sales_targets WHERE id = %s;", (target_id,))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
 @app.get("/api/products")
 def get_products():
     conn = get_db_connection()
@@ -1115,6 +1206,27 @@ async def get_whatsapp_status():
     except Exception:
         pass
     return {"connected": False, "phone": None}
+
+@app.get("/api/whatsapp/qr")
+async def get_whatsapp_qr():
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=3.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("connected"):
+                    return {"connected": True, "user": data.get("user")}
+                qr_base64 = data.get("qr")
+                if qr_base64:
+                    clean_b64 = qr_base64.split(",")[-1].strip()
+                    return Response(
+                        content=base64.b64decode(clean_b64),
+                        media_type="image/png",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
+                    )
+    except Exception:
+        pass
+    raise HTTPException(status_code=503, detail="جاري إقلاع محرك الواتساب...")
 
 @app.get("/api/whatsapp/logs")
 def get_whatsapp_logs():
