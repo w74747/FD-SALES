@@ -1,8 +1,8 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Unified Agent Model, Auto-Dispatch (Without Sender Contact), Full Edit for Targets/Customers/Agents,
-and Smart Exhibition WhatsApp Engine
+Includes: sender_phone in WhatsApp Logs, Full Edit Modals, Clean Dispatch Order (No Sender Contact),
+and One-Click CRM Lead Capture
 """
 
 import os
@@ -131,7 +131,7 @@ async def query_perplexity_intelligence(system_prompt: str, search_query: str) -
     except Exception as e:
         return f"خطأ في الاتصال بمحرك Perplexity: {str(e)}"
 
-# دالة صياغة أمر التوريد بالإنجليزية بعد إزالة سطر Sender Contact تماماً
+# تنسيق أمر التوريد الرسمي بدون سطر Sender Contact نهائياً
 def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sender_name: str, branches: list) -> str:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     loc_match = re.search(r'(https?://[^\s]+)', text)
@@ -194,7 +194,7 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
 
     items_formatted = "\n".join([f"- {it}" for it in cleaned_items])
 
-    # تم حذف سطر *Sender Contact:* نهائياً بناءً على طلبك
+    # تم حذف سطر Sender Contact تماماً
     msg_output = (
         f"*DISPATCH & DELIVERY ORDER*\n"
         f"----------------------------------------\n"
@@ -388,6 +388,7 @@ def init_database():
                 id SERIAL PRIMARY KEY,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 sender_name VARCHAR(150) NOT NULL,
+                sender_phone VARCHAR(50) DEFAULT '',
                 channel_name VARCHAR(150) DEFAULT 'محادثة مباشرة',
                 is_external_call BOOLEAN DEFAULT FALSE,
                 message_body TEXT NOT NULL
@@ -416,6 +417,7 @@ def init_database():
     finally:
         conn.close()
 
+    run_isolated_ddl("ALTER TABLE whatsapp_logs ADD COLUMN IF NOT EXISTS sender_phone VARCHAR(50) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE ai_agents ALTER COLUMN role_type DROP NOT NULL;")
     run_isolated_ddl("ALTER TABLE ai_agents ALTER COLUMN role_type SET DEFAULT 'UNIFIED';")
     run_isolated_ddl("ALTER TABLE ai_agents ALTER COLUMN category SET DEFAULT 'UNIFIED';")
@@ -447,7 +449,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="21.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="21.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -469,12 +471,16 @@ def get_logo():
 class Verify2FAPayload(BaseModel):
     code: str
 
-class UpdateRepPayload(BaseModel):
-    name: str
-    region: str
-    phone_number: str
-    monthly_target: Optional[float] = 0.0
-    status: Optional[str] = "نشط"
+class CreateCustomerPayload(BaseModel):
+    company_name: str
+    brand_name: Optional[str] = ""
+    sector: Optional[str] = "مطاعم"
+    region: Optional[str] = "مسقط"
+    contact_person: Optional[str] = ""
+    phone: str
+    assigned_rep_id: Optional[int] = None
+    assigned_rep_name: Optional[str] = ""
+    whatsapp_group_id: Optional[str] = ""
 
 class UpdateCustomerPayload(BaseModel):
     company_name: str
@@ -487,6 +493,15 @@ class UpdateCustomerPayload(BaseModel):
     assigned_rep_name: Optional[str] = ""
     whatsapp_group_id: Optional[str] = ""
 
+class CreateTargetPayload(BaseModel):
+    title: str
+    customer_id: Optional[int] = None
+    customer_name: str
+    rep_id: Optional[int] = None
+    rep_name: str
+    target_value: float
+    pipeline_stage: Optional[str] = "LEAD_CONTACT"
+
 class UpdateTargetPayload(BaseModel):
     title: str
     customer_id: Optional[int] = None
@@ -495,6 +510,13 @@ class UpdateTargetPayload(BaseModel):
     rep_name: str
     target_value: float
     pipeline_stage: str
+
+class UpdateRepPayload(BaseModel):
+    name: str
+    region: str
+    phone_number: str
+    monthly_target: Optional[float] = 0.0
+    status: Optional[str] = "نشط"
 
 class UpdateAgentPayload(BaseModel):
     name: str
@@ -579,7 +601,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- مسارات العملاء (عرض، تعديل، حذف) -----------------
+# ----------------- مسارات العملاء (إضافة، تعديل، حذف) -----------------
 @app.get("/api/customers")
 def get_customers():
     conn = get_db_connection()
@@ -589,6 +611,29 @@ def get_customers():
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM customer_accounts ORDER BY id ASC;")
             return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/customers")
+def create_customer(payload: CreateCustomerPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO customer_accounts (company_name, brand_name, sector, region, contact_person, phone, assigned_rep_id, assigned_rep_name, whatsapp_group_id, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'نشط') RETURNING id;
+            """, (
+                payload.company_name.strip(), payload.brand_name.strip() if payload.brand_name else "",
+                payload.sector or "مطاعم", payload.region or "مسقط",
+                payload.contact_person or "", payload.phone.strip(),
+                payload.assigned_rep_id, payload.assigned_rep_name or "",
+                payload.whatsapp_group_id.strip() if payload.whatsapp_group_id else ""
+            ))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
     finally:
         conn.close()
 
@@ -606,8 +651,9 @@ def update_customer(cust_id: int, payload: UpdateCustomerPayload):
                 assigned_rep_name = %s, whatsapp_group_id = %s
             WHERE id = %s;
             """, (
-                payload.company_name.strip(), payload.brand_name.strip(), payload.sector or "مطاعم",
-                payload.region or "مسقط", payload.contact_person or "", payload.phone.strip(),
+                payload.company_name.strip(), payload.brand_name.strip() if payload.brand_name else "",
+                payload.sector or "مطاعم", payload.region or "مسقط",
+                payload.contact_person or "", payload.phone.strip(),
                 payload.assigned_rep_id, payload.assigned_rep_name or "",
                 payload.whatsapp_group_id.strip() if payload.whatsapp_group_id else "",
                 cust_id
@@ -634,7 +680,7 @@ def delete_customer(cust_id: int):
     finally:
         conn.close()
 
-# ----------------- مسارات الأهداف والـ Pipeline (عرض، تعديل، حذف) -----------------
+# ----------------- مسارات الأهداف والـ Pipeline (إضافة، تعديل، حذف) -----------------
 @app.get("/api/targets")
 def get_targets():
     conn = get_db_connection()
@@ -647,6 +693,27 @@ def get_targets():
             for r in rows:
                 r["target_value"] = float(r.get("target_value") or 0)
             return rows
+    finally:
+        conn.close()
+
+@app.post("/api/targets")
+def create_target(payload: CreateTargetPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO sales_targets (title, customer_id, customer_name, rep_id, rep_name, target_value, pipeline_stage, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'IN_PROGRESS') RETURNING id;
+            """, (
+                payload.title.strip(), payload.customer_id, payload.customer_name,
+                payload.rep_id, payload.rep_name, payload.target_value or 0.0,
+                payload.pipeline_stage or "LEAD_CONTACT"
+            ))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
     finally:
         conn.close()
 
@@ -1053,7 +1120,7 @@ def delete_sample(sample_id: int):
     finally:
         conn.close()
 
-# ----------------- رادار الواتساب المحمي -----------------
+# ----------------- رادار الواتساب مع حفظ رقم الهاتف -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
@@ -1072,6 +1139,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         reply_text = None
         forward_to_logistics = None
         logistics_text = None
+        clean_phone = msg.sender_phone.replace("+", "").strip()
 
         with conn.cursor() as cur:
             cur.execute("SELECT key_name, key_value FROM system_config;")
@@ -1092,7 +1160,6 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 if any(k in text.lower() for k in trigger_keywords):
                     cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
                     branches = cur.fetchall()
-                    # استدعاء الدالة المنقحة (بدون Sender Contact)
                     logistics_msg = format_dispatch_order_en(text, customer, msg.sender_phone, msg.sender_name, branches)
                     if logistics_group:
                         forward_to_logistics = logistics_group
@@ -1100,9 +1167,9 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
 
             try:
                 cur.execute("""
-                INSERT INTO whatsapp_logs (created_at, sender_name, channel_name, is_external_call, message_body)
-                VALUES (NOW(), %s, %s, FALSE, %s);
-                """, (msg.sender_name, channel_name, text))
+                INSERT INTO whatsapp_logs (created_at, sender_name, sender_phone, channel_name, is_external_call, message_body)
+                VALUES (NOW(), %s, %s, %s, FALSE, %s);
+                """, (msg.sender_name, clean_phone, channel_name, text))
             except Exception:
                 pass
 
@@ -1240,6 +1307,7 @@ def get_whatsapp_logs():
             for r in rows:
                 if r.get("created_at") and hasattr(r["created_at"], "strftime"):
                     r["created_at"] = r["created_at"].strftime("%H:%M")
+                r["sender_phone"] = r.get("sender_phone") or ""
             return rows
     finally:
         conn.close()
