@@ -64,6 +64,9 @@
                 if (typeof window.loadWhatsAppLogs === 'function') window.loadWhatsAppLogs();
                 if (typeof window.loadExhibitionConfig === 'function') window.loadExhibitionConfig();
             }
+            if (cleanId === 'agents') {
+                if (typeof window.loadOrderKeywords === 'function') window.loadOrderKeywords();
+            }
         };
 
         window.openModal = function(id) { const m = document.getElementById(id); if (m) m.classList.remove('hidden'); };
@@ -338,7 +341,7 @@
                 </div>
             </div>
 
-            <!-- 8. منظومة الوكلاء الموحدين -->
+            <!-- 8. منظومة الوكلاء الموحدين (مع خانة الكلمات المفتاحية الحية ورقم هاتف الاختبار) -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
@@ -351,6 +354,21 @@
                         </button>
                     </div>
 
+                    <!-- بطاقة الكلمات المفتاحية الحية لرصد الطلبيات من المجموعات -->
+                    <div class="p-3.5 bg-gray-50 border border-purple-200 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="font-bold text-xs text-[#3A056A]">الكلمات المفتاحية الحية لرصد الطلبيات (Order Keywords):</div>
+                                <div class="text-[10px] text-gray-500">افصل بين الكلمات بفاصلة (,) — أي رسالة في مجموعات العملاء تحوي إحدى هذه الكلمات سيتم تحويلها فوراً لمجموعة اللوجستيك.</div>
+                            </div>
+                            <button onclick="saveOrderKeywords(true)" class="px-3.5 py-1.5 bg-[#3A056A] text-white font-bold rounded-lg text-xs hover:bg-purple-900 transition shadow-xs">
+                                حفظ الكلمات
+                            </button>
+                        </div>
+                        <textarea id="order-keywords-input" rows="2" class="w-full p-2 border rounded-lg text-xs leading-relaxed font-mono" placeholder="box, boxes, كرتون, كراتين, طلب, طلبية, potato, buns..."></textarea>
+                    </div>
+
+                    <!-- شريط رقم هاتف الاختبار المعتمد للوكلاء -->
                     <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-base">📱</span>
@@ -456,7 +474,7 @@
                             </div>
 
                             <div class="p-3 bg-gray-50 border rounded-xl space-y-2">
-                                <label class="block font-bold text-[#3A056A]">ملف المرفق الخاص بهذه الحملة (اختياري - PDF أو مستند):</label>
+                                <label class="block font-bold text-[#3A056A]">ملف المرفق الخاص بهذه الحملة (اختياري - PDF أو صورة):</label>
                                 <input type="file" id="campaign-custom-file" accept="application/pdf, image/*" onchange="handleCampaignCustomFile(event)" class="w-full text-xs file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gray-200 file:text-gray-800">
                                 <div id="campaign-custom-file-status" class="text-[10px] text-gray-500">إذا رغبت بإرسال عرض أو منشور مختلف عن الكتالوج العام.</div>
                             </div>
@@ -829,7 +847,6 @@
         </div>
     </div>
 
-    <!-- كود الجافاسكربت المنطقي الرئيسي -->
     <script>
         window.appState = {
             reps: [],
@@ -843,6 +860,29 @@
         let parsedBulkContacts = [];
         let campaignCustomAttachmentB64 = null;
         let campaignCustomAttachmentName = null;
+
+        // ---------------- دوال الكلمات المفتاحية الحية ----------------
+        window.loadOrderKeywords = async function() {
+            try {
+                const res = await fetch('/api/system/trigger-keywords');
+                const data = await res.json();
+                const el = document.getElementById('order-keywords-input');
+                if (el && data.keywords) el.value = data.keywords;
+            } catch(e) {}
+        };
+
+        window.saveOrderKeywords = async function(showNotice = false) {
+            const el = document.getElementById('order-keywords-input');
+            const keywords = el ? el.value.trim() : '';
+            const res = await fetch('/api/system/trigger-keywords', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keywords })
+            });
+            if (res.ok && showNotice) {
+                alert("تم تحديث الكلمات المفتاحية الحية بنجاح ✓");
+            }
+        };
 
         // ---------------- دوال رقم هاتف الاختبار للوكلاء ----------------
         window.saveGlobalTestPhone = function(showNotice = false) {
@@ -870,7 +910,7 @@
             }
         };
 
-        // ---------------- دوال نظام الرد الترحيبي والكتالوج ----------------
+        // ---------------- دوال وضع الرد الترحيبي والكتالوج ----------------
         window.loadExhibitionConfig = async function() {
             try {
                 const res = await fetch('/api/exhibition/config');
@@ -974,11 +1014,27 @@
             const summaryEl = document.getElementById('excel-parse-summary');
             if (!file) return;
 
+            const isCSV = file.name.toLowerCase().endsWith('.csv');
             const reader = new FileReader();
+
             reader.onload = function(evt) {
                 try {
-                    const data = new Uint8Array(evt.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    let workbook;
+                    const buffer = evt.target.result;
+
+                    if (isCSV) {
+                        let text = new TextDecoder('utf-8').decode(buffer);
+                        if (/[\u00C0-\u00FF]/.test(text) || text.includes('Ø') || text.includes('Ù')) {
+                            try {
+                                text = new TextDecoder('windows-1256').decode(buffer);
+                            } catch(err) {}
+                        }
+                        workbook = XLSX.read(text, { type: 'string' });
+                    } else {
+                        const data = new Uint8Array(buffer);
+                        workbook = XLSX.read(data, { type: 'array' });
+                    }
+
                     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                     const jsonRows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
 
@@ -1017,7 +1073,8 @@
 
                     if (summaryEl) {
                         if (parsedBulkContacts.length > 0) {
-                            summaryEl.innerHTML = '<span class="text-emerald-700">✓ تم بنجاح التعرف على <strong>' + parsedBulkContacts.length + '</strong> جهة اتصال جاهزة للإرسال.</span>';
+                            const sampleName = parsedBulkContacts[0].name;
+                            summaryEl.innerHTML = '<span class="text-emerald-700">✓ تم بنجاح التعرف على <strong>' + parsedBulkContacts.length + '</strong> جهة اتصال. (الاسم الأول: <strong>' + sampleName + '</strong>)</span>';
                         } else {
                             summaryEl.innerHTML = '<span class="text-red-600 font-bold">⚠️ لم يتم العثور على أرقام هواتف صالحة. يرجى استخدام "تحميل نموذج إكسل جاهز" للتعبئة.</span>';
                         }
@@ -1505,6 +1562,7 @@
             }
 
             checkWhatsAppLiveStatus();
+            loadOrderKeywords();
 
             // 1. الفريق
             try {
