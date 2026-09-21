@@ -1,8 +1,8 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Includes: Custom Campaign Attachments, Auto-Welcome Bot, Smart Anti-Ban Campaign Engine,
-and Complete Production CRM Suite
+Includes: Dynamic Trigger Keywords, Auto-Welcome Bot, Smart Anti-Ban Campaign Engine,
+Fuzzy Group JID Matching, and Complete Production CRM Suite
 """
 
 import os
@@ -20,7 +20,7 @@ import random
 from datetime import datetime
 from typing import Optional, List, Dict
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Response, Request, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Response, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -29,11 +29,6 @@ from psycopg2.extras import RealDictCursor
 import pyotp
 import qrcode
 import httpx
-
-try:
-    import openpyxl
-except ImportError:
-    openpyxl = None
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("SalesCRM")
@@ -135,9 +130,10 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
 
     brand_name = customer.get("brand_name") or ""
     branch_name = "Main Branch"
+
     for l in lines:
-        if 'branch' in l.lower():
-            m = re.search(r'([A-Za-z\u0600-\u06FF\s\-]+branch)', l, re.IGNORECASE)
+        if 'branch' in l.lower() or 'فرع' in l.lower():
+            m = re.search(r'([A-Za-z\u0600-\u06FF\s\-]+(?:branch|فرع[A-Za-z\u0600-\u06FF\s\-]*))', l, re.IGNORECASE)
             if m:
                 clean_b = m.group(1).strip()
                 if brand_name and brand_name.lower() in clean_b.lower():
@@ -157,18 +153,18 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
 
     raw_items = []
     for l in lines:
-        if re.search(r'^(date|coming|location|contact|tel|phone|odare|order)', l, re.IGNORECASE):
+        if re.search(r'^(date|coming|location|contact|tel|phone|odare|order|تاريخ|توصيل|شكرا|thank)', l, re.IGNORECASE):
             continue
         if 'http' in l.lower() or 'branch' in l.lower() or (brand_name and l.lower() == brand_name.lower()):
             continue
-        if re.search(r'(box|cartoon|carton|ctn|كرتون|حبة|pc|pcs|bag|كيس|bread|buns|bun|brioche|potato)', l, re.IGNORECASE):
+        if re.search(r'(box|boxes|cartoon|carton|cartons|ctn|كرتون|كراتين|كرتونين|حبة|حبات|pc|pcs|bag|كيس|bread|buns|bun|brioche|potato|خبز|صمون|برجر)', l, re.IGNORECASE):
             raw_items.append(l)
 
     cleaned_items = []
     i = 0
     while i < len(raw_items):
         item_text = raw_items[i]
-        if i + 1 < len(raw_items) and re.search(r'^\d+\s*(box|cartoon|carton|ctn|كرتون)', raw_items[i+1], re.IGNORECASE):
+        if i + 1 < len(raw_items) and re.search(r'^\d+\s*(box|boxes|cartoon|carton|cartons|ctn|كرتون|كراتين)', raw_items[i+1], re.IGNORECASE):
             item_text = f"{raw_items[i]}: {raw_items[i+1]}"
             i += 1
         cleaned_items.append(item_text)
@@ -401,7 +397,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="21.7.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="21.8.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -426,6 +422,9 @@ class Verify2FAPayload(BaseModel):
 class InboundWelcomeConfigPayload(BaseModel):
     is_enabled: bool
     greeting_text: str
+
+class KeywordsPayload(BaseModel):
+    keywords: str
 
 class BulkCampaignItem(BaseModel):
     name: str
@@ -499,9 +498,6 @@ class UnifiedAgentPayload(BaseModel):
     dispatch_channel: Optional[str] = ""
     system_prompt: str
 
-class ToggleAgentPayload(BaseModel):
-    is_active: bool
-
 class SampleFeedbackPayload(BaseModel):
     status: str
     feedback_notes: Optional[str] = ""
@@ -509,10 +505,6 @@ class SampleFeedbackPayload(BaseModel):
 class SampleConvertPOPayload(BaseModel):
     po_number: str
     po_value: Optional[float] = 0.0
-
-class SampleUpdatePayload(BaseModel):
-    qty_free: int
-    product_name: str
 
 class CalendarEventPayload(BaseModel):
     customer_name: str
@@ -568,6 +560,37 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
+# ----------------- الكلمات المفتاحية الحية لرصد الطلبيات -----------------
+@app.get("/api/system/trigger-keywords")
+def get_trigger_keywords():
+    conn = get_db_connection()
+    if not conn:
+        return {"keywords": ""}
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT key_value FROM system_config WHERE key_name = 'order_trigger_keywords';")
+            row = cur.fetchone()
+            default_kw = "box, boxes, cartoon, carton, cartons, ctn, odare, order, orders, potato, buns, bun, bread, brioche, طلب, طلبية, طلبيات, كرتون, كراتين, كرتونين, حبة, حبات, اوردر, أوردر, صلالة, مسقط"
+            return {"keywords": row["key_value"] if row and row["key_value"] else default_kw}
+    finally:
+        conn.close()
+
+@app.post("/api/system/trigger-keywords")
+def save_trigger_keywords(payload: KeywordsPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO system_config (key_name, key_value) VALUES ('order_trigger_keywords', %s)
+            ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;
+            """, (payload.keywords.strip(),))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
 # ----------------- إعدادات الرد الترحيبي والكتالوج -----------------
 @app.get("/api/exhibition/config")
 def get_inbound_welcome_config():
@@ -613,7 +636,7 @@ async def upload_catalog_file(file: UploadFile = File(...)):
         f.write(content)
     return {"status": "SUCCESS", "filename": file.filename, "size_kb": len(content) // 1024}
 
-# ----------------- الإرسال الجماعي الآمن ضد الحظر مع دعم المرفق المخصص -----------------
+# ----------------- الإرسال الجماعي الآمن ضد الحظر -----------------
 @app.post("/api/campaigns/send-bulk")
 async def send_bulk_campaign(payload: BulkCampaignPayload):
     if not payload.contacts:
@@ -625,16 +648,13 @@ async def send_bulk_campaign(payload: BulkCampaignPayload):
             phone = contact.phone.strip()
             personalized_text = payload.message_template.replace("{name}", name)
 
-            # 1. إذا تم رفع مرفق خاص بالحملة
             if payload.custom_attachment_b64:
                 file_bytes = base64.b64decode(payload.custom_attachment_b64)
                 await send_whatsapp_document(phone, personalized_text, file_bytes, payload.custom_attachment_name or "Offer.pdf")
-            # 2. أو إرفاق الكتالوج العام إذا كان الخيار محدداً
             elif payload.include_catalog and os.path.exists(CATALOG_FILE_PATH):
                 with open(CATALOG_FILE_PATH, "rb") as f:
                     pdf_bytes = f.read()
                 await send_whatsapp_document(phone, personalized_text, pdf_bytes, "Food_Development_Catalog.pdf")
-            # 3. إرسال نصي فقط
             else:
                 await send_whatsapp_direct(phone, personalized_text)
 
@@ -648,7 +668,7 @@ async def send_bulk_campaign(payload: BulkCampaignPayload):
         "message": f"تمت جدولة إرسال {len(payload.contacts)} رسالة بتأخير أمني ذكي ضد الحظر."
     }
 
-# ----------------- رادار الواتساب + التوجيه والرد التلقائي -----------------
+# ----------------- رادار الواتساب ومطابقة المجموعات -----------------
 @app.post("/api/whatsapp/webhook")
 def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
@@ -675,17 +695,34 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             auto_welcome_enabled = conf.get("exhibition_auto_reply_enabled") == "true"
             welcome_greeting = conf.get("exhibition_greeting_text", "")
 
-            cur.execute("SELECT id, company_name, brand_name FROM customer_accounts WHERE whatsapp_group_id = %s;", (chat_id,))
-            customer = cur.fetchone()
+            # مطابقة مرنة لمعرف المجموعة الرقمي
+            pure_group_num = re.sub(r'[^0-9]', '', chat_id)
+            customer = None
 
-            if not customer and "@g.us" in chat_id:
-                clean_gid = chat_id.split("@")[0]
-                cur.execute("SELECT id, company_name, brand_name FROM customer_accounts WHERE whatsapp_group_id LIKE %s;", (f"%{clean_gid}%",))
+            if pure_group_num:
+                cur.execute("""
+                SELECT id, company_name, brand_name 
+                FROM customer_accounts 
+                WHERE regexp_replace(whatsapp_group_id, '[^0-9]', '', 'g') = %s 
+                   OR whatsapp_group_id ILIKE %s 
+                LIMIT 1;
+                """, (pure_group_num, f"%{pure_group_num}%"))
                 customer = cur.fetchone()
 
             if customer:
                 channel_name = f"مجموعة: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
-                trigger_keywords = ["box", "boxes", "cartoon", "carton", "ctn", "odare", "order", "potato", "buns", "bun", "bread", "brioche", "طلب", "طلبية", "كرتون", "حبة"]
+                
+                # جلب الكلمات المفتاحية الحية من قاعدة البيانات
+                kw_val = conf.get("order_trigger_keywords", "")
+                if kw_val:
+                    trigger_keywords = [k.strip().lower() for k in kw_val.split(",") if k.strip()]
+                else:
+                    trigger_keywords = [
+                        "box", "boxes", "cartoon", "carton", "cartons", "ctn", "odare", "order", "orders",
+                        "potato", "buns", "bun", "bread", "brioche", "طلب", "طلبية", "طلبيات", "كرتون", 
+                        "كراتين", "كرتونين", "حبة", "حبات", "اوردر", "أوردر", "صلالة", "مسقط"
+                    ]
+                
                 if any(k in text.lower() for k in trigger_keywords):
                     cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
                     branches = cur.fetchall()
@@ -718,7 +755,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     finally:
         conn.close()
 
-# ----------------- مسارات العملاء وفروعهم -----------------
+# ----------------- مسارات العملاء -----------------
 @app.get("/api/customers")
 def get_customers():
     conn = get_db_connection()
@@ -786,48 +823,6 @@ def delete_customer(cust_id: int):
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM customer_accounts WHERE id = %s;", (cust_id,))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.get("/api/customers/{customer_id}/branches")
-def get_customer_branches(customer_id: int):
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s ORDER BY id ASC;", (customer_id,))
-            return cur.fetchall()
-    finally:
-        conn.close()
-
-@app.post("/api/customers/branches")
-def add_customer_branch(payload: CustomerBranchPayload):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            INSERT INTO customer_branches (customer_id, branch_name, branch_phone, location_url, city)
-            VALUES (%s, %s, %s, %s, %s) RETURNING id;
-            """, (payload.customer_id, payload.branch_name.strip(), payload.branch_phone or "", payload.location_url or "", payload.city or "مسقط"))
-            new_id = cur.fetchone()["id"]
-            conn.commit()
-            return {"status": "SUCCESS", "id": new_id}
-    finally:
-        conn.close()
-
-@app.delete("/api/customers/branches/{branch_id}")
-def delete_customer_branch(branch_id: int):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Database not reachable")
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM customer_branches WHERE id = %s;", (branch_id,))
             conn.commit()
             return {"status": "SUCCESS"}
     finally:
@@ -964,6 +959,53 @@ def delete_unified_agent(agent_id: int):
             cur.execute("DELETE FROM ai_agents WHERE id = %s;", (agent_id,))
             conn.commit()
             return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.post("/api/agents/test-global")
+async def test_unified_agent(payload: dict):
+    agent_id = payload.get("agent_id")
+    test_target = payload.get("test_phone", "").strip()
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متصلة")
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM ai_agents WHERE id = %s;", (agent_id,))
+            agent = cur.fetchone()
+            if not agent:
+                raise HTTPException(status_code=404, detail="الوكيل غير موجود")
+
+            destination = agent.get("dispatch_channel") or test_target
+            if not destination:
+                raise HTTPException(status_code=400, detail="يرجى إدخال رقم هاتف الاختبار")
+
+            message_text = (
+                f"*DISPATCH & DELIVERY ORDER (TEST SIMULATION)*\n"
+                f"----------------------------------------\n"
+                f"*Company:* Yummies Burgers & Bakery\n"
+                f"*Brand:* Yummies\n"
+                f"*Branch:* Boshar Branch\n"
+                f"*Order Received Date:* {datetime.now().strftime('%d/%m/%Y')}\n"
+                f"*Target Delivery Date:* Tomorrow 08:00 AM\n"
+                f"----------------------------------------\n"
+                f"*Ordered Items & Quantities:*\n"
+                f"- Brioche Burger Bun 75g: 10 Cartons\n"
+                f"- Potato Roll Bread 65g: 8 Cartons\n"
+                f"----------------------------------------\n"
+                f"*Branch Contact:* +96894987936\n"
+                f"*Delivery Location:*\n"
+                f"https://maps.google.com/?q=23.5880,58.3829\n"
+                f"----------------------------------------\n"
+                f"Food Development Co. | Logistics & Operations"
+            )
+
+        sent = await send_whatsapp_direct(destination, message_text)
+        if sent:
+            return {"status": "SUCCESS", "to": destination, "message_preview": message_text}
+        else:
+            raise HTTPException(status_code=400, detail="فشل الإرسال عبر محرك الواتساب")
     finally:
         conn.close()
 
