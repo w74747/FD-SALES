@@ -157,7 +157,7 @@ async function startOperationsWhatsApp() {
         if (!m.messages || m.messages.length === 0) return;
         const msg = m.messages[0];
 
-        // تخزين أي رسالة (واردة أو صادرة) في الذاكرة لتلبية طلبات فك التشفير التلقائية
+        // تخزين أي رسالة (صادرة أو واردة) لخدمة طلبات إعادة فك التشفير التلقائية
         if (msg.key && msg.key.id && msg.message) {
           messageStore.set(msg.key.id, msg.message);
           if (messageStore.size > 500) {
@@ -274,11 +274,9 @@ app.post('/send-document', async (req, res) => {
     const docBuffer = Buffer.from(file_base64, 'base64');
     const fname = (file_name || 'attachment.pdf').toLowerCase();
 
-    // تهيئة الجلسة التشفيرية مع المستلم أولاً لتفادي "في انتظار هذه الرسالة"
     try { await sessions.operations.sock.presenceSubscribe(jid); } catch (e) {}
 
     let sent;
-    // إذا كان المرفق صورة
     if (fname.endsWith('.png') || fname.endsWith('.jpg') || fname.endsWith('.jpeg') || fname.endsWith('.webp')) {
       const mime = fname.endsWith('.png') ? 'image/png' : 'image/jpeg';
       sent = await sessions.operations.sock.sendMessage(jid, {
@@ -286,9 +284,7 @@ app.post('/send-document', async (req, res) => {
         mimetype: mime,
         caption: caption || ''
       });
-    } 
-    // إذا كان المرفق مستند أو PDF
-    else {
+    } else {
       sent = await sessions.operations.sock.sendMessage(jid, {
         document: docBuffer,
         mimetype: 'application/pdf',
@@ -297,7 +293,6 @@ app.post('/send-document', async (req, res) => {
       });
     }
 
-    // حفظ مفتاح الرسالة الصادرة للرد على طلبات فك التشفير تلقائياً
     if (sent && sent.key && sent.message) {
       messageStore.set(sent.key.id, sent.message);
     }
