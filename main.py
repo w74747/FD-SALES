@@ -1,7 +1,8 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Includes: Dynamic Trigger Keywords, Auto-Welcome Bot, Smart Anti-Ban Campaign Engine,
+Includes: Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION),
+Dynamic Trigger Keywords, Auto-Welcome Bot, Smart Anti-Ban Campaign Engine,
 Fuzzy Group JID Matching, and Complete Production CRM Suite
 """
 
@@ -43,7 +44,7 @@ CATALOG_FILE_PATH = os.path.join(UPLOADS_FOLDER, "fdc_catalog.pdf")
 whatsapp_process = None
 
 LOGO_SVG_RAW = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 90" width="420" height="90">
-  <rect width="100%" height="100%" fill="transparent"/>
+  <rect width="100%" fill="transparent"/>
   <g transform="translate(10, 10)">
     <circle cx="35" cy="35" r="32" fill="#F5F0FC" stroke="#E4D9F5" stroke-width="2"/>
     <path d="M 35 15 C 23.95 15 15 23.95 15 35 C 15 46.05 23.95 55 35 55 C 43.5 55 50.8 49.7 53.6 42 L 44.5 42 C 42.4 46.3 38.9 48.5 35 48.5 C 27.5 48.5 21.5 42.5 21.5 35 C 21.5 27.5 27.5 21.5 35 21.5 C 40.2 21.5 44.6 25.2 46.5 29.5 L 54.2 29.5 C 51.5 20.9 44 15 35 15 Z" fill="#3A056A"/>
@@ -111,6 +112,58 @@ async def send_whatsapp_document(target_phone_or_group: str, caption: str, file_
     except Exception as e:
         logger.error(f"Error sending WhatsApp document: {e}")
         return False
+
+async def classify_order_intent(text: str) -> bool:
+    """
+    تحليل النية السياقية بالذكاء الاصطناعي:
+    - NEW_ORDER (طلب شراء وتوريد جديد محدد) -> True
+    - DISCUSSION (نقاش، استفسار عن موعد أو فاتورة، رد على كلام سابق، شكوى، أو تعديل شفهي) -> False
+    """
+    clean = text.strip().lower()
+
+    # 1. استبعاد صيغ الاستفهام والاستفسار الشائعة والشكاوى والتعديلات الشفهية مباشرة
+    inquiry_indicators = [
+        "متى", "وين", "وصل", "تأخر", "فاتورة", "حساب", "غيرو", "ليش", "كنسل", 
+        "عدل", "بدون فاتورة", "خليهم", "معاكم", "بكم", "السعر", "سلام", "شكرا", "thank"
+    ]
+    if any(q in clean for q in inquiry_indicators):
+        # إذا وُجد مؤشر استفسار واضح، لا يُعتبر طلباً إلا إذا كان قالباً رسمياً متكاملاً يتضمن فرعاً وكميات صريحة
+        if not (("branch" in clean or "فرع" in clean) and re.search(r'\d+\s*(box|boxes|carton|ctn|كرتون|كراتين)', clean)):
+            return False
+
+    # 2. استدعاء وكيل الذكاء الاصطناعي (LLM) عند توفر المفتاح لفحص السياق بدقة إنسانية
+    if PERPLEXITY_API_KEY:
+        prompt = (
+            "أنت مصنف ذكي متخصص في فرز رسائل مجموعات مبيعات المخابز الصناعية.\n"
+            "حلل الرسالة التالية بدقة وحدد هل هي (طلب توريد جديد محدد) أم (نقاش، استفسار، متابعة موعد، تعديل على كمية، سؤال عن فاتورة، أو حديث عام).\n\n"
+            f"نص الرسالة: \"\"\"{text}\"\"\"\n\n"
+            "شروط التصنيف الصارمة:\n"
+            "1. أجب بكلمة واحدة فقط: NEW_ORDER إذا كانت الرسالة تتضمن أمر شراء جديداً ومحدداً بالأصناف والكميات المطلوبة للتسليم.\n"
+            "2. أجب بكلمة واحدة فقط: DISCUSSION إذا كانت الرسالة سؤالاً، استفساراً، متابعة وصول، تعديلاً شفهياً لطلب سابق، أو رداً عادياً.\n"
+            "جوابك (كلمة واحدة فقط):"
+        )
+
+        try:
+            url = "https://api.perplexity.ai/chat/completions"
+            headers = {"Authorization": f"Bearer {PERPLEXITY_API_KEY}", "Content-Type": "application/json"}
+            payload = {
+                "model": "sonar",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.0,
+                "max_tokens": 10
+            }
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url, json=payload, headers=headers, timeout=4.5)
+                if resp.status_code == 200:
+                    verdict = resp.json()["choices"][0]["message"]["content"].strip().upper()
+                    return "NEW_ORDER" in verdict
+        except Exception as e:
+            logger.warning(f"Intent classifier call failed, falling back to rule engine: {e}")
+
+    # 3. محرك القواعد الاحتياطي السريع في حال تعذر استدعاء الذكاء الاصطناعي
+    has_quantity = bool(re.search(r'\d+\s*(box|boxes|cartoon|carton|cartons|ctn|كرتون|كراتين|حبة|حبات|كيس|درزن)', clean))
+    is_not_question = not any(q in clean for q in ["متى", "وين", "وصل", "تأخر", "؟", "?"])
+    return has_quantity and is_not_question
 
 def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sender_name: str, branches: list) -> str:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
@@ -397,7 +450,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="21.8.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="22.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -668,9 +721,9 @@ async def send_bulk_campaign(payload: BulkCampaignPayload):
         "message": f"تمت جدولة إرسال {len(payload.contacts)} رسالة بتأخير أمني ذكي ضد الحظر."
     }
 
-# ----------------- رادار الواتساب ومطابقة المجموعات -----------------
+# ----------------- رادار الواتساب ومطابقة المجموعات وبوابة الفرز الذكي -----------------
 @app.post("/api/whatsapp/webhook")
-def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
+async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
     if "@newsletter" in chat_id or "status@broadcast" in chat_id:
         return {"status": "IGNORED_BROADCAST"}
@@ -695,7 +748,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             auto_welcome_enabled = conf.get("exhibition_auto_reply_enabled") == "true"
             welcome_greeting = conf.get("exhibition_greeting_text", "")
 
-            # مطابقة مرنة لمعرف المجموعة الرقمي
+            # 1. مطابقة مرنة لمعرف المجموعة الرقمي
             pure_group_num = re.sub(r'[^0-9]', '', chat_id)
             customer = None
 
@@ -712,7 +765,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             if customer:
                 channel_name = f"مجموعة: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
                 
-                # جلب الكلمات المفتاحية الحية من قاعدة البيانات
+                # المرحلة 1: التصفية الأولية بالكلمات المفتاحية الحية لتفادي إشغال الذكاء الاصطناعي دون داعٍ
                 kw_val = conf.get("order_trigger_keywords", "")
                 if kw_val:
                     trigger_keywords = [k.strip().lower() for k in kw_val.split(",") if k.strip()]
@@ -723,18 +776,29 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         "كراتين", "كرتونين", "حبة", "حبات", "اوردر", "أوردر", "صلالة", "مسقط"
                     ]
                 
+                # إذا كانت الرسالة تذكر كلمات المخبوزات أو الكميات
                 if any(k in text.lower() for k in trigger_keywords):
-                    cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
-                    branches = cur.fetchall()
-                    logistics_msg = format_dispatch_order_en(text, customer, msg.sender_phone, msg.sender_name, branches)
-                    if logistics_group:
-                        forward_to_logistics = logistics_group
-                        logistics_text = logistics_msg
+                    # المرحلة 2: فحص النية السياقية بالذكاء الاصطناعي لحسم: هل هي طلب حقيقي أم مجرد نقاش؟
+                    is_actual_order = await classify_order_intent(text)
+
+                    if is_actual_order:
+                        # طلب شراء جديد مؤكد (NEW_ORDER) -> صياغة أمر التوريد والتحويل لمجموعة اللوجستيك فوراً
+                        cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
+                        branches = cur.fetchall()
+                        logistics_msg = format_dispatch_order_en(text, customer, msg.sender_phone, msg.sender_name, branches)
+                        if logistics_group:
+                            forward_to_logistics = logistics_group
+                            logistics_text = logistics_msg
+                    else:
+                        # نقاش، استفسار عن موعد، أو تعديل شفهي (DISCUSSION) -> عدم إرسال أي إشعار للوجستيك نهائياً
+                        logger.info(f"Classified as DISCUSSION/INQUIRY. Withheld from logistics: {text[:45]}")
+
             else:
                 if auto_welcome_enabled and not chat_id.endswith("@g.us"):
                     reply_text = welcome_greeting
                     send_catalog = os.path.exists(CATALOG_FILE_PATH)
 
+            # تسجيل جميع الرسائل في رادار المحادثات الميدانية للمتابعة
             try:
                 cur.execute("""
                 INSERT INTO whatsapp_logs (created_at, sender_name, sender_phone, channel_name, is_external_call, message_body)
@@ -755,7 +819,7 @@ def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     finally:
         conn.close()
 
-# ----------------- مسارات العملاء -----------------
+# ----------------- مسارات العملاء وفروعهم -----------------
 @app.get("/api/customers")
 def get_customers():
     conn = get_db_connection()
@@ -823,6 +887,48 @@ def delete_customer(cust_id: int):
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM customer_accounts WHERE id = %s;", (cust_id,))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.get("/api/customers/{customer_id}/branches")
+def get_customer_branches(customer_id: int):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s ORDER BY id ASC;", (customer_id,))
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+@app.post("/api/customers/branches")
+def add_customer_branch(payload: CustomerBranchPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO customer_branches (customer_id, branch_name, branch_phone, location_url, city)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id;
+            """, (payload.customer_id, payload.branch_name.strip(), payload.branch_phone or "", payload.location_url or "", payload.city or "مسقط"))
+            new_id = cur.fetchone()["id"]
+            conn.commit()
+            return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.delete("/api/customers/branches/{branch_id}")
+def delete_customer_branch(branch_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM customer_branches WHERE id = %s;", (branch_id,))
             conn.commit()
             return {"status": "SUCCESS"}
     finally:
