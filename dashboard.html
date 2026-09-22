@@ -278,11 +278,14 @@
                 </div>
             </div>
 
-            <!-- 5. العملاء -->
+            <!-- 5. العملاء (مع زر الفروع المحدث) -->
             <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
-                        <h3 class="font-bold text-sm brand-primary-text">دليل حسابات العملاء والفروع المعتمدة</h3>
+                        <div>
+                            <h3 class="font-bold text-sm brand-primary-text">دليل حسابات العملاء والفروع المعتمدة</h3>
+                            <div class="text-[11px] text-gray-500">إدارة حسابات الشركات، وربط الفروع بروابط خرائط جوجل وأرقام التواصل الميداني</div>
+                        </div>
                         <button onclick="openNewCustomerModal()" class="px-3.5 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة عميل يدوي</button>
                     </div>
                     <table class="w-full text-right text-xs border border-[#E4D9F5]">
@@ -341,7 +344,7 @@
                 </div>
             </div>
 
-            <!-- 8. منظومة الوكلاء الموحدين (مع خانة الكلمات المفتاحية الحية ورقم هاتف الاختبار) -->
+            <!-- 8. منظومة الوكلاء الموحدين -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
@@ -354,7 +357,6 @@
                         </button>
                     </div>
 
-                    <!-- بطاقة الكلمات المفتاحية الحية لرصد الطلبيات من المجموعات -->
                     <div class="p-3.5 bg-gray-50 border border-purple-200 rounded-xl space-y-2">
                         <div class="flex justify-between items-center">
                             <div>
@@ -368,7 +370,6 @@
                         <textarea id="order-keywords-input" rows="2" class="w-full p-2 border rounded-lg text-xs leading-relaxed font-mono" placeholder="box, boxes, كرتون, كراتين, طلب, طلبية, potato, buns..."></textarea>
                     </div>
 
-                    <!-- شريط رقم هاتف الاختبار المعتمد للوكلاء -->
                     <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-base">📱</span>
@@ -519,7 +520,57 @@
         </div>
     </main>
 
-    <!-- النوافذ المنبثقة (Modals) -->
+    <!-- مودال إدارة فروع العميل (Branches Modal) المحدث والمسترجع -->
+    <div id="branches-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4 text-xs">
+            <div class="flex justify-between items-center border-b pb-2">
+                <div>
+                    <h3 class="font-bold text-sm brand-primary-text" id="branches-modal-title">إدارة فروع العميل</h3>
+                    <div class="text-[10px] text-gray-500" id="branches-modal-subtitle">عرض وإضافة فروع الشركة وروابط المواقع وأرقام التواصل</div>
+                </div>
+                <button onclick="closeModal('branches-modal')" class="text-gray-400 hover:text-gray-600 text-base font-bold">✕</button>
+            </div>
+
+            <!-- قائمة الفروع الحالية -->
+            <div class="space-y-2">
+                <div class="font-bold text-gray-700">الفروع المسجلة الحالية:</div>
+                <div id="branches-list-container" class="max-h-48 overflow-y-auto space-y-2 divide-y divide-gray-100">
+                    <div class="text-center text-gray-400 p-2">جاري تحميل الفروع...</div>
+                </div>
+            </div>
+
+            <!-- نموذج إضافة فرع جديد -->
+            <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2.5">
+                <div class="font-bold text-[#3A056A]">+ إضافة فرع جديد لهذا العميل:</div>
+                <input type="hidden" id="branch-customer-id">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-bold mb-1">اسم الفرع (مثل: Al khoudh Branch):</label>
+                        <input type="text" id="new-branch-name" class="w-full p-2 border rounded-lg bg-white" placeholder="فرع الخوض">
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-1">رقم هاتف الفرع (Contact):</label>
+                        <input type="text" id="new-branch-phone" class="w-full p-2 border rounded-lg bg-white font-mono" placeholder="+968XXXXXXXX">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">رابط خرائط جوجل (Google Maps URL):</label>
+                    <input type="text" id="new-branch-location" class="w-full p-2 border rounded-lg bg-white font-mono text-[11px]" placeholder="https://maps.app.goo.gl/...">
+                </div>
+                <div class="flex justify-end pt-1">
+                    <button onclick="submitNewBranch()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg shadow-xs hover:opacity-95">
+                        + حفظ الفرع
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t">
+                <button onclick="closeModal('branches-modal')" class="px-4 py-2 border rounded-lg">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال إضافة وحفظ عميل جديد -->
     <div id="customer-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2" id="customer-modal-title">إضافة وحفظ عميل جديد</h3>
@@ -559,6 +610,7 @@
         </div>
     </div>
 
+    <!-- مودال تعديل وإضافة الهدف والفرصة البيعية -->
     <div id="target-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2" id="target-modal-title">بيانات الفرصة البيعية</h3>
@@ -600,6 +652,7 @@
         </div>
     </div>
 
+    <!-- مودال إضافة وكيل جديد -->
     <div id="new-agent-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 no-print p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">إضافة وكيل ذكي جديد (Unified Agent)</h3>
@@ -632,6 +685,7 @@
         </div>
     </div>
 
+    <!-- مودال تعديل الوكيل الذكي -->
     <div id="agent-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات وبرومبت الوكيل</h3>
@@ -665,6 +719,7 @@
         </div>
     </div>
 
+    <!-- مودال جدولة مهمة جديدة في التقويم -->
     <div id="calendar-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">جدولة مهمة / زيارة ميدانية جديدة</h3>
@@ -714,6 +769,7 @@
         </div>
     </div>
 
+    <!-- مودال تعديل بيانات مهمة التقويم -->
     <div id="calendar-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات المهمة / الزيارة</h3>
@@ -766,6 +822,7 @@
         </div>
     </div>
 
+    <!-- مودال تعديل بيانات عضو فريق المبيعات -->
     <div id="rep-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
@@ -805,6 +862,7 @@
         </div>
     </div>
 
+    <!-- مودال تقييم العينة وتسجيل رأي الشيف -->
     <div id="sample-feedback-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تسجيل تقييم وملاحظات الشيف الفنية</h3>
@@ -828,6 +886,7 @@
         </div>
     </div>
 
+    <!-- مودال تحويل العينة لأمر شراء رسمي (PO) -->
     <div id="sample-convert-po-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
             <h3 class="font-bold text-sm text-emerald-800 border-b pb-2">تحويل العينة إلى أمر شراء رسمي (PO)</h3>
@@ -854,12 +913,103 @@
             customers: [],
             samples: [],
             calendar: [],
-            agents: []
+            agents: [],
+            activeBranchCustomerId: null
         };
 
         let parsedBulkContacts = [];
         let campaignCustomAttachmentB64 = null;
         let campaignCustomAttachmentName = null;
+
+        // ---------------- دوال إدارة الفروع (Branches Management) ----------------
+        window.openBranchesModal = async function(customerId) {
+            window.appState.activeBranchCustomerId = customerId;
+            const c = window.appState.customers.find(x => x.id === customerId);
+            const titleEl = document.getElementById('branches-modal-title');
+            const subTitleEl = document.getElementById('branches-modal-subtitle');
+            const custIdInput = document.getElementById('branch-customer-id');
+            
+            if (titleEl && c) titleEl.innerText = `إدارة فروع: ${c.company_name}`;
+            if (subTitleEl && c) subTitleEl.innerText = `العلامة التجارية: ${c.brand_name || 'عام'} | رقم التواصل الأساسي: ${c.phone}`;
+            if (custIdInput) custIdInput.value = customerId;
+
+            // تفريغ حقول الإدخال
+            document.getElementById('new-branch-name').value = '';
+            document.getElementById('new-branch-phone').value = '';
+            document.getElementById('new-branch-location').value = '';
+
+            openModal('branches-modal');
+            await loadCustomerBranches(customerId);
+        };
+
+        window.loadCustomerBranches = async function(customerId) {
+            const container = document.getElementById('branches-list-container');
+            if (!container) return;
+            container.innerHTML = '<div class="text-center text-gray-400 p-2">جاري تحميل الفروع...</div>';
+
+            try {
+                const res = await fetch(`/api/customers/${customerId}/branches`);
+                const branches = await res.json();
+
+                if (branches && branches.length > 0) {
+                    container.innerHTML = branches.map(b => `
+                        <div class="p-2.5 bg-gray-50 border rounded-lg flex justify-between items-start text-[11px]">
+                            <div class="space-y-0.5">
+                                <div class="font-bold text-purple-900">${b.branch_name}</div>
+                                <div class="text-gray-600 font-mono">الهاتف: ${b.branch_phone || 'غير مسجل'}</div>
+                                ${b.location_url ? `<a href="${b.location_url}" target="_blank" class="text-blue-600 hover:underline flex items-center gap-1 font-mono text-[10px]">📍 فتح الموقع بالخريطة</a>` : '<div class="text-gray-400 text-[10px]">لا يوجد رابط موقع</div>'}
+                            </div>
+                            <button onclick="deleteCustomerBranch(${b.id})" class="text-red-600 hover:text-red-800 font-bold px-1.5 py-0.5 rounded text-[10px]">
+                                حذف الفرع
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div class="text-center text-gray-400 p-2">لا توجد فروع مسجلة لهذا العميل حتى الآن. يمكنك إضافة الفرع بالأسفل.</div>';
+                }
+            } catch(e) {
+                container.innerHTML = '<div class="text-center text-red-500 p-2">تعذر تحميل الفروع</div>';
+            }
+        };
+
+        window.submitNewBranch = async function() {
+            const customer_id = window.appState.activeBranchCustomerId;
+            const branch_name = document.getElementById('new-branch-name').value.trim();
+            const branch_phone = document.getElementById('new-branch-phone').value.trim();
+            const location_url = document.getElementById('new-branch-location').value.trim();
+
+            if (!branch_name) return alert("يرجى إدخال اسم الفرع (مثلاً: Al khoudh Branch)");
+
+            const res = await fetch('/api/customers/branches', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_id,
+                    branch_name,
+                    branch_phone,
+                    location_url,
+                    city: 'مسقط'
+                })
+            });
+
+            if (res.ok) {
+                document.getElementById('new-branch-name').value = '';
+                document.getElementById('new-branch-phone').value = '';
+                document.getElementById('new-branch-location').value = '';
+                await loadCustomerBranches(customer_id);
+                alert("تم حفظ الفرع بنجاح ✓");
+            } else {
+                alert("فشل حفظ بيانات الفرع");
+            }
+        };
+
+        window.deleteCustomerBranch = async function(branchId) {
+            if (!confirm("هل أنت متأكد من حذف هذا الفرع؟")) return;
+            const res = await fetch(`/api/customers/branches/${branchId}`, { method: 'DELETE' });
+            if (res.ok) {
+                await loadCustomerBranches(window.appState.activeBranchCustomerId);
+            }
+        };
 
         // ---------------- دوال الكلمات المفتاحية الحية ----------------
         window.loadOrderKeywords = async function() {
@@ -1631,7 +1781,7 @@
                 }
             } catch(e) {}
 
-            // 3. العملاء
+            // 3. العملاء (مع زر الفروع المحدث)
             try {
                 const cRes = await fetch('/api/customers');
                 window.appState.customers = await cRes.json();
@@ -1647,6 +1797,7 @@
                                 '<td class="p-3 font-mono text-[10px] text-purple-700">' + (c.whatsapp_group_id || 'غير مربوط') + '</td>' +
                                 '<td class="p-3 no-print">' +
                                     '<div class="flex items-center justify-center gap-1.5 whitespace-nowrap">' +
+                                        '<button onclick="openBranchesModal(' + c.id + ')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] rounded text-[10px] font-bold border border-purple-300">الفروع</button>' +
                                         '<button onclick="openEditCustomerModal(' + c.id + ')" class="px-2 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-[10px] font-bold border border-purple-200">تعديل</button>' +
                                         '<button onclick="deleteItem(\'/api/customers/' + c.id + '\')" class="text-red-600 font-bold text-[10px] px-1">حذف</button>' +
                                     '</div>' +
