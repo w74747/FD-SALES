@@ -2,8 +2,8 @@
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
 Includes: Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION),
-Dynamic Trigger Keywords, Auto-Welcome Bot, Smart Anti-Ban Campaign Engine,
-Fuzzy Group JID Matching, and Complete Production CRM Suite
+Fuzzy Branch Matching & Branch Update Endpoints, Dynamic Trigger Keywords, 
+Auto-Welcome Bot, Smart Anti-Ban Campaign Engine, and Full CRM Suite
 """
 
 import os
@@ -121,17 +121,14 @@ async def classify_order_intent(text: str) -> bool:
     """
     clean = text.strip().lower()
 
-    # 1. استبعاد صيغ الاستفهام والاستفسار الشائعة والشكاوى والتعديلات الشفهية مباشرة
     inquiry_indicators = [
         "متى", "وين", "وصل", "تأخر", "فاتورة", "حساب", "غيرو", "ليش", "كنسل", 
         "عدل", "بدون فاتورة", "خليهم", "معاكم", "بكم", "السعر", "سلام", "شكرا", "thank"
     ]
     if any(q in clean for q in inquiry_indicators):
-        # إذا وُجد مؤشر استفسار واضح، لا يُعتبر طلباً إلا إذا كان قالباً رسمياً متكاملاً يتضمن فرعاً وكميات صريحة
         if not (("branch" in clean or "فرع" in clean) and re.search(r'\d+\s*(box|boxes|carton|ctn|كرتون|كراتين)', clean)):
             return False
 
-    # 2. استدعاء وكيل الذكاء الاصطناعي (LLM) عند توفر المفتاح لفحص السياق بدقة إنسانية
     if PERPLEXITY_API_KEY:
         prompt = (
             "أنت مصنف ذكي متخصص في فرز رسائل مجموعات مبيعات المخابز الصناعية.\n"
@@ -160,17 +157,25 @@ async def classify_order_intent(text: str) -> bool:
         except Exception as e:
             logger.warning(f"Intent classifier call failed, falling back to rule engine: {e}")
 
-    # 3. محرك القواعد الاحتياطي السريع في حال تعذر استدعاء الذكاء الاصطناعي
     has_quantity = bool(re.search(r'\d+\s*(box|boxes|cartoon|carton|cartons|ctn|كرتون|كراتين|حبة|حبات|كيس|درزن)', clean))
     is_not_question = not any(q in clean for q in ["متى", "وين", "وصل", "تأخر", "؟", "?"])
     return has_quantity and is_not_question
 
+def normalize_branch_text(s: str) -> str:
+    """تنظيف ذكي للنص لاستخراج الكلمات الدلالية الحقيقية للفرع دون الكلمات الشائعة"""
+    if not s:
+        return ""
+    clean = re.sub(r'[^a-zA-Z0-9\u0600-\u06FF\s]', ' ', s.lower())
+    clean = re.sub(r'\b(branch|main|street|st|al|فرع|شارع)\b', ' ', clean)
+    return ' '.join(clean.split())
+
 def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sender_name: str, branches: list) -> str:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
+    
     loc_match = re.search(r'(https?://[^\s]+)', text)
     location_url = loc_match.group(1) if loc_match else ""
 
-    contact_match = re.search(r'(?:contact|phone|tel|رقم)[:\s]*([0-9\+\s]{7,15})', text, re.IGNORECASE)
+    contact_match = re.search(r'(?:contact|phone|tel|رقم|mobile)[:\s]*([0-9\+\s]{7,15})', text, re.IGNORECASE)
     branch_contact = contact_match.group(1).strip().replace(" ", "") if contact_match else ""
 
     delivery_date = "Next Scheduled Delivery"
@@ -182,8 +187,8 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
     order_date = date_match.group(1).strip() if date_match else datetime.now().strftime("%d/%m/%Y")
 
     brand_name = customer.get("brand_name") or ""
-    branch_name = "Main Branch"
-
+    
+    branch_name = ""
     for l in lines:
         if 'branch' in l.lower() or 'فرع' in l.lower():
             m = re.search(r'([A-Za-z\u0600-\u06FF\s\-]+(?:branch|فرع[A-Za-z\u0600-\u06FF\s\-]*))', l, re.IGNORECASE)
@@ -191,18 +196,48 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
                 clean_b = m.group(1).strip()
                 if brand_name and brand_name.lower() in clean_b.lower():
                     clean_b = re.sub(brand_name, '', clean_b, flags=re.IGNORECASE).strip()
-                branch_name = clean_b.title() if clean_b else "Main Branch"
+                branch_name = clean_b.title() if clean_b else ""
                 break
 
-    for b in branches:
-        b_name = b.get("branch_name", "")
-        if b_name.lower() in text.lower() or b_name.lower() in branch_name.lower():
-            branch_name = b_name
-            if not location_url and b.get("location_url"):
-                location_url = b["location_url"]
-            if not branch_contact and b.get("branch_phone"):
-                branch_contact = b["branch_phone"]
-            break
+    matched_branch = None
+
+    # خوارزمية المطابقة الذكية والمرنة مع فروع العميل المسجلة
+    if branches:
+        for b in branches:
+            b_reg = b.get("branch_name", "").strip()
+            b_norm = normalize_branch_text(b_reg)
+            text_norm = normalize_branch_text(text)
+            branch_norm = normalize_branch_text(branch_name)
+
+            # 1. مطابقة احتواء مباشر
+            if (b_reg.lower() in text.lower()) or (branch_name and (branch_name.lower() in b_reg.lower() or b_reg.lower() in branch_name.lower())):
+                matched_branch = b
+                break
+
+            # 2. مطابقة تقاطع الكلمات الدلالية (Keyword Intersection) مثل 'khoudh'
+            if b_norm and (branch_norm or text_norm):
+                b_words = set(b_norm.split())
+                target_words = set(branch_norm.split()) if branch_norm else set(text_norm.split())
+                if b_words.intersection(target_words):
+                    matched_branch = b
+                    break
+
+        if not matched_branch and len(branches) == 1:
+            matched_branch = branches[0]
+
+    if matched_branch:
+        if not branch_name:
+            branch_name = matched_branch.get("branch_name", "Main Branch")
+        if not location_url and matched_branch.get("location_url"):
+            location_url = matched_branch["location_url"]
+        if not branch_contact and matched_branch.get("branch_phone"):
+            branch_contact = matched_branch["branch_phone"]
+
+    if not branch_name:
+        branch_name = "Main Branch"
+
+    if not branch_contact:
+        branch_contact = customer.get("phone") or "N/A"
 
     raw_items = []
     for l in lines:
@@ -240,7 +275,7 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
         f"*Ordered Items & Quantities:*\n"
         f"{items_formatted}\n"
         f"----------------------------------------\n"
-        f"*Branch Contact:* {branch_contact if branch_contact else 'N/A'}\n"
+        f"*Branch Contact:* {branch_contact}\n"
         f"*Delivery Location:*\n"
         f"{location_url if location_url else 'Registered Branch Location'}\n"
         f"----------------------------------------\n"
@@ -450,7 +485,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="22.1.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="22.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -511,6 +546,12 @@ class UpdateCustomerPayload(BaseModel):
 
 class CustomerBranchPayload(BaseModel):
     customer_id: int
+    branch_name: str
+    branch_phone: Optional[str] = ""
+    location_url: Optional[str] = ""
+    city: Optional[str] = "مسقط"
+
+class UpdateCustomerBranchPayload(BaseModel):
     branch_name: str
     branch_phone: Optional[str] = ""
     location_url: Optional[str] = ""
@@ -613,7 +654,7 @@ def verify_2fa(payload: Verify2FAPayload):
     finally:
         conn.close()
 
-# ----------------- الكلمات المفتاحية الحية لرصد الطلبيات -----------------
+# ----------------- الكلمات المفتاحية الحية -----------------
 @app.get("/api/system/trigger-keywords")
 def get_trigger_keywords():
     conn = get_db_connection()
@@ -721,7 +762,7 @@ async def send_bulk_campaign(payload: BulkCampaignPayload):
         "message": f"تمت جدولة إرسال {len(payload.contacts)} رسالة بتأخير أمني ذكي ضد الحظر."
     }
 
-# ----------------- رادار الواتساب ومطابقة المجموعات وبوابة الفرز الذكي -----------------
+# ----------------- رادار الواتساب ومطابقة المجموعات -----------------
 @app.post("/api/whatsapp/webhook")
 async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
@@ -748,13 +789,12 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             auto_welcome_enabled = conf.get("exhibition_auto_reply_enabled") == "true"
             welcome_greeting = conf.get("exhibition_greeting_text", "")
 
-            # 1. مطابقة مرنة لمعرف المجموعة الرقمي
             pure_group_num = re.sub(r'[^0-9]', '', chat_id)
             customer = None
 
             if pure_group_num:
                 cur.execute("""
-                SELECT id, company_name, brand_name 
+                SELECT id, company_name, brand_name, phone 
                 FROM customer_accounts 
                 WHERE regexp_replace(whatsapp_group_id, '[^0-9]', '', 'g') = %s 
                    OR whatsapp_group_id ILIKE %s 
@@ -765,7 +805,6 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             if customer:
                 channel_name = f"مجموعة: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
                 
-                # المرحلة 1: التصفية الأولية بالكلمات المفتاحية الحية لتفادي إشغال الذكاء الاصطناعي دون داعٍ
                 kw_val = conf.get("order_trigger_keywords", "")
                 if kw_val:
                     trigger_keywords = [k.strip().lower() for k in kw_val.split(",") if k.strip()]
@@ -776,13 +815,10 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         "كراتين", "كرتونين", "حبة", "حبات", "اوردر", "أوردر", "صلالة", "مسقط"
                     ]
                 
-                # إذا كانت الرسالة تذكر كلمات المخبوزات أو الكميات
                 if any(k in text.lower() for k in trigger_keywords):
-                    # المرحلة 2: فحص النية السياقية بالذكاء الاصطناعي لحسم: هل هي طلب حقيقي أم مجرد نقاش؟
                     is_actual_order = await classify_order_intent(text)
 
                     if is_actual_order:
-                        # طلب شراء جديد مؤكد (NEW_ORDER) -> صياغة أمر التوريد والتحويل لمجموعة اللوجستيك فوراً
                         cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
                         branches = cur.fetchall()
                         logistics_msg = format_dispatch_order_en(text, customer, msg.sender_phone, msg.sender_name, branches)
@@ -790,15 +826,13 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                             forward_to_logistics = logistics_group
                             logistics_text = logistics_msg
                     else:
-                        # نقاش، استفسار عن موعد، أو تعديل شفهي (DISCUSSION) -> عدم إرسال أي إشعار للوجستيك نهائياً
-                        logger.info(f"Classified as DISCUSSION/INQUIRY. Withheld from logistics: {text[:45]}")
+                        logger.info(f"Classified as DISCUSSION. Withheld from logistics: {text[:45]}")
 
             else:
                 if auto_welcome_enabled and not chat_id.endswith("@g.us"):
                     reply_text = welcome_greeting
                     send_catalog = os.path.exists(CATALOG_FILE_PATH)
 
-            # تسجيل جميع الرسائل في رادار المحادثات الميدانية للمتابعة
             try:
                 cur.execute("""
                 INSERT INTO whatsapp_logs (created_at, sender_name, sender_phone, channel_name, is_external_call, message_body)
@@ -918,6 +952,23 @@ def add_customer_branch(payload: CustomerBranchPayload):
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
+    finally:
+        conn.close()
+
+@app.post("/api/customers/branches/{branch_id}/update")
+def update_customer_branch(branch_id: int, payload: UpdateCustomerBranchPayload):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database not reachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            UPDATE customer_branches 
+            SET branch_name = %s, branch_phone = %s, location_url = %s, city = %s
+            WHERE id = %s;
+            """, (payload.branch_name.strip(), payload.branch_phone or "", payload.location_url or "", payload.city or "مسقط", branch_id))
+            conn.commit()
+            return {"status": "SUCCESS"}
     finally:
         conn.close()
 
