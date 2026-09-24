@@ -1,9 +1,11 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Includes: Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION),
-Fuzzy Branch Matching & Branch Update Endpoints, Dynamic Trigger Keywords, 
-Auto-Welcome Bot, Smart Anti-Ban Campaign Engine, and Full CRM Suite
+Features:
+- Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION)
+- Fuzzy Phonetic Branch Matching (Bawshar vs Boshar & Al Khoudh)
+- Branch CRUD with Update Endpoints
+- Dynamic Trigger Keywords & JID Matching
 """
 
 import os
@@ -162,10 +164,13 @@ async def classify_order_intent(text: str) -> bool:
     return has_quantity and is_not_question
 
 def normalize_branch_text(s: str) -> str:
-    """تنظيف ذكي للنص لاستخراج الكلمات الدلالية الحقيقية للفرع دون الكلمات الشائعة"""
+    """توحيد الحروف المتقاربة بالإنجليزية والعربية لحل فروق التهجئة مثل Bawshar و Boshar"""
     if not s:
         return ""
-    clean = re.sub(r'[^a-zA-Z0-9\u0600-\u06FF\s]', ' ', s.lower())
+    clean = s.lower()
+    clean = re.sub(r'b[ao]+w?sh[ae]?r', 'boshar', clean)        # bawshar / bousher / boshar -> boshar
+    clean = re.sub(r'kh[ou]+[wd]+h?', 'khoudh', clean)           # khoud / khodh / khoudh -> khoudh
+    clean = re.sub(r'[^a-zA-Z0-9\u0600-\u06FF\s]', ' ', clean)
     clean = re.sub(r'\b(branch|main|street|st|al|فرع|شارع)\b', ' ', clean)
     return ' '.join(clean.split())
 
@@ -201,7 +206,7 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
 
     matched_branch = None
 
-    # خوارزمية المطابقة الذكية والمرنة مع فروع العميل المسجلة
+    # مطابقة صوتية ذكية للفروع تتجاوز فروق الحروف
     if branches:
         for b in branches:
             b_reg = b.get("branch_name", "").strip()
@@ -209,12 +214,10 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
             text_norm = normalize_branch_text(text)
             branch_norm = normalize_branch_text(branch_name)
 
-            # 1. مطابقة احتواء مباشر
-            if (b_reg.lower() in text.lower()) or (branch_name and (branch_name.lower() in b_reg.lower() or b_reg.lower() in branch_name.lower())):
+            if (b_reg.lower() in text.lower()) or (branch_name and branch_name.lower() in b_reg.lower()):
                 matched_branch = b
                 break
 
-            # 2. مطابقة تقاطع الكلمات الدلالية (Keyword Intersection) مثل 'khoudh'
             if b_norm and (branch_norm or text_norm):
                 b_words = set(b_norm.split())
                 target_words = set(branch_norm.split()) if branch_norm else set(text_norm.split())
@@ -222,8 +225,13 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
                     matched_branch = b
                     break
 
-        if not matched_branch and len(branches) == 1:
-            matched_branch = branches[0]
+        if not matched_branch and sender_phone:
+            clean_sender = re.sub(r'[^0-9]', '', sender_phone)
+            for b in branches:
+                clean_b_phone = re.sub(r'[^0-9]', '', b.get("branch_phone") or "")
+                if clean_b_phone and (clean_b_phone.endswith(clean_sender[-8:]) or clean_sender.endswith(clean_b_phone[-8:])):
+                    matched_branch = b
+                    break
 
     if matched_branch:
         if not branch_name:
@@ -237,11 +245,11 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
         branch_name = "Main Branch"
 
     if not branch_contact:
-        branch_contact = customer.get("phone") or "N/A"
+        branch_contact = sender_phone if sender_phone else (customer.get("phone") or "N/A")
 
     raw_items = []
     for l in lines:
-        if re.search(r'^(date|coming|location|contact|tel|phone|odare|order|تاريخ|توصيل|شكرا|thank)', l, re.IGNORECASE):
+        if re.search(r'^(date|coming|location|contact|tel|phone|odare|order|تاريخ|توصيل|شكرا|thank|good|because|which|can|forwarded)', l, re.IGNORECASE):
             continue
         if 'http' in l.lower() or 'branch' in l.lower() or (brand_name and l.lower() == brand_name.lower()):
             continue
@@ -485,7 +493,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="22.2.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="22.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
