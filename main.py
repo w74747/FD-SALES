@@ -1,10 +1,11 @@
 """
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
-Features:
+Includes: 
 - Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION)
+- Dispatched Orders Analytics & Monthly Reporting (By Customer & Branch)
 - Fuzzy Phonetic Branch Matching (Bawshar vs Boshar & Al Khoudh)
-- Branch CRUD with Update Endpoints
+- Branch CRUD with Live Update Endpoints
 - Dynamic Trigger Keywords & JID Matching
 """
 
@@ -174,7 +175,42 @@ def normalize_branch_text(s: str) -> str:
     clean = re.sub(r'\b(branch|main|street|st|al|فرع|شارع)\b', ' ', clean)
     return ' '.join(clean.split())
 
-def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sender_name: str, branches: list) -> str:
+def save_dispatched_order_items(customer_id: int, customer_name: str, branch_name: str, order_date_str: str, cleaned_items: list):
+    """تخزين بنود الطلبية والكميات المستخرجة رقمياً في قاعدة البيانات للإحصائيات الشهرية"""
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        try:
+            parsed_date = datetime.strptime(order_date_str.strip(), "%d/%m/%Y").date()
+        except Exception:
+            parsed_date = datetime.now().date()
+
+        with conn.cursor() as cur:
+            for item in cleaned_items:
+                if item == "Items specified in customer communication":
+                    continue
+                qty_match = re.search(r'(\d+)\s*(box|boxes|carton|cartons|ctn|كرتون|كراتين)?', item, re.IGNORECASE)
+                qty = int(qty_match.group(1)) if qty_match else 1
+                unit = qty_match.group(2) if qty_match and qty_match.group(2) else 'box'
+
+                clean_item = re.sub(r'[:=\-\d]+', ' ', item)
+                clean_item = re.sub(r'\b(box|boxes|carton|cartons|ctn|كرتون|كراتين)\b', ' ', clean_item, flags=re.IGNORECASE)
+                clean_item = ' '.join(clean_item.split()).strip()
+                if not clean_item:
+                    clean_item = "Potato Buns / Bakery Item"
+
+                cur.execute("""
+                INSERT INTO dispatched_orders (customer_id, customer_name, branch_name, order_date, item_name, quantity, unit)
+                VALUES (%s, %s, %s, %s, %s, %s, %s);
+                """, (customer_id, customer_name, branch_name, parsed_date, clean_item, qty, unit))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error saving dispatched order items: {e}")
+    finally:
+        conn.close()
+
+def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sender_name: str, branches: list) -> tuple:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     
     loc_match = re.search(r'(https?://[^\s]+)', text)
@@ -206,7 +242,6 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
 
     matched_branch = None
 
-    # مطابقة صوتية ذكية للفروع تتجاوز فروق الحروف
     if branches:
         for b in branches:
             b_reg = b.get("branch_name", "").strip()
@@ -271,7 +306,7 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
 
     items_formatted = "\n".join([f"- {it}" for it in cleaned_items])
 
-    return (
+    formatted_msg = (
         f"*DISPATCH & DELIVERY ORDER*\n"
         f"----------------------------------------\n"
         f"*Company:* {customer.get('company_name', 'Customer')}\n"
@@ -289,6 +324,8 @@ def format_dispatch_order_en(text: str, customer: dict, sender_phone: str, sende
         f"----------------------------------------\n"
         f"Food Development Co. | Logistics & Operations"
     )
+
+    return formatted_msg, branch_name, order_date, cleaned_items
 
 def init_database():
     conn = get_db_connection()
@@ -383,6 +420,21 @@ def init_database():
                 location_url TEXT DEFAULT '',
                 city VARCHAR(100) DEFAULT 'مسقط',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # جدول بنود الطلبيات الرقمي للإحصائيات الشهرية
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS dispatched_orders (
+                id SERIAL PRIMARY KEY,
+                customer_id INT REFERENCES customer_accounts(id) ON DELETE CASCADE,
+                customer_name VARCHAR(200) NOT NULL,
+                branch_name VARCHAR(150) NOT NULL,
+                order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                item_name VARCHAR(200) NOT NULL,
+                quantity INT NOT NULL DEFAULT 1,
+                unit VARCHAR(50) DEFAULT 'box',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
             """)
 
@@ -493,7 +545,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="22.3.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="22.4.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -770,7 +822,7 @@ async def send_bulk_campaign(payload: BulkCampaignPayload):
         "message": f"تمت جدولة إرسال {len(payload.contacts)} رسالة بتأخير أمني ذكي ضد الحظر."
     }
 
-# ----------------- رادار الواتساب ومطابقة المجموعات -----------------
+# ----------------- رادار الواتساب وبوابة الفرز الذكي وحفظ الإحصائيات -----------------
 @app.post("/api/whatsapp/webhook")
 async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
@@ -829,10 +881,17 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                     if is_actual_order:
                         cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
                         branches = cur.fetchall()
-                        logistics_msg = format_dispatch_order_en(text, customer, msg.sender_phone, msg.sender_name, branches)
+                        logistics_msg, matched_branch_name, parsed_order_date, order_items = format_dispatch_order_en(
+                            text, customer, msg.sender_phone, msg.sender_name, branches
+                        )
                         if logistics_group:
                             forward_to_logistics = logistics_group
                             logistics_text = logistics_msg
+
+                        # تسجيل بنود الطلبية رقمياً للإحصائيات الشهرية
+                        save_dispatched_order_items(
+                            customer["id"], customer["company_name"], matched_branch_name, parsed_order_date, order_items
+                        )
                     else:
                         logger.info(f"Classified as DISCUSSION. Withheld from logistics: {text[:45]}")
 
@@ -857,6 +916,64 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 "catalog_path": CATALOG_FILE_PATH if send_catalog else None,
                 "forward_to_logistics": forward_to_logistics,
                 "logistics_text": logistics_text
+            }
+    finally:
+        conn.close()
+
+# ----------------- مسارات إحصائيات الطلبيات الشهرية -----------------
+@app.get("/api/analytics/monthly-orders")
+def get_monthly_orders_analytics(month: Optional[str] = None, customer_id: Optional[int] = None):
+    conn = get_db_connection()
+    if not conn:
+        return {"records": [], "totals_by_item": [], "total_boxes": 0}
+    try:
+        with conn.cursor() as cur:
+            query = """
+                SELECT 
+                    TO_CHAR(order_date, 'YYYY-MM') AS order_month,
+                    customer_name,
+                    branch_name,
+                    item_name,
+                    SUM(quantity) AS total_qty,
+                    unit
+                FROM dispatched_orders
+                WHERE 1=1
+            """
+            params = []
+            if month:
+                query += " AND TO_CHAR(order_date, 'YYYY-MM') = %s"
+                params.append(month)
+            if customer_id:
+                query += " AND customer_id = %s"
+                params.append(customer_id)
+
+            query += " GROUP BY order_month, customer_name, branch_name, item_name, unit ORDER BY order_month DESC, customer_name ASC;"
+            cur.execute(query, tuple(params))
+            rows = cur.fetchall()
+
+            total_boxes = sum(r["total_qty"] for r in rows)
+
+            item_query = """
+                SELECT item_name, SUM(quantity) as item_total 
+                FROM dispatched_orders 
+                WHERE 1=1
+            """
+            item_params = []
+            if month:
+                item_query += " AND TO_CHAR(order_date, 'YYYY-MM') = %s"
+                item_params.append(month)
+            if customer_id:
+                item_query += " AND customer_id = %s"
+                item_params.append(customer_id)
+            item_query += " GROUP BY item_name ORDER BY item_total DESC;"
+
+            cur.execute(item_query, tuple(item_params))
+            item_totals = cur.fetchall()
+
+            return {
+                "records": rows,
+                "totals_by_item": item_totals,
+                "total_boxes": total_boxes
             }
     finally:
         conn.close()
