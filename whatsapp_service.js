@@ -1,7 +1,7 @@
 /**
- * whatsapp_service.js - Multi-Session WhatsApp Engine with Smart Media & Image Detection
+ * whatsapp_service.js - Multi-Session WhatsApp Engine with Smart Media & Forwarded Message Support
  * Food Development Company (شركة تنمية الغذاء)
- * Solves 'Waiting for this message' by caching outgoing messages & using presenceSubscribe
+ * Handles auto media decryption, message cache storage, and multi-format text extraction
  */
 
 const express = require('express');
@@ -157,7 +157,7 @@ async function startOperationsWhatsApp() {
         if (!m.messages || m.messages.length === 0) return;
         const msg = m.messages[0];
 
-        // تخزين أي رسالة (صادرة أو واردة) لخدمة طلبات إعادة فك التشفير التلقائية
+        // تخزين أي رسالة لتلبية طلبات فك التشفير التلقائية (Retry requests)
         if (msg.key && msg.key.id && msg.message) {
           messageStore.set(msg.key.id, msg.message);
           if (messageStore.size > 500) {
@@ -169,10 +169,18 @@ async function startOperationsWhatsApp() {
         if (!msg.message || msg.key.fromMe) return;
 
         const chatId = msg.key.remoteJid;
-        const text = msg.message.conversation || 
-                     msg.message.extendedTextMessage?.text || 
-                     msg.message.imageMessage?.caption || 
+
+        // استخراج النص الذكي والشامل بما يشمل الرسائل المحولة (Forwarded) والمقتبسة
+        const mMsg = msg.message?.ephemeralMessage?.message || 
+                     msg.message?.viewOnceMessage?.message || 
+                     msg.message;
+
+        const text = mMsg?.conversation || 
+                     mMsg?.extendedTextMessage?.text || 
+                     mMsg?.imageMessage?.caption || 
+                     mMsg?.documentMessage?.caption || 
                      '';
+
         if (!text.trim()) return;
 
         const senderPhone = (msg.key.participant || chatId).split('@')[0].replace(/[^0-9]/g, '');
