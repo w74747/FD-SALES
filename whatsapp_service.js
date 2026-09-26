@@ -1,7 +1,8 @@
 /**
- * whatsapp_service.js - Multi-Session WhatsApp Engine with Smart Media & Forwarded Message Support
+ * whatsapp_service.js - Multi-Session WhatsApp Engine with Smart Media, Location Pin & Forwarded Message Support
  * Food Development Company (شركة تنمية الغذاء)
- * Handles auto media decryption, message cache storage, and multi-format text extraction
+ * Handles auto media decryption, message cache storage, multi-format text extraction,
+ * and group location buffers for automated logistics dispatch.
  */
 
 const express = require('express');
@@ -78,6 +79,8 @@ const sessions = {
 };
 
 const messageStore = new Map();
+// ذاكرة مؤقتة لروابط المواقع المرسلة حديثاً في المجموعات (صلاحية 5 دقائق)
+const recentGroupLocations = new Map();
 
 async function startOperationsWhatsApp() {
   if (sessions.operations.isStarting) return;
@@ -157,7 +160,6 @@ async function startOperationsWhatsApp() {
         if (!m.messages || m.messages.length === 0) return;
         const msg = m.messages[0];
 
-        // تخزين أي رسالة لتلبية طلبات فك التشفير التلقائية (Retry requests)
         if (msg.key && msg.key.id && msg.message) {
           messageStore.set(msg.key.id, msg.message);
           if (messageStore.size > 500) {
@@ -169,28 +171,57 @@ async function startOperationsWhatsApp() {
         if (!msg.message || msg.key.fromMe) return;
 
         const chatId = msg.key.remoteJid;
-
-        // استخراج النص الذكي والشامل بما يشمل الرسائل المحولة (Forwarded) والمقتبسة
         const mMsg = msg.message?.ephemeralMessage?.message || 
                      msg.message?.viewOnceMessage?.message || 
                      msg.message;
 
-        const text = mMsg?.conversation || 
-                     mMsg?.extendedTextMessage?.text || 
-                     mMsg?.imageMessage?.caption || 
-                     mMsg?.documentMessage?.caption || 
-                     '';
+        // 1. التقاط إحداثيات رسائل الموقع الجغرافي المباشرة من واتساب (Location Pin)
+        let locationUrl = '';
+        const locMsg = mMsg?.locationMessage || mMsg?.liveLocationMessage;
+        if (locMsg && locMsg.degreesLatitude && locMsg.degreesLongitude) {
+          locationUrl = `https://maps.google.com/?q=${locMsg.degreesLatitude},${locMsg.degreesLongitude}`;
+          recentGroupLocations.set(chatId, { url: locationUrl, timestamp: Date.now() });
+        }
 
-        if (!text.trim()) return;
+        // 2. استخراج النص الشامل (بما يشمل الرسائل المحولة Forwarded والتعليقات المكتوبة)
+        let text = mMsg?.conversation || 
+                   mMsg?.extendedTextMessage?.text || 
+                   mMsg?.imageMessage?.caption || 
+                   mMsg?.documentMessage?.caption || 
+                   '';
 
-        const senderPhone = (msg.key.participant || chatId).split('@')[0].replace(/[^0-9]/g, '');
+        // استرجاع الموقع المرسل مؤخراً إن وجد خلال آخر 5 دقائق في نفس المجموعة
+        if (recentGroupLocations.has(chatId)) {
+          const locData = recentGroupLocations.get(chatId);
+          if (Date.now() - locData.timestamp < 5 * 60 * 1000) {
+            locationUrl = locData.url;
+          } else {
+            recentGroupLocations.delete(chatId);
+          }
+        }
+
+        if (!text.trim() && !locationUrl) return;
+
+        // 3. تنظيف رقم المرسل الميداني الصافي وإزالة معرفات الأجهزة المتعددة (LID)
+        let rawSender = msg.key.participant || chatId;
+        rawSender = rawSender.split('@')[0];
+        let senderPhone = rawSender.replace(/[^0-9]/g, '');
+
+        if (senderPhone.startsWith('968') && senderPhone.length > 11) {
+          senderPhone = senderPhone.slice(0, 11);
+        } else if (senderPhone.length > 12) {
+          const match968 = senderPhone.match(/968\d{8}/);
+          if (match968) senderPhone = match968[0];
+        }
+
         const senderName = msg.pushName || senderPhone;
 
         const resp = await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
           chat_id: chatId,
           sender_phone: `+${senderPhone}`,
           sender_name: senderName,
-          message_text: text
+          message_text: text,
+          shared_location_url: locationUrl
         }, { timeout: 8000 });
 
         if (resp.data && resp.data.reply_text) {
@@ -333,5 +364,5 @@ app.post('/disconnect', async (req, res) => {
 setTimeout(startOperationsWhatsApp, 2500);
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Baileys Server] Active with Image & PDF support on port ${PORT}`);
+  console.log(`[Baileys Server] Active with Location & Media Buffers on port ${PORT}`);
 });
