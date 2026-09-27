@@ -3,7 +3,8 @@ main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
 Features:
 - Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION)
-- AI Customer Memory & Habitual Item Standardizer (standardize_order_items_with_ai)
+- Automated Interactive Bilingual Clarification for Ambiguous Branches
+- AI Customer Memory & Habitual Item Standardizer
 - Reverse Geocoding & Smart Street-Level Branch Matching
 - Auto-Provisioning for New Branches with First Delivery Alert
 - Dispatched Orders Analytics & Monthly Reporting (Excel Export)
@@ -145,7 +146,7 @@ async def get_location_address(location_url: str) -> dict:
     lat, lon = coord_match.group(1), coord_match.group(2)
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-        headers = {"User-Agent": "FDCBakeryLogistics/2.1"}
+        headers = {"User-Agent": "FDCBakeryLogistics/2.2"}
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, headers=headers, timeout=3.5)
             if resp.status_code == 200:
@@ -342,7 +343,6 @@ async def format_dispatch_order_en(
     contact_match = re.search(r'(?:contact|phone|tel|رقم|mobile)[:\s]*([0-9\+\s]{7,15})', text, re.IGNORECASE)
     branch_contact = contact_match.group(1).strip().replace(" ", "") if contact_match else ""
 
-    # تعديل موعد التسليم ليكون مرناً ومتروكاً لجدولة اللوجستيك
     delivery_date = "ASAP (Subject to Logistics Schedule)"
     coming_match = re.search(r'(?:coming|delivery|توصيل|وصول)[:\s]*([0-9]{1,2}[\.\/\-][0-9]{1,2}[\.\/\-][0-9]{2,4})', text, re.IGNORECASE)
     if coming_match:
@@ -353,21 +353,29 @@ async def format_dispatch_order_en(
 
     brand_name = customer.get("brand_name") or ""
     
+    # 1. استخراج اسم الفرع الصريح من السطور مع استبعاد كلمة Forwarded ودعم أسماء المدن
     branch_name = ""
     for l in lines:
-        if 'branch' in l.lower() or 'فرع' in l.lower():
-            m = re.search(r'([A-Za-z\u0600-\u06FF\s\-]+(?:branch|فرع[A-Za-z\u0600-\u06FF\s\-]*))', l, re.IGNORECASE)
-            if m:
-                clean_b = m.group(1).strip()
-                if brand_name and brand_name.lower() in clean_b.lower():
-                    clean_b = re.sub(brand_name, '', clean_b, flags=re.IGNORECASE).strip()
-                branch_name = clean_b.title() if clean_b else ""
+        clean_line = l.strip()
+        if clean_line.lower() in ['forwarded', 'محولة']:
+            continue
+            
+        if 'branch' in clean_line.lower() or 'فرع' in clean_line.lower():
+            clean_b = re.sub(r'^(forwarded|محولة)\s*', '', clean_line, flags=re.IGNORECASE).strip()
+            if brand_name and brand_name.lower() in clean_b.lower():
+                clean_b = re.sub(brand_name, '', clean_b, flags=re.IGNORECASE).strip()
+            branch_name = clean_b.title() if clean_b else ""
+            if branch_name:
                 break
+                
+        elif clean_line.lower() in ['muscat', 'sohar', 'salalah', 'مسقط', 'صحار', 'صلالة']:
+            branch_name = f"{clean_line.title()} Branch"
+            break
 
     matched_branch = None
     is_new_branch = False
 
-    # 1. الفحص الجغرافي للشارع والحي عبر اللوكيشن
+    # 2. الفحص الجغرافي للشارع والحي عبر اللوكيشن
     if location_url:
         coord_match = re.search(r'q=([0-9\.\-]+),([0-9\.\-]+)', location_url)
         curr_lat = float(coord_match.group(1)) if coord_match else None
@@ -381,7 +389,6 @@ async def format_dispatch_order_en(
         clean_road = normalize_branch_text(road)
         clean_suburb = normalize_branch_text(suburb)
 
-        # مطابقة القرب المباشر (أقل من 350 متر)
         if curr_lat and curr_lon and branches:
             for b in branches:
                 b_url = b.get("location_url", "")
@@ -392,7 +399,6 @@ async def format_dispatch_order_en(
                         matched_branch = b
                         break
 
-        # مطابقة الشارع والحي
         if not matched_branch and branches:
             for b in branches:
                 b_name_clean = normalize_branch_text(b.get("branch_name", ""))
@@ -402,7 +408,6 @@ async def format_dispatch_order_en(
                     matched_branch = b
                     break
 
-        # إذا اختلف الشارع ولم يُطابق أي فرع مسجل -> فرع جديد تماماً
         if not matched_branch:
             is_new_branch = True
             auto_b_name = f"{suburb} Branch ({road})" if (suburb and road) else (f"{suburb} Branch" if suburb else f"Branch - {road or 'New Location'}")
@@ -416,7 +421,7 @@ async def format_dispatch_order_en(
             )
             matched_branch = created_b or {"branch_name": auto_b_name, "branch_phone": sender_phone}
 
-    # 2. المطابقة النصية الاحتياطية في حال لم يرسل لوكيشن
+    # 3. المطابقة النصية مع الفروع المسجلة
     if not matched_branch and branches:
         for b in branches:
             b_reg = b.get("branch_name", "").strip()
@@ -443,24 +448,33 @@ async def format_dispatch_order_en(
                     matched_branch = b
                     break
 
+    # 4. تحديد ما إذا كان الفرع معروفاً بشكل كافٍ
+    branch_identified = bool(matched_branch or branch_name or location_url or (branches and len(branches) == 1))
+
     if matched_branch:
+        branch_name = matched_branch.get("branch_name", branch_name or "Main Branch")
+        if not location_url and matched_branch.get("location_url"):
+            location_url = matched_branch["location_url"]
+        if not branch_contact and matched_branch.get("branch_phone"):
+            branch_contact = matched_branch["branch_phone"]
+    elif not branch_name and branches and len(branches) == 1:
+        matched_branch = branches[0]
         branch_name = matched_branch.get("branch_name", "Main Branch")
         if not location_url and matched_branch.get("location_url"):
             location_url = matched_branch["location_url"]
         if not branch_contact and matched_branch.get("branch_phone"):
             branch_contact = matched_branch["branch_phone"]
-    else:
-        branch_name = "Main Branch"
+
+    if not branch_name:
+        branch_name = "Unspecified Branch"
 
     if not branch_contact:
         branch_contact = sender_phone if sender_phone else (customer.get("phone") or "N/A")
 
-    # استنتاج الصنف والكمية عبر الذكاء الاصطناعي استناداً إلى سجل العميل التاريخي
     habitual_items = get_customer_habitual_items(customer.get("id", 0))
     cleaned_items = await standardize_order_items_with_ai(text, brand_name, habitual_items)
     items_formatted = "\n".join([f"- {it}" for it in cleaned_items])
 
-    # تجهيز تنبيه الفرع الجديد للوجستيك
     header_title = "*DISPATCH & DELIVERY ORDER (NEW BRANCH ALERT 🚨)*" if is_new_branch else "*DISPATCH & DELIVERY ORDER*"
     branch_display = f"{branch_name} ⭐️ [NEW BRANCH - FIRST DELIVERY]" if is_new_branch else branch_name
     
@@ -491,7 +505,7 @@ async def format_dispatch_order_en(
         f"Food Development Co. | Logistics & Operations"
     )
 
-    return formatted_msg, branch_name, order_date, cleaned_items
+    return formatted_msg, branch_name, order_date, cleaned_items, branch_identified
 
 def init_database():
     conn = get_db_connection()
@@ -589,7 +603,6 @@ def init_database():
             );
             """)
 
-            # جدول بنود الطلبيات الرقمي للإحصائيات الشهرية
             cur.execute("""
             CREATE TABLE IF NOT EXISTS dispatched_orders (
                 id SERIAL PRIMARY KEY,
@@ -711,7 +724,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="22.5.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="22.6.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -989,7 +1002,7 @@ async def send_bulk_campaign(payload: BulkCampaignPayload):
         "message": f"تمت جدولة إرسال {len(payload.contacts)} رسالة بتأخير أمني ذكي ضد الحظر."
     }
 
-# ----------------- رادار الواتساب وبوابة الفرز الذكي وحفظ الإحصائيات -----------------
+# ----------------- رادار الواتساب، التحقق الذكي، والاستفسار التفاعلي -----------------
 @app.post("/api/whatsapp/webhook")
 async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
@@ -1042,23 +1055,35 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         "كراتين", "كرتونين", "حبة", "حبات", "اوردر", "أوردر", "صلالة", "مسقط"
                     ]
                 
-                if any(k in text.lower() for k in trigger_keywords):
+                # فحص الكلمات المفتاحية أو إرفاق لوكيشن في المجموعة
+                if any(k in text.lower() for k in trigger_keywords) or bool(msg.shared_location_url):
                     is_actual_order = await classify_order_intent(text)
 
                     if is_actual_order:
                         cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
                         branches = cur.fetchall()
-                        logistics_msg, matched_branch_name, parsed_order_date, order_items = await format_dispatch_order_en(
+                        
+                        logistics_msg, matched_branch_name, parsed_order_date, order_items, branch_identified = await format_dispatch_order_en(
                             text, customer, msg.sender_phone, msg.sender_name, branches, msg.shared_location_url or ""
                         )
-                        if logistics_group:
-                            forward_to_logistics = logistics_group
-                            logistics_text = logistics_msg
 
-                        # تسجيل بنود الطلبية رقمياً للإحصائيات الشهرية
-                        save_dispatched_order_items(
-                            customer["id"], customer["company_name"], matched_branch_name, parsed_order_date, order_items
-                        )
+                        # إذا كان الفرع غير محدد وغامض (وللعميل فروع متعددة أو لا يوجد لوكيشن)
+                        if not branch_identified:
+                            # إيقاف التحويل للوجستيك مؤقتاً والرد فوراً في مجموعة العميل بالاستفسار ثنائي اللغة المعتمد
+                            reply_text = (
+                                "فضلاً، يرجى تحديد الفرع المطلوب للتوصيل (مثلاً: فرع الخوض، فرع بوشر) أو مشاركة موقع الفرع (Location) لتأكيد أمر التوريد لفريق اللوجستيك.\n\n"
+                                "Kindly specify the target delivery branch (e.g., Al Khoudh Branch, Boshar Branch) or share the branch Location Pin to confirm the dispatch order for the logistics team."
+                            )
+                            logger.info(f"Ambiguous branch for customer {customer['id']}. Sent interactive bilingual query in group.")
+                        else:
+                            # اعتماد الطلب وتحويله فوراً لمجموعة اللوجستيك
+                            if logistics_group:
+                                forward_to_logistics = logistics_group
+                                logistics_text = logistics_msg
+
+                            save_dispatched_order_items(
+                                customer["id"], customer["company_name"], matched_branch_name, parsed_order_date, order_items
+                            )
                     else:
                         logger.info(f"Classified as DISCUSSION. Withheld from logistics: {text[:45]}")
 
