@@ -1,8 +1,8 @@
 /**
- * whatsapp_service.js - Multi-Session WhatsApp Engine with Smart Media, Location Pin & Forwarded Message Support
+ * whatsapp_service.js - Multi-Session WhatsApp Engine with Staff Filtering, Edit/Delete Tracking, & Location Pins
  * Food Development Company (شركة تنمية الغذاء)
- * Handles auto media decryption, message cache storage, multi-format text extraction,
- * and group location buffers for automated logistics dispatch.
+ * Handles auto media decryption, message cache storage, staff whitelisting,
+ * edited/revoked message detection, and group location buffers for logistics dispatch.
  */
 
 const express = require('express');
@@ -79,8 +79,14 @@ const sessions = {
 };
 
 const messageStore = new Map();
-// ذاكرة مؤقتة لروابط المواقع المرسلة حديثاً في المجموعات (صلاحية 5 دقائق)
 const recentGroupLocations = new Map();
+
+// فحص أولي لأعضاء فريق العمل والمبيعات الداخلي بالاسم
+function isInternalStaffName(pushName) {
+  if (!pushName) return false;
+  const upper = pushName.toUpperCase();
+  return upper.includes('FDC') || upper.includes('SALES TEAM') || upper.includes('تنمية الغذاء');
+}
 
 async function startOperationsWhatsApp() {
   if (sessions.operations.isStarting) return;
@@ -162,7 +168,7 @@ async function startOperationsWhatsApp() {
 
         if (msg.key && msg.key.id && msg.message) {
           messageStore.set(msg.key.id, msg.message);
-          if (messageStore.size > 500) {
+          if (messageStore.size > 800) {
             const firstKey = messageStore.keys().next().value;
             messageStore.delete(firstKey);
           }
@@ -171,38 +177,8 @@ async function startOperationsWhatsApp() {
         if (!msg.message || msg.key.fromMe) return;
 
         const chatId = msg.key.remoteJid;
-        const mMsg = msg.message?.ephemeralMessage?.message || 
-                     msg.message?.viewOnceMessage?.message || 
-                     msg.message;
 
-        // 1. التقاط إحداثيات رسائل الموقع الجغرافي المباشرة من واتساب (Location Pin)
-        let locationUrl = '';
-        const locMsg = mMsg?.locationMessage || mMsg?.liveLocationMessage;
-        if (locMsg && locMsg.degreesLatitude && locMsg.degreesLongitude) {
-          locationUrl = `https://maps.google.com/?q=${locMsg.degreesLatitude},${locMsg.degreesLongitude}`;
-          recentGroupLocations.set(chatId, { url: locationUrl, timestamp: Date.now() });
-        }
-
-        // 2. استخراج النص الشامل (بما يشمل الرسائل المحولة Forwarded والتعليقات المكتوبة)
-        let text = mMsg?.conversation || 
-                   mMsg?.extendedTextMessage?.text || 
-                   mMsg?.imageMessage?.caption || 
-                   mMsg?.documentMessage?.caption || 
-                   '';
-
-        // استرجاع الموقع المرسل مؤخراً إن وجد خلال آخر 5 دقائق في نفس المجموعة
-        if (recentGroupLocations.has(chatId)) {
-          const locData = recentGroupLocations.get(chatId);
-          if (Date.now() - locData.timestamp < 5 * 60 * 1000) {
-            locationUrl = locData.url;
-          } else {
-            recentGroupLocations.delete(chatId);
-          }
-        }
-
-        if (!text.trim() && !locationUrl) return;
-
-        // 3. تنظيف رقم المرسل الميداني الصافي وإزالة معرفات الأجهزة المتعددة (LID)
+        // استخراج وتنظيف رقم هاتف المرسل الميداني
         let rawSender = msg.key.participant || chatId;
         rawSender = rawSender.split('@')[0];
         let senderPhone = rawSender.replace(/[^0-9]/g, '');
@@ -216,11 +192,67 @@ async function startOperationsWhatsApp() {
 
         const senderName = msg.pushName || senderPhone;
 
+        // 1. استبعاد فوري لأي رسالة قادمة من أعضاء فريق المبيعات بالاسم
+        if (isInternalStaffName(senderName)) {
+          return;
+        }
+
+        // 2. التحقق من حالات حذف الرسالة (Revoke / Delete for everyone)
+        const isRevoked = msg.message?.protocolMessage?.type === 0;
+        if (isRevoked) {
+          const targetMsgId = msg.message.protocolMessage.key?.id;
+          await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
+            chat_id: chatId,
+            sender_phone: `+${senderPhone}`,
+            sender_name: senderName,
+            message_text: '',
+            message_id: targetMsgId,
+            event_type: 'MESSAGE_DELETED'
+          }, { timeout: 8000 });
+          return;
+        }
+
+        // 3. التحقق من حالات تعديل الرسالة (Edited Message)
+        const isEdited = Boolean(msg.message?.protocolMessage?.editedMessage);
+        let mMsg = isEdited ? msg.message.protocolMessage.editedMessage : (
+          msg.message?.ephemeralMessage?.message || 
+          msg.message?.viewOnceMessage?.message || 
+          msg.message
+        );
+
+        let locationUrl = '';
+        const locMsg = mMsg?.locationMessage || mMsg?.liveLocationMessage;
+        if (locMsg && locMsg.degreesLatitude && locMsg.degreesLongitude) {
+          locationUrl = `https://maps.google.com/?q=${locMsg.degreesLatitude},${locMsg.degreesLongitude}`;
+          recentGroupLocations.set(chatId, { url: locationUrl, timestamp: Date.now() });
+        }
+
+        let text = mMsg?.conversation || 
+                   mMsg?.extendedTextMessage?.text || 
+                   mMsg?.imageMessage?.caption || 
+                   mMsg?.documentMessage?.caption || 
+                   '';
+
+        if (recentGroupLocations.has(chatId)) {
+          const locData = recentGroupLocations.get(chatId);
+          if (Date.now() - locData.timestamp < 5 * 60 * 1000) {
+            locationUrl = locData.url;
+          } else {
+            recentGroupLocations.delete(chatId);
+          }
+        }
+
+        if (!text.trim() && !locationUrl) return;
+
+        const originalMsgId = isEdited ? msg.message.protocolMessage.key?.id : msg.key.id;
+
         const resp = await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
           chat_id: chatId,
           sender_phone: `+${senderPhone}`,
           sender_name: senderName,
           message_text: text,
+          message_id: originalMsgId,
+          event_type: isEdited ? 'MESSAGE_EDITED' : 'NORMAL',
           shared_location_url: locationUrl
         }, { timeout: 8000 });
 
@@ -364,5 +396,5 @@ app.post('/disconnect', async (req, res) => {
 setTimeout(startOperationsWhatsApp, 2500);
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Baileys Server] Active with Location & Media Buffers on port ${PORT}`);
+  console.log(`[Baileys Server] Active with Staff Filter, Edits, Deletions on port ${PORT}`);
 });
