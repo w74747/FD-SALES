@@ -2,6 +2,8 @@
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
 Features:
+- Standardized Product Naming & Official Unit of Measure (Carton/Piece/Pack)
+- Cleans and Sanitizes Legacy Analytics Records
 - Sales Staff Whitelisting & Auto-Exclusion from Customer Bot Triggers
 - Real-time Message Edit & Message Revocation (Deletion) Handling for Logistics
 - Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION)
@@ -51,7 +53,6 @@ CATALOG_FILE_PATH = os.path.join(UPLOADS_FOLDER, "fdc_catalog.pdf")
 
 whatsapp_process = None
 
-# ذاكرة مؤقتة لتتبع رسائل الطلبات الحديثة ومفاتيحها لمعالجة التعديل والحذف
 dispatched_messages_cache: Dict[str, dict] = {}
 
 LOGO_SVG_RAW = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 90" width="420" height="90">
@@ -142,6 +143,19 @@ def normalize_branch_text(s: str) -> str:
     clean = re.sub(r'\b(branch|main|street|st|road|rd|al|فرع|شارع)\b', ' ', clean)
     return ' '.join(clean.split())
 
+def normalize_unit_name(raw_unit: str) -> str:
+    """توحيد مسميات وحدات القياس إلى صيغة قياسية رسمية"""
+    if not raw_unit:
+        return "Carton"
+    u = raw_unit.strip().lower()
+    if any(k in u for k in ['كرتون', 'كراتين', 'كرتونين', 'carton', 'cartons', 'box', 'boxes', 'ctn']):
+        return "Carton"
+    elif any(k in u for k in ['حبة', 'حبات', 'قطعة', 'pc', 'pcs', 'piece']):
+        return "Piece"
+    elif any(k in u for k in ['كيس', 'أكياس', 'bag', 'bags', 'pack', 'packs']):
+        return "Pack"
+    return "Carton"
+
 async def get_location_address(location_url: str) -> dict:
     if not location_url:
         return {}
@@ -151,7 +165,7 @@ async def get_location_address(location_url: str) -> dict:
     lat, lon = coord_match.group(1), coord_match.group(2)
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-        headers = {"User-Agent": "FDCBakeryLogistics/2.3"}
+        headers = {"User-Agent": "FDCBakeryLogistics/2.4"}
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, headers=headers, timeout=3.5)
             if resp.status_code == 200:
@@ -204,7 +218,7 @@ def get_customer_habitual_items(customer_id: int) -> list:
             cur.execute("""
                 SELECT item_name, COUNT(*) as frequency 
                 FROM dispatched_orders 
-                WHERE customer_id = %s 
+                WHERE customer_id = %s AND item_name NOT ILIKE '%في مجال%'
                 GROUP BY item_name 
                 ORDER BY frequency DESC 
                 LIMIT 3;
@@ -299,6 +313,7 @@ async def classify_order_intent(text: str) -> bool:
     return has_quantity and is_not_question
 
 def save_dispatched_order_items(customer_id: int, customer_name: str, branch_name: str, order_date_str: str, cleaned_items: list):
+    """تخزين بنود الطلبية والكميات المستخرجة رقمياً في قاعدة البيانات بأسماء منتجات ووحدات رسمية ومقننة"""
     conn = get_db_connection()
     if not conn:
         return
@@ -310,22 +325,39 @@ def save_dispatched_order_items(customer_id: int, customer_name: str, branch_nam
 
         with conn.cursor() as cur:
             for item in cleaned_items:
-                if item == "Items specified in customer communication":
+                if not item or item == "Items specified in customer communication":
                     continue
-                qty_match = re.search(r'(\d+)\s*(box|boxes|carton|cartons|ctn|كرتون|كراتين)?', item, re.IGNORECASE)
-                qty = int(qty_match.group(1)) if qty_match else 1
-                unit = qty_match.group(2) if qty_match and qty_match.group(2) else 'box'
 
-                clean_item = re.sub(r'[:=\-\d]+', ' ', item)
-                clean_item = re.sub(r'\b(box|boxes|carton|cartons|ctn|كرتون|كراتين)\b', ' ', clean_item, flags=re.IGNORECASE)
-                clean_item = ' '.join(clean_item.split()).strip()
-                if not clean_item:
-                    clean_item = "Potato Buns / Bakery Item"
+                item_name = ""
+                qty = 1
+                unit = "Carton"
+
+                if ":" in item:
+                    parts = item.split(":", 1)
+                    item_name = parts[0].strip().lstrip("-").strip()
+                    qty_part = parts[1].strip()
+                    
+                    q_match = re.search(r'(\d+)', qty_part)
+                    qty = int(q_match.group(1)) if q_match else 1
+                    
+                    unit_match = re.search(r'[A-Za-z\u0600-\u06FF]+', qty_part)
+                    unit = normalize_unit_name(unit_match.group(0) if unit_match else "Carton")
+                else:
+                    q_match = re.search(r'(\d+)', item)
+                    qty = int(q_match.group(1)) if q_match else 1
+                    
+                    clean_item = re.sub(r'[:=\-\d]+', ' ', item)
+                    clean_item = re.sub(r'\b(box|boxes|carton|cartons|ctn|كرتون|كراتين|في مجال|طلب|اليوم|محتاجين)\b', ' ', clean_item, flags=re.IGNORECASE)
+                    item_name = ' '.join(clean_item.split()).strip()
+                    unit = "Carton"
+
+                if not item_name or any(noise in item_name.lower() for noise in ['في مجال', 'طلب اليوم', 'طلب']):
+                    item_name = "Burger Buns (Standard)"
 
                 cur.execute("""
                 INSERT INTO dispatched_orders (customer_id, customer_name, branch_name, order_date, item_name, quantity, unit)
                 VALUES (%s, %s, %s, %s, %s, %s, %s);
-                """, (customer_id, customer_name, branch_name, parsed_date, clean_item, qty, unit))
+                """, (customer_id, customer_name, branch_name, parsed_date, item_name, qty, unit))
             conn.commit()
     except Exception as e:
         logger.error(f"Error saving dispatched order items: {e}")
@@ -613,9 +645,20 @@ def init_database():
                 order_date DATE NOT NULL DEFAULT CURRENT_DATE,
                 item_name VARCHAR(200) NOT NULL,
                 quantity INT NOT NULL DEFAULT 1,
-                unit VARCHAR(50) DEFAULT 'box',
+                unit VARCHAR(50) DEFAULT 'Carton',
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
+            """)
+
+            # تنظيف وتوحيد البيانات التاريخية السابقة المشوهة
+            cur.execute("""
+            UPDATE dispatched_orders 
+            SET item_name = 'Burger Buns (Standard)' 
+            WHERE item_name ILIKE '%في مجال%' OR item_name ILIKE '%طلب اليوم%';
+
+            UPDATE dispatched_orders 
+            SET unit = 'Carton' 
+            WHERE unit IN ('كراتين', 'كرتون', 'box', 'boxes', 'ctn');
             """)
 
             cur.execute("""
@@ -725,7 +768,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="22.7.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="22.8.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1025,7 +1068,7 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         clean_phone = msg.sender_phone.replace("+", "").strip()
         send_catalog = False
 
-        # 1. استبعاد فوري لمندوبي المبيعات الداخليين المسجلين في جدول sales_executives
+        # استبعاد فوري لأي رسالة قادمة من فريق العمل والمبيعات الداخلي
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, name FROM sales_executives 
@@ -1058,7 +1101,6 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 """, (pure_group_num, f"%{pure_group_num}%"))
                 customer = cur.fetchone()
 
-            # 2. معالجة حالات حذف الرسالة (Revoke)
             if msg.event_type == 'MESSAGE_DELETED':
                 if msg.message_id and msg.message_id in dispatched_messages_cache:
                     cached_order = dispatched_messages_cache[msg.message_id]
@@ -1111,7 +1153,6 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                             )
                             logger.info(f"Ambiguous branch for customer {customer['id']}. Sent interactive bilingual query in group.")
                         else:
-                            # 3. معالجة حالات تعديل الرسالة (Message Edited)
                             if msg.event_type == 'MESSAGE_EDITED':
                                 logistics_msg = (
                                     f"✏️ *AMENDED ORDER (CUSTOMER UPDATED MESSAGE)*\n"
