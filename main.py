@@ -2,6 +2,8 @@
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
 Features:
+- Sales Staff Whitelisting & Auto-Exclusion from Customer Bot Triggers
+- Real-time Message Edit & Message Revocation (Deletion) Handling for Logistics
 - Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION)
 - Automated Interactive Bilingual Clarification for Ambiguous Branches
 - AI Customer Memory & Habitual Item Standardizer
@@ -48,6 +50,9 @@ os.makedirs(UPLOADS_FOLDER, exist_ok=True)
 CATALOG_FILE_PATH = os.path.join(UPLOADS_FOLDER, "fdc_catalog.pdf")
 
 whatsapp_process = None
+
+# ذاكرة مؤقتة لتتبع رسائل الطلبات الحديثة ومفاتيحها لمعالجة التعديل والحذف
+dispatched_messages_cache: Dict[str, dict] = {}
 
 LOGO_SVG_RAW = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 90" width="420" height="90">
   <rect width="100%" fill="transparent"/>
@@ -146,7 +151,7 @@ async def get_location_address(location_url: str) -> dict:
     lat, lon = coord_match.group(1), coord_match.group(2)
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-        headers = {"User-Agent": "FDCBakeryLogistics/2.2"}
+        headers = {"User-Agent": "FDCBakeryLogistics/2.3"}
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, headers=headers, timeout=3.5)
             if resp.status_code == 200:
@@ -353,7 +358,6 @@ async def format_dispatch_order_en(
 
     brand_name = customer.get("brand_name") or ""
     
-    # 1. استخراج اسم الفرع الصريح من السطور مع استبعاد كلمة Forwarded ودعم أسماء المدن
     branch_name = ""
     for l in lines:
         clean_line = l.strip()
@@ -375,7 +379,6 @@ async def format_dispatch_order_en(
     matched_branch = None
     is_new_branch = False
 
-    # 2. الفحص الجغرافي للشارع والحي عبر اللوكيشن
     if location_url:
         coord_match = re.search(r'q=([0-9\.\-]+),([0-9\.\-]+)', location_url)
         curr_lat = float(coord_match.group(1)) if coord_match else None
@@ -421,7 +424,6 @@ async def format_dispatch_order_en(
             )
             matched_branch = created_b or {"branch_name": auto_b_name, "branch_phone": sender_phone}
 
-    # 3. المطابقة النصية مع الفروع المسجلة
     if not matched_branch and branches:
         for b in branches:
             b_reg = b.get("branch_name", "").strip()
@@ -448,7 +450,6 @@ async def format_dispatch_order_en(
                     matched_branch = b
                     break
 
-    # 4. تحديد ما إذا كان الفرع معروفاً بشكل كافٍ
     branch_identified = bool(matched_branch or branch_name or location_url or (branches and len(branches) == 1))
 
     if matched_branch:
@@ -724,7 +725,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="22.6.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="22.7.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -861,6 +862,8 @@ class IncomingWhatsAppMessage(BaseModel):
     sender_phone: str
     sender_name: str
     message_text: str
+    message_id: Optional[str] = None
+    event_type: Optional[str] = "NORMAL"
     shared_location_url: Optional[str] = None
 
 class SessionSnapshotPayload(BaseModel):
@@ -1002,7 +1005,7 @@ async def send_bulk_campaign(payload: BulkCampaignPayload):
         "message": f"تمت جدولة إرسال {len(payload.contacts)} رسالة بتأخير أمني ذكي ضد الحظر."
     }
 
-# ----------------- رادار الواتساب، التحقق الذكي، والاستفسار التفاعلي -----------------
+# ----------------- رادار الواتساب ومعالجة التعديل والحذف واستبعاد المندوبين -----------------
 @app.post("/api/whatsapp/webhook")
 async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
@@ -1021,6 +1024,19 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         logistics_text = None
         clean_phone = msg.sender_phone.replace("+", "").strip()
         send_catalog = False
+
+        # 1. استبعاد فوري لمندوبي المبيعات الداخليين المسجلين في جدول sales_executives
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, name FROM sales_executives 
+                WHERE regexp_replace(phone_number, '[^0-9]', '', 'g') LIKE %s 
+                   OR %s LIKE concat('%%', regexp_replace(phone_number, '[^0-9]', '', 'g'), '%%')
+                LIMIT 1;
+            """, (f"%{clean_phone[-8:]}%", clean_phone))
+            is_staff = cur.fetchone()
+            if is_staff or "FDC" in (msg.sender_name or "").upper():
+                logger.info(f"Ignored message from internal sales representative: {msg.sender_name} ({clean_phone})")
+                return {"status": "IGNORED_INTERNAL_STAFF"}
 
         with conn.cursor() as cur:
             cur.execute("SELECT key_name, key_value FROM system_config;")
@@ -1042,6 +1058,28 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 """, (pure_group_num, f"%{pure_group_num}%"))
                 customer = cur.fetchone()
 
+            # 2. معالجة حالات حذف الرسالة (Revoke)
+            if msg.event_type == 'MESSAGE_DELETED':
+                if msg.message_id and msg.message_id in dispatched_messages_cache:
+                    cached_order = dispatched_messages_cache[msg.message_id]
+                    if logistics_group:
+                        cancel_notice = (
+                            f"🚫 *ORDER RETRACTED / CANCELLED BY SENDER*\n"
+                            f"----------------------------------------\n"
+                            f"*Company:* {cached_order.get('company')}\n"
+                            f"*Branch:* {cached_order.get('branch')}\n"
+                            f"----------------------------------------\n"
+                            f"⚠️ *Notice:* The customer deleted the order message from WhatsApp. Please hold and do not dispatch."
+                        )
+                        forward_to_logistics = logistics_group
+                        logistics_text = cancel_notice
+                    del dispatched_messages_cache[msg.message_id]
+                return {
+                    "status": "PROCESSED_DELETE",
+                    "forward_to_logistics": forward_to_logistics,
+                    "logistics_text": logistics_text
+                }
+
             if customer:
                 channel_name = f"مجموعة: {customer['company_name']} ({customer['brand_name'] or 'عام'})"
                 
@@ -1055,7 +1093,6 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         "كراتين", "كرتونين", "حبة", "حبات", "اوردر", "أوردر", "صلالة", "مسقط"
                     ]
                 
-                # فحص الكلمات المفتاحية أو إرفاق لوكيشن في المجموعة
                 if any(k in text.lower() for k in trigger_keywords) or bool(msg.shared_location_url):
                     is_actual_order = await classify_order_intent(text)
 
@@ -1067,19 +1104,31 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                             text, customer, msg.sender_phone, msg.sender_name, branches, msg.shared_location_url or ""
                         )
 
-                        # إذا كان الفرع غير محدد وغامض (وللعميل فروع متعددة أو لا يوجد لوكيشن)
                         if not branch_identified:
-                            # إيقاف التحويل للوجستيك مؤقتاً والرد فوراً في مجموعة العميل بالاستفسار ثنائي اللغة المعتمد
                             reply_text = (
                                 "فضلاً، يرجى تحديد الفرع المطلوب للتوصيل (مثلاً: فرع الخوض، فرع بوشر) أو مشاركة موقع الفرع (Location) لتأكيد أمر التوريد لفريق اللوجستيك.\n\n"
                                 "Kindly specify the target delivery branch (e.g., Al Khoudh Branch, Boshar Branch) or share the branch Location Pin to confirm the dispatch order for the logistics team."
                             )
                             logger.info(f"Ambiguous branch for customer {customer['id']}. Sent interactive bilingual query in group.")
                         else:
-                            # اعتماد الطلب وتحويله فوراً لمجموعة اللوجستيك
+                            # 3. معالجة حالات تعديل الرسالة (Message Edited)
+                            if msg.event_type == 'MESSAGE_EDITED':
+                                logistics_msg = (
+                                    f"✏️ *AMENDED ORDER (CUSTOMER UPDATED MESSAGE)*\n"
+                                    f"----------------------------------------\n"
+                                    f"{logistics_msg.split('----------------------------------------', 1)[-1]}"
+                                )
+
                             if logistics_group:
                                 forward_to_logistics = logistics_group
                                 logistics_text = logistics_msg
+
+                            if msg.message_id:
+                                dispatched_messages_cache[msg.message_id] = {
+                                    "company": customer["company_name"],
+                                    "branch": matched_branch_name,
+                                    "time": datetime.now().isoformat()
+                                }
 
                             save_dispatched_order_items(
                                 customer["id"], customer["company_name"], matched_branch_name, parsed_order_date, order_items
