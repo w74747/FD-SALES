@@ -2,8 +2,8 @@
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
 Features:
-- Standardized Product Naming & Official Unit of Measure (Carton/Piece/Pack)
-- Cleans and Sanitizes Legacy Analytics Records
+- Fixes SQL parameter interpolation error for habitual items
+- Added /api/whatsapp/disconnect endpoint with DB purge
 - Sales Staff Whitelisting & Auto-Exclusion from Customer Bot Triggers
 - Real-time Message Edit & Message Revocation (Deletion) Handling for Logistics
 - Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION)
@@ -144,7 +144,6 @@ def normalize_branch_text(s: str) -> str:
     return ' '.join(clean.split())
 
 def normalize_unit_name(raw_unit: str) -> str:
-    """توحيد مسميات وحدات القياس إلى صيغة قياسية رسمية"""
     if not raw_unit:
         return "Carton"
     u = raw_unit.strip().lower()
@@ -165,7 +164,7 @@ async def get_location_address(location_url: str) -> dict:
     lat, lon = coord_match.group(1), coord_match.group(2)
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-        headers = {"User-Agent": "FDCBakeryLogistics/2.4"}
+        headers = {"User-Agent": "FDCBakeryLogistics/2.5"}
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, headers=headers, timeout=3.5)
             if resp.status_code == 200:
@@ -215,16 +214,20 @@ def get_customer_habitual_items(customer_id: int) -> list:
         return []
     try:
         with conn.cursor() as cur:
+            # تم إصلاح الخطأ بتمرير باراميتر الاستبعاد كقيمة آمنة
             cur.execute("""
                 SELECT item_name, COUNT(*) as frequency 
                 FROM dispatched_orders 
-                WHERE customer_id = %s AND item_name NOT ILIKE '%في مجال%'
+                WHERE customer_id = %s AND item_name NOT LIKE %s
                 GROUP BY item_name 
                 ORDER BY frequency DESC 
                 LIMIT 3;
-            """, (customer_id,))
+            """, (customer_id, "%في مجال%"))
             rows = cur.fetchall()
             return [r["item_name"] for r in rows if r["item_name"]]
+    except Exception as e:
+        logger.warning(f"Error getting habitual items: {e}")
+        return []
     finally:
         conn.close()
 
@@ -313,7 +316,6 @@ async def classify_order_intent(text: str) -> bool:
     return has_quantity and is_not_question
 
 def save_dispatched_order_items(customer_id: int, customer_name: str, branch_name: str, order_date_str: str, cleaned_items: list):
-    """تخزين بنود الطلبية والكميات المستخرجة رقمياً في قاعدة البيانات بأسماء منتجات ووحدات رسمية ومقننة"""
     conn = get_db_connection()
     if not conn:
         return
@@ -650,7 +652,6 @@ def init_database():
             );
             """)
 
-            # تنظيف وتوحيد البيانات التاريخية السابقة المشوهة
             cur.execute("""
             UPDATE dispatched_orders 
             SET item_name = 'Burger Buns (Standard)' 
@@ -768,7 +769,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="22.8.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="22.9.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1800,7 +1801,7 @@ def get_expenses():
     finally:
         conn.close()
 
-# ----------------- مسارات الواتساب وسجل الرادار -----------------
+# ----------------- مسارات الواتساب وسجل الرادار وفصل الجلسة -----------------
 @app.get("/api/whatsapp/status")
 async def get_whatsapp_status():
     try:
@@ -1808,10 +1809,36 @@ async def get_whatsapp_status():
             resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=1.5)
             if resp.status_code == 200:
                 data = resp.json()
-                return {"connected": bool(data.get("connected")), "phone": data.get("user")}
+                return {
+                    "connected": bool(data.get("connected")), 
+                    "phone": data.get("user"),
+                    "qr": data.get("qr")
+                }
     except Exception:
         pass
-    return {"connected": False, "phone": None}
+    return {"connected": False, "phone": None, "qr": None}
+
+@app.post("/api/whatsapp/disconnect")
+async def disconnect_whatsapp():
+    """فصل الواتساب فوراً، مسح الجلسة من السيرفر، وتصفير قاعدة البيانات"""
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post("http://127.0.0.1:3001/disconnect", timeout=4.0)
+    except Exception:
+        pass
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM whatsapp_session_snapshots WHERE session_name = 'operations_main';")
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            conn.close()
+
+    return {"status": "DISCONNECTED"}
 
 @app.get("/api/whatsapp/logs")
 def get_whatsapp_logs():
@@ -1859,6 +1886,19 @@ def save_session_snapshot(payload: SessionSnapshotPayload):
             ON CONFLICT (session_name) DO UPDATE 
             SET snapshot_data = EXCLUDED.snapshot_data, updated_at = NOW();
             """, (payload.session_name, json.dumps(payload.snapshot)))
+            conn.commit()
+            return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+@app.delete("/api/internal/session-snapshot/{session_name}")
+def delete_session_snapshot(session_name: str):
+    conn = get_db_connection()
+    if not conn:
+        return Response(status_code=500)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM whatsapp_session_snapshots WHERE session_name = %s;", (session_name,))
             conn.commit()
             return {"status": "SUCCESS"}
     finally:
