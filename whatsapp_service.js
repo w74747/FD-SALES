@@ -81,7 +81,6 @@ const sessions = {
 const messageStore = new Map();
 const recentGroupLocations = new Map();
 
-// فحص أولي لأعضاء فريق العمل والمبيعات الداخلي بالاسم
 function isInternalStaffName(pushName) {
   if (!pushName) return false;
   const upper = pushName.toUpperCase();
@@ -178,7 +177,6 @@ async function startOperationsWhatsApp() {
 
         const chatId = msg.key.remoteJid;
 
-        // استخراج وتنظيف رقم هاتف المرسل الميداني
         let rawSender = msg.key.participant || chatId;
         rawSender = rawSender.split('@')[0];
         let senderPhone = rawSender.replace(/[^0-9]/g, '');
@@ -192,12 +190,10 @@ async function startOperationsWhatsApp() {
 
         const senderName = msg.pushName || senderPhone;
 
-        // 1. استبعاد فوري لأي رسالة قادمة من أعضاء فريق المبيعات بالاسم
         if (isInternalStaffName(senderName)) {
           return;
         }
 
-        // 2. التحقق من حالات حذف الرسالة (Revoke / Delete for everyone)
         const isRevoked = msg.message?.protocolMessage?.type === 0;
         if (isRevoked) {
           const targetMsgId = msg.message.protocolMessage.key?.id;
@@ -212,7 +208,6 @@ async function startOperationsWhatsApp() {
           return;
         }
 
-        // 3. التحقق من حالات تعديل الرسالة (Edited Message)
         const isEdited = Boolean(msg.message?.protocolMessage?.editedMessage);
         let mMsg = isEdited ? msg.message.protocolMessage.editedMessage : (
           msg.message?.ephemeralMessage?.message || 
@@ -386,7 +381,7 @@ app.post('/disconnect', async (req, res) => {
     const authFolder = path.join(__dirname, 'auth_info');
     try { fs.rmSync(authFolder, { recursive: true, force: true }); } catch (e) {}
     try { await axios.delete('http://127.0.0.1:8000/api/internal/session-snapshot/operations_main'); } catch (e) {}
-    setTimeout(startOperationsWhatsApp, 2000);
+    setTimeout(startOperationsWhatsApp, 1500);
     return res.json({ status: 'DISCONNECTED' });
   } catch (e) {
     return res.status(500).json({ error: e.message });
