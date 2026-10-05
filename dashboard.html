@@ -196,13 +196,19 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <!-- زر فتح نافذة التحكم باتصال الواتساب -->
-                <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition border cursor-pointer hover:shadow-xs" id="top-bar-wa-btn">
-                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" id="top-bar-wa-dot"></span>
-                    <span id="top-bar-wa-text">واتساب: فحص الاتصال...</span>
-                </button>
+                <!-- أزرار الواتساب المحدثة مع زر إعادة الربط والتصفير المباشر -->
+                <div class="flex items-center gap-2">
+                    <button onclick="openWhatsAppModal()" class="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition border cursor-pointer hover:shadow-xs" id="top-bar-wa-btn">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" id="top-bar-wa-dot"></span>
+                        <span id="top-bar-wa-text">واتساب: فحص الاتصال...</span>
+                    </button>
 
-                <button onclick="window.print()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 flex items-center gap-2">
+                    <button onclick="forceDisconnectWhatsAppDirect()" title="اضغط لتسجيل الخروج وتوليد رمز QR جديد فوراً عند تعليق الرسائل" class="px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-full text-xs font-bold flex items-center gap-1 shadow-xs transition">
+                        <span>🔄</span> <span>إعادة ربط / تسجيل خروج</span>
+                    </button>
+                </div>
+
+                <button onclick="window.print()" class="px-4 py-2 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-95 flex items-center gap-2 mr-1">
                     <span>إصدار تقرير رسمي</span>
                 </button>
             </div>
@@ -248,7 +254,7 @@
                 </div>
             </div>
 
-            <!-- تبويب إحصائيات الطلبيات والتوزيع -->
+            <!-- تبويب إحصائيات الطلبيات والتوزيع المحدث -->
             <div id="tab-analytics" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center border-b pb-3 no-print">
@@ -300,7 +306,7 @@
                 </div>
             </div>
 
-            <!-- باقي التبويبات القياسية -->
+            <!-- المنتجات -->
             <div id="tab-products-catalog" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة</h3>
@@ -319,6 +325,7 @@
                 </div>
             </div>
 
+            <!-- الأهداف والفرص البيعية -->
             <div id="tab-targets" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -329,6 +336,7 @@
                 </div>
             </div>
 
+            <!-- الفريق -->
             <div id="tab-reps" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <h3 class="font-bold text-sm brand-primary-text mb-4">دليل أعضاء فريق المبيعات</h3>
@@ -336,6 +344,7 @@
                 </div>
             </div>
 
+            <!-- العملاء -->
             <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -362,6 +371,7 @@
                 </div>
             </div>
 
+            <!-- العينات -->
             <div id="tab-samples" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <h3 class="font-bold text-sm brand-primary-text">سجل جرد العينات المجانية وتقييمات الشيف</h3>
@@ -384,6 +394,7 @@
                 </div>
             </div>
 
+            <!-- التقويم والعمليات -->
             <div id="tab-calendar" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center no-print">
@@ -399,6 +410,7 @@
                 </div>
             </div>
 
+            <!-- منظومة الوكلاء الأذكياء -->
             <div id="tab-agents" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center">
@@ -442,6 +454,7 @@
                 <div id="unified-agents-grid" class="grid grid-cols-3 gap-4"></div>
             </div>
 
+            <!-- المصاريف -->
             <div id="tab-expenses-log" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <h3 class="font-bold text-sm text-amber-800 mb-4">سجل المصاريف الميدانية والتشغيلية</h3>
@@ -460,6 +473,7 @@
                 </div>
             </div>
 
+            <!-- رادار المحادثات واستقطاب العملاء -->
             <div id="tab-whatsapp-feed" class="tab-content hidden space-y-6">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4 no-print">
                     <div class="flex justify-between items-center border-b pb-3">
@@ -578,7 +592,6 @@
             <div class="space-y-2 py-2">
                 <div id="wa-modal-status-text" class="text-xs font-bold text-gray-700">جاري فحص الجلسة...</div>
                 
-                <!-- مكان عرض الرمز في حال كان مفصولاً -->
                 <div id="wa-qr-container" class="hidden flex flex-col items-center justify-center p-3 bg-purple-50 rounded-xl border border-purple-200">
                     <p class="text-[11px] text-purple-900 mb-2 font-bold">امسح الرمز من تطبيق واتساب لربط الرقم:</p>
                     <img id="wa-qr-image" src="" alt="WhatsApp QR Code" class="w-48 h-48 rounded-lg shadow-sm border bg-white p-1">
@@ -586,7 +599,7 @@
             </div>
 
             <div class="pt-2 border-t flex flex-col gap-2">
-                <button onclick="forceDisconnectWhatsApp()" id="wa-disconnect-btn" class="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-xs transition">
+                <button onclick="forceDisconnectWhatsAppDirect()" id="wa-disconnect-btn" class="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-xs transition">
                     تسجيل الخروج وإعادة مسح الرمز (QR Code)
                 </button>
                 <button onclick="closeModal('whatsapp-modal')" class="w-full py-2 border rounded-xl text-gray-600 hover:bg-gray-50">
@@ -1063,23 +1076,25 @@
             } catch(e) {}
         };
 
-        window.forceDisconnectWhatsApp = async function() {
-            if (!confirm("هل أنت متأكد من تسجيل الخروج وفصل الجلسة؟ سيتم تصفير مفاتيح التشفير القديمة وإعادة توليد رمز QR جديد فوراً.")) return;
-
-            const modalStatusText = document.getElementById('wa-modal-status-text');
-            if (modalStatusText) modalStatusText.innerText = "جاري تصفير وفصل الجلسة وإعادة التهيئة...";
-
+        window.forceDisconnectWhatsAppDirect = async function() {
+            if (!confirm("هل تريد تصفير جلسة الواتساب القديمة وتوليد رمز QR جديد فوراً؟\nاستخدم هذا الخيار لإعادة الربط عندما تتوقف الرسائل.")) return;
+            
+            const textEl = document.getElementById('top-bar-wa-text');
+            if (textEl) textEl.innerText = "جاري تصفير الجلسة وتوليد QR...";
+            
             try {
                 const res = await fetch('/api/whatsapp/disconnect', { method: 'POST' });
                 if (res.ok) {
+                    alert("تم تصفير الجلسة بنجاح ✓\nانتظر لحظات وسيظهر رمز QR الجديد لمسحه بالهاتف.");
                     setTimeout(() => {
+                        openModal('whatsapp-modal');
                         checkWhatsAppLiveStatus();
                     }, 2000);
                 } else {
                     alert("تعذر فصل الجلسة");
                 }
-            } catch (err) {
-                alert("حدث خطأ أثناء محاولة فصل الجلسة");
+            } catch (e) {
+                alert("حدث خطأ أثناء الاتصال بالسيرفر");
             }
         };
 
