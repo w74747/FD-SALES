@@ -2,10 +2,11 @@
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
 Features:
-- Fixes SQL parameter interpolation error for habitual items
-- Added /api/whatsapp/disconnect endpoint with DB purge
+- Historical Orders Reconciliation & Backfill Endpoint (/api/analytics/reconcile-missed-orders)
+- SQL Parameter Fixes for Habitual Items & Safe Queries
+- /api/whatsapp/disconnect with Database & Snapshot Purge
 - Sales Staff Whitelisting & Auto-Exclusion from Customer Bot Triggers
-- Real-time Message Edit & Message Revocation (Deletion) Handling for Logistics
+- Real-time Message Edit & Message Revocation (Deletion) Handling
 - Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION)
 - Automated Interactive Bilingual Clarification for Ambiguous Branches
 - AI Customer Memory & Habitual Item Standardizer
@@ -164,7 +165,7 @@ async def get_location_address(location_url: str) -> dict:
     lat, lon = coord_match.group(1), coord_match.group(2)
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-        headers = {"User-Agent": "FDCBakeryLogistics/2.5"}
+        headers = {"User-Agent": "FDCBakeryLogistics/2.6"}
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, headers=headers, timeout=3.5)
             if resp.status_code == 200:
@@ -314,7 +315,7 @@ async def classify_order_intent(text: str) -> bool:
     is_not_question = not any(q in clean for q in ["متى", "وين", "وصل", "تأخر", "؟", "?"])
     return has_quantity and is_not_question
 
-def save_dispatched_order_items(customer_id: int, customer_name: str, branch_name: str, order_date_str: str, cleaned_items: list):
+def save_dispatched_order_items(customer_id: int, customer_name: str, branch_name: str, order_date_str: str, cleaned_items: list, message_id: Optional[str] = None):
     conn = get_db_connection()
     if not conn:
         return
@@ -355,10 +356,12 @@ def save_dispatched_order_items(customer_id: int, customer_name: str, branch_nam
                 if not item_name or any(noise in item_name.lower() for noise in ['في مجال', 'طلب اليوم', 'طلب']):
                     item_name = "Burger Buns (Standard)"
 
+                # استخدام قيد message_id لتفادي تكرار إدخال الطلب نفسه نهائياً
                 cur.execute("""
-                INSERT INTO dispatched_orders (customer_id, customer_name, branch_name, order_date, item_name, quantity, unit)
-                VALUES (%s, %s, %s, %s, %s, %s, %s);
-                """, (customer_id, customer_name, branch_name, parsed_date, item_name, qty, unit))
+                INSERT INTO dispatched_orders (customer_id, customer_name, branch_name, order_date, item_name, quantity, unit, message_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (message_id) DO NOTHING;
+                """, (customer_id, customer_name, branch_name, parsed_date, item_name, qty, unit, message_id))
             conn.commit()
     except Exception as e:
         logger.error(f"Error saving dispatched order items: {e}")
@@ -647,8 +650,16 @@ def init_database():
                 item_name VARCHAR(200) NOT NULL,
                 quantity INT NOT NULL DEFAULT 1,
                 unit VARCHAR(50) DEFAULT 'Carton',
+                message_id VARCHAR(100),
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
+            """)
+
+            # قيد فريد لمعرف الرسالة لمنع تكرار إدخال أي طلبية
+            cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatched_orders_msg_id 
+            ON dispatched_orders (message_id) 
+            WHERE message_id IS NOT NULL;
             """)
 
             cur.execute("""
@@ -746,6 +757,7 @@ def init_database():
         conn.close()
 
     run_isolated_ddl("ALTER TABLE whatsapp_logs ADD COLUMN IF NOT EXISTS sender_phone VARCHAR(50) DEFAULT '';")
+    run_isolated_ddl("ALTER TABLE dispatched_orders ADD COLUMN IF NOT EXISTS message_id VARCHAR(100);")
 
 def start_whatsapp_service():
     global whatsapp_process
@@ -768,7 +780,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="23.0.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="23.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1048,6 +1060,97 @@ async def send_bulk_campaign(payload: BulkCampaignPayload):
         "message": f"تمت جدولة إرسال {len(payload.contacts)} رسالة بتأخير أمني ذكي ضد الحظر."
     }
 
+# ----------------- مسار المطابقة واسترجاع الطلبيات الفائتة -----------------
+@app.post("/api/analytics/reconcile-missed-orders")
+async def reconcile_missed_orders():
+    """
+    مطابقة وفحص جميع المجموعات والرسائل السابقة لاستخراج وإدراج الطلبيات الفائتة
+    في جدول dispatched_orders دون إرسال إشعار متأخر لمجموعة اللوجستيك.
+    """
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+
+    recovered_count = 0
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, company_name, brand_name, whatsapp_group_id FROM customer_accounts WHERE whatsapp_group_id IS NOT NULL AND whatsapp_group_id != '';")
+            customers = cur.fetchall()
+
+            for customer in customers:
+                group_id = customer["whatsapp_group_id"].strip()
+                pure_group = re.sub(r'[^0-9]', '', group_id)
+
+                # 1. البحث في سجل الرسائل المحلية المحفوظة في قاعدة البيانات
+                cur.execute("""
+                    SELECT id, created_at, sender_name, sender_phone, message_body 
+                    FROM whatsapp_logs 
+                    WHERE channel_name ILIKE %s OR channel_name ILIKE %s
+                    ORDER BY id DESC LIMIT 50;
+                """, (f"%{customer['company_name']}%", f"%{customer['brand_name']}%"))
+                logs = cur.fetchall()
+
+                # جلب فروع العميل الحالية
+                cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
+                branches = cur.fetchall()
+
+                for l in logs:
+                    text = l["message_body"].strip()
+                    msg_fake_id = f"log-{l['id']}"
+
+                    # فحص هل الطلب مسجل مسبقاً
+                    cur.execute("SELECT id FROM dispatched_orders WHERE message_id = %s;", (msg_fake_id,))
+                    if cur.fetchone():
+                        continue
+
+                    is_actual_order = await classify_order_intent(text)
+                    if is_actual_order:
+                        order_date_str = l["created_at"].strftime("%d/%m/%Y") if l.get("created_at") else datetime.now().strftime("%d/%m/%Y")
+                        _, branch_name, _, order_items, _ = await format_dispatch_order_en(
+                            text, customer, l.get("sender_phone", ""), l.get("sender_name", ""), branches
+                        )
+                        save_dispatched_order_items(
+                            customer["id"], customer["company_name"], branch_name, order_date_str, order_items, message_id=msg_fake_id
+                        )
+                        recovered_count += 1
+
+                # 2. محاولة جلب رسائل الذاكرة الحديثة من محرك Baileys
+                try:
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post("http://127.0.0.1:3001/fetch-group-messages", json={"group_jid": group_id, "limit": 40}, timeout=4.0)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            for b_msg in data.get("messages", []):
+                                b_id = b_msg.get("message_id")
+                                b_text = b_msg.get("text", "").strip()
+                                if not b_id or not b_text:
+                                    continue
+
+                                cur.execute("SELECT id FROM dispatched_orders WHERE message_id = %s;", (b_id,))
+                                if cur.fetchone():
+                                    continue
+
+                                if await classify_order_intent(b_text):
+                                    order_date_str = datetime.now().strftime("%d/%m/%Y")
+                                    _, b_branch, _, b_items, _ = await format_dispatch_order_en(
+                                        b_text, customer, "", "", branches
+                                    )
+                                    save_dispatched_order_items(
+                                        customer["id"], customer["company_name"], b_branch, order_date_str, b_items, message_id=b_id
+                                    )
+                                    recovered_count += 1
+                except Exception:
+                    pass
+
+        conn.commit()
+        return {
+            "status": "SUCCESS",
+            "recovered_count": recovered_count,
+            "message": f"تمت مطابقة وفحص المجموعات بنجاح. تم استرجاع وتسجيل {recovered_count} طلبية فائتة إلى الإحصائيات."
+        }
+    finally:
+        conn.close()
+
 # ----------------- رادار الواتساب ومعالجة التعديل والحذف واستبعاد المندوبين -----------------
 @app.post("/api/whatsapp/webhook")
 async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
@@ -1172,7 +1275,7 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                                 }
 
                             save_dispatched_order_items(
-                                customer["id"], customer["company_name"], matched_branch_name, parsed_order_date, order_items
+                                customer["id"], customer["company_name"], matched_branch_name, parsed_order_date, order_items, message_id=msg.message_id
                             )
                     else:
                         logger.info(f"Classified as DISCUSSION. Withheld from logistics: {text[:45]}")
