@@ -214,7 +214,6 @@ def get_customer_habitual_items(customer_id: int) -> list:
         return []
     try:
         with conn.cursor() as cur:
-            # تم إصلاح الخطأ بتمرير باراميتر الاستبعاد كقيمة آمنة
             cur.execute("""
                 SELECT item_name, COUNT(*) as frequency 
                 FROM dispatched_orders 
@@ -769,7 +768,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="22.9.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="23.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1069,7 +1068,7 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         clean_phone = msg.sender_phone.replace("+", "").strip()
         send_catalog = False
 
-        # استبعاد فوري لأي رسالة قادمة من فريق العمل والمبيعات الداخلي
+        # استبعاد فوري لمندوبي المبيعات الداخليين
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, name FROM sales_executives 
@@ -1796,127 +1795,4 @@ def get_expenses():
             rows = cur.fetchall()
             for r in rows:
                 r["amount"] = float(r.get("amount") or 0)
-                r["created_at_str"] = r["created_at"].strftime("%Y-%m-%d %H:%M") if r.get("created_at") and hasattr(r["created_at"], "strftime") else "—"
-            return rows
-    finally:
-        conn.close()
-
-# ----------------- مسارات الواتساب وسجل الرادار وفصل الجلسة -----------------
-@app.get("/api/whatsapp/status")
-async def get_whatsapp_status():
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get("http://127.0.0.1:3001/qr-status", timeout=1.5)
-            if resp.status_code == 200:
-                data = resp.json()
-                return {
-                    "connected": bool(data.get("connected")), 
-                    "phone": data.get("user"),
-                    "qr": data.get("qr")
-                }
-    except Exception:
-        pass
-    return {"connected": False, "phone": None, "qr": None}
-
-@app.post("/api/whatsapp/disconnect")
-async def disconnect_whatsapp():
-    """فصل الواتساب فوراً، مسح الجلسة من السيرفر، وتصفير قاعدة البيانات"""
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post("http://127.0.0.1:3001/disconnect", timeout=4.0)
-    except Exception:
-        pass
-
-    conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM whatsapp_session_snapshots WHERE session_name = 'operations_main';")
-            conn.commit()
-        except Exception:
-            pass
-        finally:
-            conn.close()
-
-    return {"status": "DISCONNECTED"}
-
-@app.get("/api/whatsapp/logs")
-def get_whatsapp_logs():
-    conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM whatsapp_logs ORDER BY id DESC LIMIT 50;")
-            rows = cur.fetchall()
-            for r in rows:
-                if r.get("created_at") and hasattr(r["created_at"], "strftime"):
-                    r["created_at"] = r["created_at"].strftime("%H:%M")
-                r["sender_phone"] = r.get("sender_phone") or ""
-            return rows
-    finally:
-        conn.close()
-
-# ----------------- مسارات استرجاع وحفظ الجلسات -----------------
-@app.get("/api/internal/session-snapshot/{session_name}")
-def get_session_snapshot(session_name: str):
-    conn = get_db_connection()
-    if not conn:
-        return Response(status_code=500)
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT snapshot_data FROM whatsapp_session_snapshots WHERE session_name = %s;", (session_name,))
-            row = cur.fetchone()
-            if row:
-                return {"snapshot": row["snapshot_data"]}
-            return Response(status_code=404)
-    finally:
-        conn.close()
-
-@app.post("/api/internal/session-snapshot")
-def save_session_snapshot(payload: SessionSnapshotPayload):
-    conn = get_db_connection()
-    if not conn:
-        return Response(status_code=500)
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-            INSERT INTO whatsapp_session_snapshots (session_name, snapshot_data, updated_at)
-            VALUES (%s, %s, NOW())
-            ON CONFLICT (session_name) DO UPDATE 
-            SET snapshot_data = EXCLUDED.snapshot_data, updated_at = NOW();
-            """, (payload.session_name, json.dumps(payload.snapshot)))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.delete("/api/internal/session-snapshot/{session_name}")
-def delete_session_snapshot(session_name: str):
-    conn = get_db_connection()
-    if not conn:
-        return Response(status_code=500)
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM whatsapp_session_snapshots WHERE session_name = %s;", (session_name,))
-            conn.commit()
-            return {"status": "SUCCESS"}
-    finally:
-        conn.close()
-
-@app.get("/", response_class=HTMLResponse)
-def serve_dashboard():
-    dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
-    if os.path.exists(dashboard_path):
-        with open(dashboard_path, "r", encoding="utf-8") as f:
-            return f.read()
-    return "<h1>dashboard.html not found</h1>"
-
-if __name__ == "__main__":
-    import uvicorn
-    raw_port = os.getenv("PORT", "8000")
-    try:
-        clean_port = int(raw_port)
-    except Exception:
-        clean_port = 8000
-    uvicorn.run("main:app", host="0.0.0.0", port=clean_port)
+                r["created_at_str"] = r["created_at"].strftime("%Y-%m-%d %H:%M") if r.get("created_at") and hasattr
