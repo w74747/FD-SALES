@@ -2,7 +2,7 @@
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
 Features:
-- Historical Orders Reconciliation & Backfill Endpoint (/api/analytics/reconcile-missed-orders)
+- Universal Historical Orders Reconciliation & Backfill Endpoint (/api/analytics/reconcile-missed-orders)
 - SQL Parameter Fixes for Habitual Items & Safe Queries
 - /api/whatsapp/disconnect with Database & Snapshot Purge
 - Sales Staff Whitelisting & Auto-Exclusion from Customer Bot Triggers
@@ -356,7 +356,6 @@ def save_dispatched_order_items(customer_id: int, customer_name: str, branch_nam
                 if not item_name or any(noise in item_name.lower() for noise in ['في مجال', 'طلب اليوم', 'طلب']):
                     item_name = "Burger Buns (Standard)"
 
-                # استخدام قيد message_id لتفادي تكرار إدخال الطلب نفسه نهائياً
                 cur.execute("""
                 INSERT INTO dispatched_orders (customer_id, customer_name, branch_name, order_date, item_name, quantity, unit, message_id)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -655,7 +654,6 @@ def init_database():
             );
             """)
 
-            # قيد فريد لمعرف الرسالة لمنع تكرار إدخال أي طلبية
             cur.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatched_orders_msg_id 
             ON dispatched_orders (message_id) 
@@ -780,7 +778,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="23.1.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="23.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1060,12 +1058,12 @@ async def send_bulk_campaign(payload: BulkCampaignPayload):
         "message": f"تمت جدولة إرسال {len(payload.contacts)} رسالة بتأخير أمني ذكي ضد الحظر."
     }
 
-# ----------------- مسار المطابقة واسترجاع الطلبيات الفائتة -----------------
+# ----------------- مسار المطابقة الشاملة واسترجاع الطلبيات الفائتة -----------------
 @app.post("/api/analytics/reconcile-missed-orders")
 async def reconcile_missed_orders():
     """
-    مطابقة وفحص جميع المجموعات والرسائل السابقة لاستخراج وإدراج الطلبيات الفائتة
-    في جدول dispatched_orders دون إرسال إشعار متأخر لمجموعة اللوجستيك.
+    محرك المطابقة الشامل: يمشط كافة الرسائل المخزنة في whatsapp_logs ويربطها بالعملاء
+    حتى لو كانت مسجلة كـ 'محادثة مباشرة'، ويسجل أي طلبية فائتة بدقة تامة في الإحصائيات.
     """
     conn = get_db_connection()
     if not conn:
@@ -1074,79 +1072,85 @@ async def reconcile_missed_orders():
     recovered_count = 0
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, company_name, brand_name, whatsapp_group_id FROM customer_accounts WHERE whatsapp_group_id IS NOT NULL AND whatsapp_group_id != '';")
+            # 1. جلب جميع حسابات العملاء المسجلين
+            cur.execute("SELECT id, company_name, brand_name, phone, whatsapp_group_id FROM customer_accounts;")
             customers = cur.fetchall()
 
-            for customer in customers:
-                group_id = customer["whatsapp_group_id"].strip()
-                pure_group = re.sub(r'[^0-9]', '', group_id)
+            # 2. جلب جميع الرسائل من whatsapp_logs التي تحتوي على مؤشرات طلب
+            cur.execute("""
+                SELECT id, created_at, sender_name, sender_phone, channel_name, message_body 
+                FROM whatsapp_logs 
+                WHERE message_body ~* '(box|boxes|carton|cartons|ctn|كرتون|كراتين|طلب|طلبية|potato|brioche|bun|buns)'
+                ORDER BY id ASC;
+            """)
+            potential_logs = cur.fetchall()
 
-                # 1. البحث في سجل الرسائل المحلية المحفوظة في قاعدة البيانات
-                cur.execute("""
-                    SELECT id, created_at, sender_name, sender_phone, message_body 
-                    FROM whatsapp_logs 
-                    WHERE channel_name ILIKE %s OR channel_name ILIKE %s
-                    ORDER BY id DESC LIMIT 50;
-                """, (f"%{customer['company_name']}%", f"%{customer['brand_name']}%"))
-                logs = cur.fetchall()
+            for log_entry in potential_logs:
+                text = log_entry["message_body"].strip()
+                fake_msg_id = f"reconciled-log-{log_entry['id']}"
 
-                # جلب فروع العميل الحالية
-                cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
+                # التحقق هل تم إدراج هذا السجل مسبقاً
+                cur.execute("SELECT id FROM dispatched_orders WHERE message_id = %s;", (fake_msg_id,))
+                if cur.fetchone():
+                    continue
+
+                # تحديد هوية العميل المناسب
+                matched_cust = None
+                s_phone = re.sub(r'[^0-9]', '', log_entry.get("sender_phone") or "")
+                ch_name = (log_entry.get("channel_name") or "").lower()
+
+                for c in customers:
+                    c_phone = re.sub(r'[^0-9]', '', c.get("phone") or "")
+                    c_group = re.sub(r'[^0-9]', '', c.get("whatsapp_group_id") or "")
+                    c_comp = (c.get("company_name") or "").lower()
+                    c_brand = (c.get("brand_name") or "").lower()
+
+                    if c_comp and c_comp in ch_name:
+                        matched_cust = c
+                        break
+                    if c_brand and len(c_brand) > 2 and c_brand in ch_name:
+                        matched_cust = c
+                        break
+                    if c_brand and len(c_brand) > 2 and c_brand in text.lower():
+                        matched_cust = c
+                        break
+                    if s_phone and c_phone and (s_phone.endswith(c_phone[-8:]) or c_phone.endswith(s_phone[-8:])):
+                        matched_cust = c
+                        break
+                    if c_group and c_group in ch_name:
+                        matched_cust = c
+                        break
+
+                if not matched_cust:
+                    continue
+
+                # التحقق من نية الشراء
+                is_order = await classify_order_intent(text)
+                if not is_order:
+                    continue
+
+                # جلب فروع العميل
+                cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (matched_cust["id"],))
                 branches = cur.fetchall()
 
-                for l in logs:
-                    text = l["message_body"].strip()
-                    msg_fake_id = f"log-{l['id']}"
+                # استخراج تفاصيل الصنف والكمية والفرع
+                _, branch_name, extracted_date, order_items, _ = await format_dispatch_order_en(
+                    text, matched_cust, log_entry.get("sender_phone", ""), log_entry.get("sender_name", ""), branches
+                )
 
-                    # فحص هل الطلب مسجل مسبقاً
-                    cur.execute("SELECT id FROM dispatched_orders WHERE message_id = %s;", (msg_fake_id,))
-                    if cur.fetchone():
-                        continue
+                # تحديد تاريخ الطلب: إذا لم يحدد في الرسالة، نعتمد تاريخ استلام الرسالة الفعلي في قاعدة البيانات
+                order_date_str = log_entry["created_at"].strftime("%d/%m/%Y") if log_entry.get("created_at") else extracted_date
 
-                    is_actual_order = await classify_order_intent(text)
-                    if is_actual_order:
-                        order_date_str = l["created_at"].strftime("%d/%m/%Y") if l.get("created_at") else datetime.now().strftime("%d/%m/%Y")
-                        _, branch_name, _, order_items, _ = await format_dispatch_order_en(
-                            text, customer, l.get("sender_phone", ""), l.get("sender_name", ""), branches
-                        )
-                        save_dispatched_order_items(
-                            customer["id"], customer["company_name"], branch_name, order_date_str, order_items, message_id=msg_fake_id
-                        )
-                        recovered_count += 1
-
-                # 2. محاولة جلب رسائل الذاكرة الحديثة من محرك Baileys
-                try:
-                    async with httpx.AsyncClient() as client:
-                        resp = await client.post("http://127.0.0.1:3001/fetch-group-messages", json={"group_jid": group_id, "limit": 40}, timeout=4.0)
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            for b_msg in data.get("messages", []):
-                                b_id = b_msg.get("message_id")
-                                b_text = b_msg.get("text", "").strip()
-                                if not b_id or not b_text:
-                                    continue
-
-                                cur.execute("SELECT id FROM dispatched_orders WHERE message_id = %s;", (b_id,))
-                                if cur.fetchone():
-                                    continue
-
-                                if await classify_order_intent(b_text):
-                                    order_date_str = datetime.now().strftime("%d/%m/%Y")
-                                    _, b_branch, _, b_items, _ = await format_dispatch_order_en(
-                                        b_text, customer, "", "", branches
-                                    )
-                                    save_dispatched_order_items(
-                                        customer["id"], customer["company_name"], b_branch, order_date_str, b_items, message_id=b_id
-                                    )
-                                    recovered_count += 1
-                except Exception:
-                    pass
+                save_dispatched_order_items(
+                    matched_cust["id"], matched_cust["company_name"], branch_name, order_date_str, order_items, message_id=fake_msg_id
+                )
+                recovered_count += 1
 
         conn.commit()
         return {
             "status": "SUCCESS",
             "recovered_count": recovered_count,
-            "message": f"تمت مطابقة وفحص المجموعات بنجاح. تم استرجاع وتسجيل {recovered_count} طلبية فائتة إلى الإحصائيات."
+            "message": f"تمت مطابقة السجلات الشاملة بنجاح، واسترجاع وإدراج {recovered_count} طلبية فائتة إلى الإحصائيات."
         }
     finally:
         conn.close()
