@@ -254,17 +254,23 @@
                 </div>
             </div>
 
-            <!-- تبويب إحصائيات الطلبيات والتوزيع المحدث -->
+            <!-- تبويب إحصائيات الطلبيات والتوزيع المحدث مع زر المطابقة والاسترجاع -->
             <div id="tab-analytics" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
                     <div class="flex justify-between items-center border-b pb-3 no-print">
                         <div>
                             <h3 class="font-bold text-sm brand-primary-text">إحصائيات استهلاك وتوزيع الطلبيات الشهرية</h3>
-                            <div class="text-[11px] text-gray-500">حصر الكميات المسلّمة بالأصناف والكراتين لكل عميل وفرع مع إمكانية التصدير</div>
+                            <div class="text-[11px] text-gray-500">حصر الكميات المسلّمة بالأصناف والكراتين لكل عميل وفرع مع خيار المطابقة الذكية</div>
                         </div>
-                        <button onclick="exportAnalyticsToExcel()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs">
-                            <span>📊</span> <span>تصدير تقرير الإكسل (Excel)</span>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <!-- زر مطابقة واسترجاع الطلبيات الفائتة -->
+                            <button onclick="reconcileMissedOrders()" id="reconcile-orders-btn" class="px-3.5 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition">
+                                <span>🔍</span> <span>مطابقة واسترجاع الطلبات الفائتة</span>
+                            </button>
+                            <button onclick="exportAnalyticsToExcel()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs">
+                                <span>📊</span> <span>تصدير تقرير الإكسل (Excel)</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-3 gap-3 text-xs no-print">
@@ -1095,6 +1101,34 @@
                 }
             } catch (e) {
                 alert("حدث خطأ أثناء الاتصال بالسيرفر");
+            }
+        };
+
+        // ---------------- دالة مطابقة واسترجاع الطلبيات الفائتة ----------------
+        window.reconcileMissedOrders = async function() {
+            const btn = document.getElementById('reconcile-orders-btn');
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span>⏳</span> <span>جاري فحص المجموعات ومطابقة الطلبيات...</span>';
+            }
+
+            try {
+                const res = await fetch('/api/analytics/reconcile-missed-orders', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✓ اكتملت عملية التسوية بنجاح!\n${data.message || 'تم تحديث الإحصائيات'}`);
+                    await loadAnalyticsData();
+                } else {
+                    alert("حدث خطأ أثناء محاولة استرجاع الطلبيات الفائتة");
+                }
+            } catch (err) {
+                alert("تعذر الاتصال بالخادم لمطابقة الطلبات");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
             }
         };
 
