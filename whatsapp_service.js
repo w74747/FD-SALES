@@ -1,5 +1,5 @@
 /**
- * whatsapp_service.js - Multi-Session WhatsApp Engine with Staff Filtering, Edit/Delete Tracking, & Location Pins
+ * whatsapp_service.js - Multi-Session WhatsApp Engine with Auto-Session Recovery
  * Food Development Company (شركة تنمية الغذاء)
  * Handles auto media decryption, message cache storage, staff whitelisting,
  * edited/revoked message detection, and group location buffers for logistics dispatch.
@@ -78,6 +78,7 @@ const sessions = {
   operations: { sock: null, qr: null, connected: false, user: null, isStarting: false }
 };
 
+let consecutiveDisconnects = 0;
 const messageStore = new Map();
 const recentGroupLocations = new Map();
 
@@ -133,23 +134,26 @@ async function startOperationsWhatsApp() {
 
       if (connection === 'close') {
         const statusCode = (lastDisconnect?.error)?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        consecutiveDisconnects++;
         sessions.operations.connected = false;
-        sessions.operations.qr = null;
         sessions.operations.isStarting = false;
 
-        console.log(`[Operations WA] Closed. Code: ${statusCode}. Reconnect: ${shouldReconnect}`);
+        console.log(`[Operations WA] Closed. Code: ${statusCode}. Consecutive: ${consecutiveDisconnects}`);
 
-        if (shouldReconnect) {
-          setTimeout(startOperationsWhatsApp, 3000);
-        } else {
+        // إذا تكرر فشل التشفير والاتصال (كود 500 أو 428)، يتم تنظيف الجلسة وتوليد رمز QR جديد
+        if (consecutiveDisconnects >= 4 || statusCode === DisconnectReason.loggedOut) {
+          console.log(`[Operations WA] Clearing corrupted session files to generate fresh QR.`);
           try {
             fs.rmSync(authFolder, { recursive: true, force: true });
             await axios.delete('http://127.0.0.1:8000/api/internal/session-snapshot/operations_main');
           } catch (e) {}
+          consecutiveDisconnects = 0;
+          setTimeout(startOperationsWhatsApp, 2000);
+        } else {
           setTimeout(startOperationsWhatsApp, 3000);
         }
       } else if (connection === 'open') {
+        consecutiveDisconnects = 0;
         sessions.operations.connected = true;
         sessions.operations.qr = null;
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
@@ -177,6 +181,7 @@ async function startOperationsWhatsApp() {
 
         const chatId = msg.key.remoteJid;
 
+        // استخراج وتنظيف رقم هاتف المرسل الميداني
         let rawSender = msg.key.participant || chatId;
         rawSender = rawSender.split('@')[0];
         let senderPhone = rawSender.replace(/[^0-9]/g, '');
@@ -190,10 +195,12 @@ async function startOperationsWhatsApp() {
 
         const senderName = msg.pushName || senderPhone;
 
+        // 1. استبعاد فوري لأي رسالة قادمة من فريق العمل والمبيعات الداخلي بالاسم
         if (isInternalStaffName(senderName)) {
           return;
         }
 
+        // 2. التحقق من حالات حذف الرسالة (Revoke / Delete for everyone)
         const isRevoked = msg.message?.protocolMessage?.type === 0;
         if (isRevoked) {
           const targetMsgId = msg.message.protocolMessage.key?.id;
@@ -208,6 +215,7 @@ async function startOperationsWhatsApp() {
           return;
         }
 
+        // 3. التحقق من حالات تعديل الرسالة (Edited Message)
         const isEdited = Boolean(msg.message?.protocolMessage?.editedMessage);
         let mMsg = isEdited ? msg.message.protocolMessage.editedMessage : (
           msg.message?.ephemeralMessage?.message || 
@@ -374,6 +382,7 @@ app.post('/disconnect', async (req, res) => {
     sessions.operations.connected = false;
     sessions.operations.user = null;
     sessions.operations.qr = null;
+    consecutiveDisconnects = 0;
     if (sessions.operations.sock) {
       try { await sessions.operations.sock.logout(); } catch (e) {}
       try { sessions.operations.sock.end(); } catch (e) {}
@@ -391,5 +400,5 @@ app.post('/disconnect', async (req, res) => {
 setTimeout(startOperationsWhatsApp, 2500);
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Baileys Server] Active with Staff Filter, Edits, Deletions on port ${PORT}`);
+  console.log(`[Baileys Server] Active on port ${PORT}`);
 });
