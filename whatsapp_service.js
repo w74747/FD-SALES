@@ -1,8 +1,8 @@
 /**
- * whatsapp_service.js - Multi-Session WhatsApp Engine with Auto-Session Recovery
+ * whatsapp_service.js - Multi-Session WhatsApp Engine with Auto-Session Recovery & History Backfill
  * Food Development Company (شركة تنمية الغذاء)
  * Handles auto media decryption, message cache storage, staff whitelisting,
- * edited/revoked message detection, and group location buffers for logistics dispatch.
+ * edited/revoked message detection, group location buffers, and chat history sync for reconciliation.
  */
 
 const express = require('express');
@@ -88,6 +88,15 @@ function isInternalStaffName(pushName) {
   return upper.includes('FDC') || upper.includes('SALES TEAM') || upper.includes('تنمية الغذاء');
 }
 
+function extractMessageText(mMsg) {
+  if (!mMsg) return '';
+  return mMsg.conversation || 
+         mMsg.extendedTextMessage?.text || 
+         mMsg.imageMessage?.caption || 
+         mMsg.documentMessage?.caption || 
+         '';
+}
+
 async function startOperationsWhatsApp() {
   if (sessions.operations.isStarting) return;
   sessions.operations.isStarting = true;
@@ -140,7 +149,6 @@ async function startOperationsWhatsApp() {
 
         console.log(`[Operations WA] Closed. Code: ${statusCode}. Consecutive: ${consecutiveDisconnects}`);
 
-        // إذا تكرر فشل التشفير والاتصال (كود 500 أو 428)، يتم تنظيف الجلسة وتوليد رمز QR جديد
         if (consecutiveDisconnects >= 4 || statusCode === DisconnectReason.loggedOut) {
           console.log(`[Operations WA] Clearing corrupted session files to generate fresh QR.`);
           try {
@@ -171,7 +179,7 @@ async function startOperationsWhatsApp() {
 
         if (msg.key && msg.key.id && msg.message) {
           messageStore.set(msg.key.id, msg.message);
-          if (messageStore.size > 800) {
+          if (messageStore.size > 1000) {
             const firstKey = messageStore.keys().next().value;
             messageStore.delete(firstKey);
           }
@@ -181,7 +189,6 @@ async function startOperationsWhatsApp() {
 
         const chatId = msg.key.remoteJid;
 
-        // استخراج وتنظيف رقم هاتف المرسل الميداني
         let rawSender = msg.key.participant || chatId;
         rawSender = rawSender.split('@')[0];
         let senderPhone = rawSender.replace(/[^0-9]/g, '');
@@ -195,12 +202,10 @@ async function startOperationsWhatsApp() {
 
         const senderName = msg.pushName || senderPhone;
 
-        // 1. استبعاد فوري لأي رسالة قادمة من فريق العمل والمبيعات الداخلي بالاسم
         if (isInternalStaffName(senderName)) {
           return;
         }
 
-        // 2. التحقق من حالات حذف الرسالة (Revoke / Delete for everyone)
         const isRevoked = msg.message?.protocolMessage?.type === 0;
         if (isRevoked) {
           const targetMsgId = msg.message.protocolMessage.key?.id;
@@ -215,7 +220,6 @@ async function startOperationsWhatsApp() {
           return;
         }
 
-        // 3. التحقق من حالات تعديل الرسالة (Edited Message)
         const isEdited = Boolean(msg.message?.protocolMessage?.editedMessage);
         let mMsg = isEdited ? msg.message.protocolMessage.editedMessage : (
           msg.message?.ephemeralMessage?.message || 
@@ -230,11 +234,7 @@ async function startOperationsWhatsApp() {
           recentGroupLocations.set(chatId, { url: locationUrl, timestamp: Date.now() });
         }
 
-        let text = mMsg?.conversation || 
-                   mMsg?.extendedTextMessage?.text || 
-                   mMsg?.imageMessage?.caption || 
-                   mMsg?.documentMessage?.caption || 
-                   '';
+        let text = extractMessageText(mMsg);
 
         if (recentGroupLocations.has(chatId)) {
           const locData = recentGroupLocations.get(chatId);
@@ -311,6 +311,44 @@ app.get('/groups', async (req, res) => {
     res.json(result);
   } catch (e) {
     res.json([]);
+  }
+});
+
+/**
+ * جلب سجل رسائل مجموعة محددة لمطابقة واسترجاع الطلبات الفائتة
+ */
+app.post('/fetch-group-messages', async (req, res) => {
+  const { group_jid, limit = 50 } = req.body;
+  if (!sessions.operations.connected || !sessions.operations.sock) {
+    return res.status(503).json({ error: 'خدمة الواتساب غير متصلة', messages: [] });
+  }
+
+  try {
+    let cleanJid = group_jid.trim();
+    if (!cleanJid.endsWith('@g.us')) {
+      cleanJid = `${cleanJid}@g.us`;
+    }
+
+    const fetchedMessages = [];
+
+    // استخراج الرسائل المسجلة في الذاكرة المؤقتة للمجموعة
+    for (const [msgId, rawMsg] of messageStore.entries()) {
+      const mMsg = rawMsg?.ephemeralMessage?.message || 
+                   rawMsg?.viewOnceMessage?.message || 
+                   rawMsg;
+      const text = extractMessageText(mMsg);
+      if (text) {
+        fetchedMessages.push({
+          message_id: msgId,
+          text: text,
+          timestamp: Date.now()
+        });
+      }
+    }
+
+    return res.json({ status: 'SUCCESS', messages: fetchedMessages.slice(-limit) });
+  } catch (e) {
+    return res.status(500).json({ error: e.message, messages: [] });
   }
 });
 
