@@ -314,24 +314,14 @@ app.get('/groups', async (req, res) => {
   }
 });
 
-/**
- * جلب سجل رسائل مجموعة محددة لمطابقة واسترجاع الطلبات الفائتة
- */
 app.post('/fetch-group-messages', async (req, res) => {
-  const { group_jid, limit = 50 } = req.body;
+  const { group_jid, limit = 100 } = req.body;
   if (!sessions.operations.connected || !sessions.operations.sock) {
     return res.status(503).json({ error: 'خدمة الواتساب غير متصلة', messages: [] });
   }
 
   try {
-    let cleanJid = group_jid.trim();
-    if (!cleanJid.endsWith('@g.us')) {
-      cleanJid = `${cleanJid}@g.us`;
-    }
-
     const fetchedMessages = [];
-
-    // استخراج الرسائل المسجلة في الذاكرة المؤقتة للمجموعة
     for (const [msgId, rawMsg] of messageStore.entries()) {
       const mMsg = rawMsg?.ephemeralMessage?.message || 
                    rawMsg?.viewOnceMessage?.message || 
@@ -345,7 +335,6 @@ app.post('/fetch-group-messages', async (req, res) => {
         });
       }
     }
-
     return res.json({ status: 'SUCCESS', messages: fetchedMessages.slice(-limit) });
   } catch (e) {
     return res.status(500).json({ error: e.message, messages: [] });
