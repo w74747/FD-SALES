@@ -2,17 +2,14 @@
 main.py - Enterprise AI Sales CRM & Industrial Bakery Intelligence
 Food Development Company (شركة تنمية الغذاء)
 Features:
+- Dynamic Semantic AI Order & Branch Matching (No hardcoded dictionaries)
+- Intelligent Branch Auto-Provisioning & Interactive Location Prompting
 - Universal Historical Orders Reconciliation & Backfill Endpoint (/api/analytics/reconcile-missed-orders)
-- SQL Parameter Fixes for Habitual Items & Safe Queries
-- /api/whatsapp/disconnect with Database & Snapshot Purge
+- SQL Parameter Safeguards against string format crashes
+- Direct Session Reset Endpoint (/api/whatsapp/disconnect) with Database Purge
 - Sales Staff Whitelisting & Auto-Exclusion from Customer Bot Triggers
-- Real-time Message Edit & Message Revocation (Deletion) Handling
+- Real-time Message Edit & Message Revocation (Deletion) Tracking for Logistics
 - Two-Tier Intent Verification Pipeline (NEW_ORDER vs DISCUSSION)
-- Automated Interactive Bilingual Clarification for Ambiguous Branches
-- AI Customer Memory & Habitual Item Standardizer
-- Reverse Geocoding & Smart Street-Level Branch Matching
-- Auto-Provisioning for New Branches with First Delivery Alert
-- Dispatched Orders Analytics & Monthly Reporting (Excel Export)
 - ASAP Flexible Delivery Scheduling (Subject to Logistics Schedule)
 """
 
@@ -134,16 +131,6 @@ def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) ->
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-def normalize_branch_text(s: str) -> str:
-    if not s:
-        return ""
-    clean = s.lower()
-    clean = re.sub(r'b[ao]+w?sh[ae]?r', 'boshar', clean)
-    clean = re.sub(r'kh[ou]+[wd]+h?', 'khoudh', clean)
-    clean = re.sub(r'[^a-zA-Z0-9\u0600-\u06FF\s]', ' ', clean)
-    clean = re.sub(r'\b(branch|main|street|st|road|rd|al|فرع|شارع)\b', ' ', clean)
-    return ' '.join(clean.split())
-
 def normalize_unit_name(raw_unit: str) -> str:
     if not raw_unit:
         return "Carton"
@@ -165,7 +152,7 @@ async def get_location_address(location_url: str) -> dict:
     lat, lon = coord_match.group(1), coord_match.group(2)
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-        headers = {"User-Agent": "FDCBakeryLogistics/2.6"}
+        headers = {"User-Agent": "FDCBakeryLogistics/2.8"}
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, headers=headers, timeout=3.5)
             if resp.status_code == 200:
@@ -231,23 +218,36 @@ def get_customer_habitual_items(customer_id: int) -> list:
     finally:
         conn.close()
 
-async def standardize_order_items_with_ai(text: str, customer_brand: str, habitual_items: list) -> list:
-    clean = text.strip()
+async def extract_order_and_branch_with_ai(text: str, customer_brand: str, registered_branches: list, habitual_items: list) -> dict:
+    """
+    تحليل ذكي ديناميكي موحد:
+    - يطابق الفرع دلالياً مع الفروع المسجلة (حتى لو كتب بالعربي أو بالعامية مثل 'بوشر' -> 'Bawshar Branch').
+    - يكتشف أي فرع جديد غير مسجل ويترجمه فوراً للإنجليزية (مثل 'Amerat Branch').
+    - يستخرج الأصناف والكميات ويترجمها للإنجليزية، ويفترض الصنف المعتاد في حال إغفال اسم الخبز (مثل '10 كراتين بوشر').
+    """
+    branches_context = [b.get("branch_name") for b in registered_branches] if registered_branches else []
     history_hint = ", ".join(habitual_items) if habitual_items else "Brioche Bun, Potato Bun"
 
     if PERPLEXITY_API_KEY:
         prompt = (
-            f"You are a logistics dispatch assistant for an industrial bakery.\n"
-            f"The customer '{customer_brand}' sent this order message in Arabic/informal text:\n"
-            f"\"\"\"{clean}\"\"\"\n\n"
-            f"Client's recurring/habitual product history from previous orders: [{history_hint}].\n\n"
-            f"Task:\n"
-            f"1. Extract the exact item and quantity.\n"
-            f"2. If the customer mentioned only quantity (e.g. '10 كراتين' or '5 box') without naming the bread type, ASSUME their primary habitual product from the history above.\n"
-            f"3. Translate and format the items strictly into clean English dispatch lines, e.g.:\n"
-            f"- Potato Burger Bun: 10 Cartons\n"
-            f"4. Do NOT include polite phrases, chit-chat, or filler words like 'is it possible' or 'driver will collect'.\n"
-            f"Return ONLY the formatted lines (one per item, starting with a dash '-')."
+            f"You are an industrial bakery logistics dispatcher.\n"
+            f"Customer '{customer_brand}' sent this order message in Arabic or English:\n"
+            f"\"\"\"{text}\"\"\"\n\n"
+            f"Client's registered delivery branches in our CRM database: {branches_context}\n"
+            f"Client's recurring/habitual products from past orders: [{history_hint}]\n\n"
+            f"Tasks:\n"
+            f"1. Extract items & quantities formatted strictly in English lines like '- Potato Burger Bun: 10 Cartons'. If bread type is missing (e.g. '10 كراتين'), assume the habitual product.\n"
+            f"2. Identify the target delivery branch:\n"
+            f"   - Match it to one of the registered branches if mentioned (e.g., 'بوشر' matches 'Bawshar Branch', 'الخوض' matches 'Al Khoudh Branch').\n"
+            f"   - If an unlisted/new branch area is specified (e.g., 'العامرات' or 'سلطنة' or 'صلالة'), provide its English name (e.g., 'Al Amerat Branch') and set 'matched_existing' to false and 'is_new_branch' to true.\n"
+            f"   - If no branch is mentioned at all, set 'branch_name' to null.\n\n"
+            f"Return STRICT JSON only without Markdown or backticks:\n"
+            f"{{\n"
+            f"  \"items\": [\"Potato Burger Bun: 10 Cartons\"],\n"
+            f"  \"branch_name\": \"Bawshar Branch\",\n"
+            f"  \"matched_existing\": true,\n"
+            f"  \"is_new_branch\": false\n"
+            f"}}"
         )
         try:
             url = "https://api.perplexity.ai/chat/completions"
@@ -256,22 +256,29 @@ async def standardize_order_items_with_ai(text: str, customer_brand: str, habitu
                 "model": "sonar",
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1,
-                "max_tokens": 80
+                "max_tokens": 160
             }
             async with httpx.AsyncClient() as client:
-                resp = await client.post(url, json=payload, headers=headers, timeout=5.0)
+                resp = await client.post(url, json=payload, headers=headers, timeout=5.5)
                 if resp.status_code == 200:
-                    raw_content = resp.json()["choices"][0]["message"]["content"].strip()
-                    lines = [l.strip().lstrip('-').strip() for l in raw_content.splitlines() if l.strip()]
-                    if lines:
-                        return lines
+                    raw = resp.json()["choices"][0]["message"]["content"].strip()
+                    json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+                    if json_match:
+                        return json.loads(json_match.group(0))
         except Exception as e:
-            logger.warning(f"Error calling AI order standardizer: {e}")
+            logger.warning(f"AI semantic branch & order extraction fallback: {e}")
 
-    qty_match = re.search(r'(\d+)\s*(box|boxes|carton|cartons|ctn|كرتون|كراتين)?', clean, re.IGNORECASE)
+    # Fallback في حال تعذر الذكاء الاصطناعي
+    qty_match = re.search(r'(\d+)', text)
     qty = qty_match.group(1) if qty_match else "10"
     default_product = habitual_items[0] if habitual_items else "Burger Buns (Standard)"
-    return [f"{default_product}: {qty} Cartons"]
+    fallback_branch = registered_branches[0].get("branch_name") if registered_branches else None
+    return {
+        "items": [f"{default_product}: {qty} Cartons"],
+        "branch_name": fallback_branch,
+        "matched_existing": bool(fallback_branch),
+        "is_new_branch": False
+    }
 
 async def classify_order_intent(text: str) -> bool:
     clean = text.strip().lower()
@@ -375,8 +382,6 @@ async def format_dispatch_order_en(
     branches: list,
     shared_location: str = ""
 ) -> tuple:
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    
     loc_match = re.search(r'(https?://[^\s]+)', text)
     location_url = shared_location if shared_location else (loc_match.group(1) if loc_match else "")
 
@@ -392,28 +397,26 @@ async def format_dispatch_order_en(
     order_date = date_match.group(1).strip() if date_match else datetime.now().strftime("%d/%m/%Y")
 
     brand_name = customer.get("brand_name") or ""
-    
-    branch_name = ""
-    for l in lines:
-        clean_line = l.strip()
-        if clean_line.lower() in ['forwarded', 'محولة']:
-            continue
-            
-        if 'branch' in clean_line.lower() or 'فرع' in clean_line.lower():
-            clean_b = re.sub(r'^(forwarded|محولة)\s*', '', clean_line, flags=re.IGNORECASE).strip()
-            if brand_name and brand_name.lower() in clean_b.lower():
-                clean_b = re.sub(brand_name, '', clean_b, flags=re.IGNORECASE).strip()
-            branch_name = clean_b.title() if clean_b else ""
-            if branch_name:
-                break
-                
-        elif clean_line.lower() in ['muscat', 'sohar', 'salalah', 'مسقط', 'صحار', 'صلالة']:
-            branch_name = f"{clean_line.title()} Branch"
-            break
+    habitual_items = get_customer_habitual_items(customer.get("id", 0))
+
+    # استخراج دلالي ذكي للأصناف والفرع
+    ai_result = await extract_order_and_branch_with_ai(text, brand_name, branches, habitual_items)
+    cleaned_items = ai_result.get("items", [])
+    extracted_branch_name = ai_result.get("branch_name")
+    is_new_branch = bool(ai_result.get("is_new_branch"))
 
     matched_branch = None
-    is_new_branch = False
 
+    # مطابقة الفرع المكتشف مع قاعدة البيانات
+    if extracted_branch_name and branches:
+        for b in branches:
+            if b.get("branch_name", "").lower() in extracted_branch_name.lower() or extracted_branch_name.lower() in b.get("branch_name", "").lower():
+                matched_branch = b
+                extracted_branch_name = b.get("branch_name")
+                is_new_branch = False
+                break
+
+    # معالجة اللوكيشن الجغرافي عند إرفاقه
     if location_url:
         coord_match = re.search(r'q=([0-9\.\-]+),([0-9\.\-]+)', location_url)
         curr_lat = float(coord_match.group(1)) if coord_match else None
@@ -424,9 +427,6 @@ async def format_dispatch_order_en(
         suburb = extracted_addr.get("suburb", "")
         city = extracted_addr.get("city", "Muscat")
 
-        clean_road = normalize_branch_text(road)
-        clean_suburb = normalize_branch_text(suburb)
-
         if curr_lat and curr_lon and branches:
             for b in branches:
                 b_url = b.get("location_url", "")
@@ -435,21 +435,13 @@ async def format_dispatch_order_en(
                     dist = calculate_distance_km(curr_lat, curr_lon, float(b_coords.group(1)), float(b_coords.group(2)))
                     if dist <= 0.35:
                         matched_branch = b
+                        is_new_branch = False
                         break
 
-        if not matched_branch and branches:
-            for b in branches:
-                b_name_clean = normalize_branch_text(b.get("branch_name", ""))
-                has_street = clean_road and clean_road in b_name_clean
-                has_suburb = clean_suburb and clean_suburb in b_name_clean
-                if has_street and (has_suburb or len(clean_road) > 4):
-                    matched_branch = b
-                    break
-
+        # إذا كان الموقع بعيداً عن الفروع المسجلة، يتم تسجيله ذاتياً كفرع جديد
         if not matched_branch:
             is_new_branch = True
-            auto_b_name = f"{suburb} Branch ({road})" if (suburb and road) else (f"{suburb} Branch" if suburb else f"Branch - {road or 'New Location'}")
-            
+            auto_b_name = extracted_branch_name or (f"{suburb} Branch ({road})" if (suburb and road) else (f"{suburb} Branch" if suburb else "New Delivery Branch"))
             created_b = auto_create_new_branch(
                 customer_id=customer["id"],
                 branch_name=auto_b_name,
@@ -458,58 +450,38 @@ async def format_dispatch_order_en(
                 city=city
             )
             matched_branch = created_b or {"branch_name": auto_b_name, "branch_phone": sender_phone}
+            extracted_branch_name = auto_b_name
 
-    if not matched_branch and branches:
-        for b in branches:
-            b_reg = b.get("branch_name", "").strip()
-            b_norm = normalize_branch_text(b_reg)
-            text_norm = normalize_branch_text(text)
-            branch_norm = normalize_branch_text(branch_name)
-
-            if (b_reg.lower() in text.lower()) or (branch_name and branch_name.lower() in b_reg.lower()):
-                matched_branch = b
-                break
-
-            if b_norm and (branch_norm or text_norm):
-                b_words = set(b_norm.split())
-                target_words = set(branch_norm.split()) if branch_norm else set(text_norm.split())
-                if b_words.intersection(target_words):
-                    matched_branch = b
-                    break
-
-        if not matched_branch and sender_phone:
-            clean_sender = re.sub(r'[^0-9]', '', sender_phone)
-            for b in branches:
-                clean_b_phone = re.sub(r'[^0-9]', '', b.get("branch_phone") or "")
-                if clean_b_phone and (clean_b_phone.endswith(clean_sender[-8:]) or clean_sender.endswith(clean_b_phone[-8:])):
-                    matched_branch = b
-                    break
-
-    branch_identified = bool(matched_branch or branch_name or location_url or (branches and len(branches) == 1))
-
+    # هل تم التعرف على الفرع بشكل قاطع؟
+    branch_identified = False
     if matched_branch:
-        branch_name = matched_branch.get("branch_name", branch_name or "Main Branch")
+        branch_identified = True
+        branch_name = matched_branch.get("branch_name", "Main Branch")
         if not location_url and matched_branch.get("location_url"):
             location_url = matched_branch["location_url"]
         if not branch_contact and matched_branch.get("branch_phone"):
             branch_contact = matched_branch["branch_phone"]
-    elif not branch_name and branches and len(branches) == 1:
+    elif extracted_branch_name and not is_new_branch:
+        branch_identified = True
+        branch_name = extracted_branch_name
+    elif not extracted_branch_name and branches and len(branches) == 1:
+        # إذا كان للعميل فرع واحد فقط مسجل ولم يذكر شيئاً
+        branch_identified = True
         matched_branch = branches[0]
         branch_name = matched_branch.get("branch_name", "Main Branch")
         if not location_url and matched_branch.get("location_url"):
             location_url = matched_branch["location_url"]
         if not branch_contact and matched_branch.get("branch_phone"):
             branch_contact = matched_branch["branch_phone"]
-
-    if not branch_name:
-        branch_name = "Unspecified Branch"
+    else:
+        # فرع غير محدد أو جديد تماماً بدون لوكيشن
+        branch_identified = False
+        branch_name = extracted_branch_name or "Unspecified Branch"
 
     if not branch_contact:
         branch_contact = sender_phone if sender_phone else (customer.get("phone") or "N/A")
 
-    habitual_items = get_customer_habitual_items(customer.get("id", 0))
-    cleaned_items = await standardize_order_items_with_ai(text, brand_name, habitual_items)
-    items_formatted = "\n".join([f"- {it}" for it in cleaned_items])
+    items_formatted = "\n".join([f"- {it.lstrip('-').strip()}" for it in cleaned_items])
 
     header_title = "*DISPATCH & DELIVERY ORDER (NEW BRANCH ALERT 🚨)*" if is_new_branch else "*DISPATCH & DELIVERY ORDER*"
     branch_display = f"{branch_name} ⭐️ [NEW BRANCH - FIRST DELIVERY]" if is_new_branch else branch_name
@@ -518,7 +490,7 @@ async def format_dispatch_order_en(
     if is_new_branch:
         new_branch_notice = (
             f"----------------------------------------\n"
-            f"⚠️ *Logistics Note:* This is a newly established branch location. Please verify location pin and contact driver/receiver on arrival.\n"
+            f"⚠️ *Logistics Note:* This is a newly established branch location. Please verify location pin and contact receiver on arrival.\n"
         )
 
     formatted_msg = (
@@ -778,7 +750,7 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="23.2.0", lifespan=lifespan)
+app = FastAPI(title="FDC Sales CRM", version="23.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1072,11 +1044,9 @@ async def reconcile_missed_orders():
     recovered_count = 0
     try:
         with conn.cursor() as cur:
-            # 1. جلب جميع حسابات العملاء المسجلين
             cur.execute("SELECT id, company_name, brand_name, phone, whatsapp_group_id FROM customer_accounts;")
             customers = cur.fetchall()
 
-            # 2. جلب جميع الرسائل من whatsapp_logs التي تحتوي على مؤشرات طلب
             cur.execute("""
                 SELECT id, created_at, sender_name, sender_phone, channel_name, message_body 
                 FROM whatsapp_logs 
@@ -1089,12 +1059,10 @@ async def reconcile_missed_orders():
                 text = log_entry["message_body"].strip()
                 fake_msg_id = f"reconciled-log-{log_entry['id']}"
 
-                # التحقق هل تم إدراج هذا السجل مسبقاً
                 cur.execute("SELECT id FROM dispatched_orders WHERE message_id = %s;", (fake_msg_id,))
                 if cur.fetchone():
                     continue
 
-                # تحديد هوية العميل المناسب
                 matched_cust = None
                 s_phone = re.sub(r'[^0-9]', '', log_entry.get("sender_phone") or "")
                 ch_name = (log_entry.get("channel_name") or "").lower()
@@ -1124,21 +1092,17 @@ async def reconcile_missed_orders():
                 if not matched_cust:
                     continue
 
-                # التحقق من نية الشراء
                 is_order = await classify_order_intent(text)
                 if not is_order:
                     continue
 
-                # جلب فروع العميل
                 cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s;", (matched_cust["id"],))
                 branches = cur.fetchall()
 
-                # استخراج تفاصيل الصنف والكمية والفرع
                 _, branch_name, extracted_date, order_items, _ = await format_dispatch_order_en(
                     text, matched_cust, log_entry.get("sender_phone", ""), log_entry.get("sender_name", ""), branches
                 )
 
-                # تحديد تاريخ الطلب: إذا لم يحدد في الرسالة، نعتمد تاريخ استلام الرسالة الفعلي في قاعدة البيانات
                 order_date_str = log_entry["created_at"].strftime("%d/%m/%Y") if log_entry.get("created_at") else extracted_date
 
                 save_dispatched_order_items(
@@ -1175,7 +1139,7 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         clean_phone = msg.sender_phone.replace("+", "").strip()
         send_catalog = False
 
-        # استبعاد فوري لمندوبي المبيعات الداخليين
+        # استبعاد فوري لأي رسالة قادمة من فريق العمل الداخلي
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, name FROM sales_executives 
@@ -1253,6 +1217,7 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                             text, customer, msg.sender_phone, msg.sender_name, branches, msg.shared_location_url or ""
                         )
 
+                        # إذا كان الفرع غير محدد أو فرعاً جديداً تماماً دون موقع، يُرسل استفسار التحديد التفاعلي
                         if not branch_identified:
                             reply_text = (
                                 "فضلاً، يرجى تحديد الفرع المطلوب للتوصيل (مثلاً: فرع الخوض، فرع بوشر) أو مشاركة موقع الفرع (Location) لتأكيد أمر التوريد لفريق اللوجستيك.\n\n"
