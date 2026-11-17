@@ -34,6 +34,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
 import security
+import db_pool
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pyotp
@@ -67,16 +68,8 @@ LOGO_SVG_RAW = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 90" w
 </svg>"""
 
 def get_db_connection():
-    if not DATABASE_URL:
-        return None
-    try:
-        conn_url = DATABASE_URL
-        if conn_url.startswith("postgres://"):
-            conn_url = conn_url.replace("postgres://", "postgresql://", 1)
-        return psycopg2.connect(conn_url, cursor_factory=RealDictCursor, connect_timeout=5)
-    except Exception as e:
-        logger.error(f"Database connection error: {e}")
-        return None
+    """اتصال من المجمّع (Connection Pool) - close() يعيده للمجمّع بدل إغلاقه"""
+    return db_pool.get_pooled_connection(DATABASE_URL)
 
 def run_isolated_ddl(sql_statement: str):
     conn = get_db_connection()
@@ -90,6 +83,33 @@ def run_isolated_ddl(sql_statement: str):
         logger.warning(f"DDL notice ({sql_statement[:35]}...): {e}")
     finally:
         conn.close()
+
+MAX_CATALOG_BYTES = 15 * 1024 * 1024
+
+
+def restore_catalog_from_db():
+    """
+    قرص حاوية Railway مؤقت ويُمسح مع كل نشر، لذلك الكتالوج محفوظ في قاعدة البيانات
+    ويُستعاد إلى القرص عند تشغيل الخادم.
+    """
+    if os.path.exists(CATALOG_FILE_PATH):
+        return
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT content FROM stored_files WHERE file_key = 'catalog_pdf';")
+            row = cur.fetchone()
+        if row and row["content"]:
+            with open(CATALOG_FILE_PATH, "wb") as f:
+                f.write(bytes(row["content"]))
+            logger.info("Catalog PDF restored from database.")
+    except Exception as e:
+        logger.warning(f"Catalog restore skipped: {e}")
+    finally:
+        conn.close()
+
 
 async def send_whatsapp_direct(target_phone_or_group: str, message: str) -> bool:
     if not target_phone_or_group:
@@ -745,6 +765,15 @@ def init_database():
         ON dispatched_orders (message_id, item_name) WHERE message_id IS NOT NULL;
     """)
     run_isolated_ddl("ALTER TABLE customer_accounts ALTER COLUMN contact_person SET DEFAULT '';")
+    run_isolated_ddl("""
+        CREATE TABLE IF NOT EXISTS stored_files (
+            file_key VARCHAR(100) PRIMARY KEY,
+            file_name VARCHAR(255) NOT NULL,
+            mime_type VARCHAR(100) NOT NULL,
+            content BYTEA NOT NULL,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
 
 def start_whatsapp_service():
     global whatsapp_process
@@ -761,11 +790,13 @@ def start_whatsapp_service():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_database()
+    restore_catalog_from_db()
     start_whatsapp_service()
     yield
     global whatsapp_process
     if whatsapp_process:
         whatsapp_process.terminate()
+    db_pool.close_pool()
 
 # توثيق الـ API التلقائي (/docs, /openapi.json) معطّل لعدم كشف خريطة المسارات للعموم
 app = FastAPI(
@@ -1131,6 +1162,25 @@ async def upload_catalog_file(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="يرجى رفع ملف بصيغة PDF حصراً")
     content = await file.read()
+    if len(content) > MAX_CATALOG_BYTES:
+        raise HTTPException(status_code=400, detail="حجم الكتالوج يتجاوز 15 ميجابايت")
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="الملف ليس PDF صالحاً")
+    # الحفظ في قاعدة البيانات أولاً (دائم)، ثم نسخة على القرص للإرسال السريع
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO stored_files (file_key, file_name, mime_type, content, updated_at)
+                VALUES ('catalog_pdf', %s, 'application/pdf', %s, NOW())
+                ON CONFLICT (file_key) DO UPDATE SET file_name = EXCLUDED.file_name,
+                    content = EXCLUDED.content, updated_at = NOW();
+            """, (file.filename, psycopg2.Binary(content)))
+        conn.commit()
+    finally:
+        conn.close()
     with open(CATALOG_FILE_PATH, "wb") as f:
         f.write(content)
     return {"status": "SUCCESS", "filename": file.filename, "size_kb": len(content) // 1024}
@@ -2102,11 +2152,39 @@ async def get_whatsapp_status():
                 return {
                     "connected": bool(data.get("connected")), 
                     "phone": data.get("user"),
-                    "qr": data.get("qr")
+                    "qr": data.get("qr"),
+                    "state": data.get("status") or ("connected" if data.get("connected") else "connecting")
                 }
     except Exception:
         pass
-    return {"connected": False, "phone": None, "qr": None}
+    return {"connected": False, "phone": None, "qr": None, "state": "service_down"}
+
+
+@app.post("/api/whatsapp/request-qr")
+async def request_whatsapp_qr():
+    """استئناف الربط وتوليد رمز QR جديد بعد إيقاف المحاولات التلقائية"""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post("http://127.0.0.1:3001/start", timeout=4.0)
+            return resp.json()
+    except Exception:
+        raise HTTPException(status_code=503, detail="خدمة الواتساب لا تستجيب")
+
+
+@app.get("/healthz")
+def healthz():
+    """فحص صحة الخدمة لـ Railway: الخادم يعمل وقاعدة البيانات تستجيب"""
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"status": "degraded", "database": False}, status_code=503)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+        return {"status": "ok", "database": True}
+    except Exception:
+        return JSONResponse({"status": "degraded", "database": False}, status_code=503)
+    finally:
+        conn.close()
 
 @app.post("/api/whatsapp/disconnect")
 async def disconnect_whatsapp():

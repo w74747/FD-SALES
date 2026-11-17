@@ -85,9 +85,14 @@ function debouncedSaveSessionToDB(sessionName, folderPath) {
 }
 
 const sessions = {
-  operations: { sock: null, qr: null, connected: false, user: null, isStarting: false }
+  // status: connecting | qr | connected | paused | replaced
+  operations: { sock: null, qr: null, connected: false, user: null, isStarting: false, status: 'connecting' }
 };
 
+// عدد دورات انتهاء رمز QR دون مسح قبل الإيقاف المؤقت (كل دورة ≈ 2.7 دقيقة)
+const MAX_QR_CYCLES = parseInt(process.env.WA_MAX_QR_CYCLES || '3', 10);
+let qrTimeoutCycles = 0;
+let reconnectAttempts = 0;
 let consecutiveDisconnects = 0;
 const messageStore = new Map();
 const recentGroupLocations = new Map();
@@ -148,30 +153,65 @@ async function startOperationsWhatsApp() {
         try {
           sessions.operations.qr = await QRCode.toDataURL(qr);
           sessions.operations.connected = false;
+          sessions.operations.status = 'qr';
         } catch (err) {}
       }
 
       if (connection === 'close') {
         const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+        const isRegistered = Boolean(state?.creds?.registered);
         consecutiveDisconnects++;
         sessions.operations.connected = false;
         sessions.operations.isStarting = false;
 
-        console.log(`[Operations WA] Closed. Code: ${statusCode}. Consecutive: ${consecutiveDisconnects}`);
+        console.log(`[Operations WA] Closed. Code: ${statusCode}. Registered: ${isRegistered}. Consecutive: ${consecutiveDisconnects}`);
 
-        if (consecutiveDisconnects >= 4 || statusCode === DisconnectReason.loggedOut) {
-          console.log(`[Operations WA] Clearing corrupted session files to generate fresh QR.`);
+        // 1) تسجيل خروج من الهاتف أو جلسة تالفة: مسح الجلسة وتوليد QR جديد
+        if (statusCode === DisconnectReason.loggedOut || statusCode === DisconnectReason.badSession) {
+          console.log('[Operations WA] Logged out / bad session. Clearing credentials for a fresh QR.');
           try {
             fs.rmSync(authFolder, { recursive: true, force: true });
             await coreApi.delete('/api/internal/session-snapshot/operations_main');
           } catch (e) {}
           consecutiveDisconnects = 0;
+          qrTimeoutCycles = 0;
+          sessions.operations.status = 'connecting';
           setTimeout(startOperationsWhatsApp, 2000);
-        } else {
-          setTimeout(startOperationsWhatsApp, 3000);
+          return;
         }
+
+        // 2) فُتحت الجلسة من جهاز/خادم آخر: لا نعيد الاتصال حتى لا يطرد كل منهما الآخر
+        if (statusCode === DisconnectReason.connectionReplaced) {
+          console.log('[Operations WA] Session replaced by another client. Paused until requested from dashboard.');
+          sessions.operations.status = 'replaced';
+          sessions.operations.qr = null;
+          return;
+        }
+
+        // 3) مرحلة انتظار المسح: انتهى رمز QR دون أن يُمسح
+        if (!isRegistered) {
+          qrTimeoutCycles++;
+          if (qrTimeoutCycles >= MAX_QR_CYCLES) {
+            console.log(`[Operations WA] QR not scanned after ${qrTimeoutCycles} cycles. Paused - request a new QR from the dashboard.`);
+            sessions.operations.status = 'paused';
+            sessions.operations.qr = null;
+            return;
+          }
+          setTimeout(startOperationsWhatsApp, 3000);
+          return;
+        }
+
+        // 4) جلسة صالحة انقطعت مؤقتاً (شبكة/خادم واتساب): إعادة اتصال بتأخير متزايد دون مسح الجلسة
+        reconnectAttempts++;
+        const delay = statusCode === DisconnectReason.restartRequired ? 1000 : Math.min(60000, 3000 * Math.pow(2, reconnectAttempts - 1));
+        sessions.operations.status = 'connecting';
+        console.log(`[Operations WA] Reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempts}).`);
+        setTimeout(startOperationsWhatsApp, delay);
       } else if (connection === 'open') {
         consecutiveDisconnects = 0;
+        reconnectAttempts = 0;
+        qrTimeoutCycles = 0;
+        sessions.operations.status = 'connected';
         sessions.operations.connected = true;
         sessions.operations.qr = null;
         const cleanPhone = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : 'متصل';
@@ -322,8 +362,20 @@ app.get('/qr-status', (req, res) => {
   res.json({
     connected: sessions.operations.connected,
     user: sessions.operations.user,
-    qr: sessions.operations.qr
+    qr: sessions.operations.qr,
+    status: sessions.operations.status
   });
+});
+
+// طلب رمز QR جديد / استئناف الاتصال بعد الإيقاف المؤقت (من زر في اللوحة)
+app.post('/start', (req, res) => {
+  if (sessions.operations.connected) return res.json({ status: 'ALREADY_CONNECTED' });
+  qrTimeoutCycles = 0;
+  reconnectAttempts = 0;
+  sessions.operations.status = 'connecting';
+  sessions.operations.isStarting = false;
+  startOperationsWhatsApp();
+  return res.json({ status: 'STARTING' });
 });
 
 app.get('/groups', async (req, res) => {
@@ -437,6 +489,9 @@ app.post('/disconnect', async (req, res) => {
     sessions.operations.user = null;
     sessions.operations.qr = null;
     consecutiveDisconnects = 0;
+    qrTimeoutCycles = 0;
+    reconnectAttempts = 0;
+    sessions.operations.status = 'connecting';
     if (sessions.operations.sock) {
       try { await sessions.operations.sock.logout(); } catch (e) {}
       try { sessions.operations.sock.end(); } catch (e) {}
