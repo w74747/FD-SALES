@@ -68,6 +68,7 @@
             }
             if (cleanId === 'agents') {
                 if (typeof window.loadOrderKeywords === 'function') window.loadOrderKeywords();
+                if (typeof window.loadLogisticsGroup === 'function') window.loadLogisticsGroup();
             }
             if (cleanId === 'analytics') {
                 if (typeof window.loadAnalyticsData === 'function') window.loadAnalyticsData();
@@ -77,8 +78,56 @@
         window.openModal = function(id) { const m = document.getElementById(id); if (m) m.classList.remove('hidden'); };
         window.closeModal = function(id) { const m = document.getElementById(id); if (m) m.classList.add('hidden'); };
 
-        window.checkSessionPersisted = function() {
-            return localStorage.getItem('fdc_auth_token') === 'AUTHENTICATED' || document.cookie.includes('fdc_auth=AUTHENTICATED');
+        // ---------------- المصادقة على الخادم ----------------
+        // الجلسة محفوظة في Cookie من نوع HttpOnly يصدرها الخادم بعد التحقق الثنائي،
+        // ولا يمكن تزويرها من المتصفح كما كان الحال مع localStorage.
+        localStorage.removeItem('fdc_auth_token');
+        document.cookie = "fdc_auth=; path=/; max-age=0";
+
+        window.showAuthOverlay = function() {
+            document.getElementById('auth-overlay')?.classList.remove('hidden');
+        };
+
+        // أي رد 401 من الـ API يعني انتهاء الجلسة: إظهار شاشة الدخول فوراً
+        (function() {
+            const nativeFetch = window.fetch.bind(window);
+            window.fetch = async function(input, init) {
+                const res = await nativeFetch(input, Object.assign({ credentials: 'same-origin' }, init || {}));
+                const url = typeof input === 'string' ? input : (input && input.url) || '';
+                if (res.status === 401 && url.indexOf('/api/auth/') === -1) window.showAuthOverlay();
+                return res;
+            };
+        })();
+
+        window.checkServerSession = async function() {
+            try {
+                const res = await fetch('/api/auth/status');
+                const data = await res.json();
+                const setupBox = document.getElementById('auth-setup-box');
+                if (setupBox) setupBox.classList.toggle('hidden', !(data.setup_available && !data.two_fa_enabled));
+                const setupLink = document.getElementById('auth-setup-toggle');
+                if (setupLink) setupLink.classList.toggle('hidden', !(data.setup_available && data.two_fa_enabled));
+                return data;
+            } catch (e) {
+                return { authenticated: false };
+            }
+        };
+
+        window.request2FASetup = async function() {
+            const tokenEl = document.getElementById('auth-setup-token');
+            const setup_token = tokenEl ? tokenEl.value.trim() : '';
+            if (!setup_token) return alert("أدخل توكن الإعداد (ADMIN_SETUP_TOKEN)");
+            const res = await fetch('/api/auth/2fa/setup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ setup_token })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.detail || "تعذر إعداد التحقق الثنائي");
+            const img = document.getElementById('auth-setup-qr');
+            if (img) { img.src = data.qr; img.classList.remove('hidden'); }
+            document.getElementById('auth-setup-box')?.classList.remove('hidden');
+            alert("امسح رمز QR بتطبيق Google Authenticator أو Microsoft Authenticator، ثم أدخل الرمز المكون من 6 أرقام لتفعيل الدخول.");
         };
 
         window.submit2FAVerification = async function() {
@@ -93,21 +142,22 @@
                     body: JSON.stringify({ code })
                 });
                 if (res.ok) {
-                    localStorage.setItem('fdc_auth_token', 'AUTHENTICATED');
-                    document.cookie = "fdc_auth=AUTHENTICATED; path=/; max-age=31536000";
+                    if (codeInput) codeInput.value = '';
+                    document.getElementById('auth-setup-qr')?.classList.add('hidden');
                     document.getElementById('auth-overlay')?.classList.add('hidden');
                     if (typeof window.loadAllData === 'function') window.loadAllData();
+                    if (typeof window.loadExhibitionConfig === 'function') window.loadExhibitionConfig();
                 } else {
-                    alert("رمز التحقق غير صحيح");
+                    const data = await res.json().catch(() => ({}));
+                    alert(data.detail || "رمز التحقق غير صحيح");
                 }
             } catch (err) {
                 alert("تعذر الاتصال بالخادم");
             }
         };
 
-        window.logoutSession = function() {
-            localStorage.removeItem('fdc_auth_token');
-            document.cookie = "fdc_auth=; path=/; max-age=0";
+        window.logoutSession = async function() {
+            try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
             location.reload();
         };
     </script>
@@ -131,6 +181,19 @@
             <button onclick="submit2FAVerification()" class="w-full py-2.5 bg-[#3A056A] text-white font-bold text-xs rounded-xl shadow hover:bg-purple-900 transition">
                 تأكيد الدخول
             </button>
+
+            <!-- إعداد / إعادة ضبط التحقق الثنائي (يتطلب ADMIN_SETUP_TOKEN من Railway) -->
+            <button id="auth-setup-toggle" onclick="document.getElementById('auth-setup-box').classList.toggle('hidden')"
+                    class="hidden text-[10px] text-purple-700 underline">إعادة ضبط تطبيق المصادقة</button>
+            <div id="auth-setup-box" class="hidden border-t border-purple-100 pt-3 space-y-2">
+                <p class="text-[11px] text-gray-600">الإعداد الأول: أدخل توكن الإعداد المعرّف في Railway لعرض رمز QR</p>
+                <input type="password" id="auth-setup-token" placeholder="ADMIN_SETUP_TOKEN" autocomplete="off"
+                       class="w-full p-2 border rounded-lg text-xs text-center font-mono">
+                <button onclick="request2FASetup()" class="w-full py-2 bg-purple-100 text-[#3A056A] font-bold text-xs rounded-xl hover:bg-purple-200 transition">
+                    عرض رمز QR للإعداد
+                </button>
+                <img id="auth-setup-qr" class="hidden mx-auto w-48 h-48 border rounded-xl p-1" alt="2FA QR" />
+            </div>
         </div>
     </div>
 
@@ -440,6 +503,31 @@
                             </button>
                         </div>
                         <textarea id="order-keywords-input" rows="2" class="w-full p-2 border rounded-lg text-xs leading-relaxed font-mono" placeholder="box, boxes, كرتون, كراتين, طلب, طلبية, potato, buns..."></textarea>
+                    </div>
+
+                    <!-- مجموعة اللوجستيك: الوجهة التي تُرسل إليها أوامر التوريد المعتمدة وتنبيهات الإلغاء -->
+                    <div class="p-3.5 bg-gray-50 border border-purple-200 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center gap-2">
+                            <div>
+                                <div class="font-bold text-xs text-[#3A056A]">مجموعة اللوجستيك (Logistics Group):</div>
+                                <div class="text-[10px] text-gray-500">تُرسل إليها أوامر التوريد المستخرجة من مجموعات العملاء وتنبيهات إلغاء الطلبيات.</div>
+                                <div id="logistics-group-effective" class="text-[10px] font-mono text-red-600 mt-1">غير محددة — لن تُوجَّه الطلبيات</div>
+                            </div>
+                            <div class="flex gap-1.5 flex-shrink-0">
+                                <button onclick="loadWhatsAppGroupsForLogistics()" class="px-3 py-1.5 bg-purple-100 text-[#3A056A] font-bold rounded-lg text-xs hover:bg-purple-200 transition">
+                                    تحميل المجموعات
+                                </button>
+                                <button onclick="saveLogisticsGroup()" class="px-3.5 py-1.5 bg-[#3A056A] text-white font-bold rounded-lg text-xs hover:bg-purple-900 transition shadow-xs">
+                                    حفظ
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <select id="logistics-group-select" onchange="if (this.value) document.getElementById('logistics-group-input').value = this.value" class="w-1/2 p-2 border rounded-lg text-xs">
+                                <option value="">— اختر من مجموعات الواتساب —</option>
+                            </select>
+                            <input id="logistics-group-input" type="text" dir="ltr" placeholder="120363000000000000@g.us" class="w-1/2 p-2 border rounded-lg text-xs font-mono">
+                        </div>
                     </div>
 
                     <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between">
@@ -1342,6 +1430,62 @@
             }
         };
 
+        // ---------------- مجموعة اللوجستيك ----------------
+        window.renderLogisticsEffective = function(target) {
+            const el = document.getElementById('logistics-group-effective');
+            if (!el) return;
+            el.textContent = target ? ('الوجهة الحالية: ' + target) : 'غير محددة — لن تُوجَّه الطلبيات';
+            el.className = 'text-[10px] font-mono mt-1 ' + (target ? 'text-green-700' : 'text-red-600');
+        };
+
+        window.loadLogisticsGroup = async function() {
+            try {
+                const res = await fetch('/api/system/logistics-group');
+                const data = await res.json();
+                const el = document.getElementById('logistics-group-input');
+                if (el) el.value = data.group_id || '';
+                renderLogisticsEffective(data.effective_target || '');
+            } catch (e) {}
+        };
+
+        window.loadWhatsAppGroupsForLogistics = async function() {
+            const sel = document.getElementById('logistics-group-select');
+            if (!sel) return;
+            try {
+                const res = await fetch('/api/whatsapp/groups');
+                const groups = await res.json();
+                if (!Array.isArray(groups) || groups.length === 0) {
+                    return alert("لا توجد مجموعات — تأكد من ربط الواتساب أولاً");
+                }
+                sel.innerHTML = '';
+                const first = document.createElement('option');
+                first.value = ''; first.textContent = '— اختر من مجموعات الواتساب —';
+                sel.appendChild(first);
+                groups.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g.id;
+                    opt.textContent = (g.subject || g.id) + ' (' + (g.participants_count || 0) + ')';
+                    sel.appendChild(opt);
+                });
+            } catch (e) {
+                alert("تعذر تحميل المجموعات");
+            }
+        };
+
+        window.saveLogisticsGroup = async function() {
+            const el = document.getElementById('logistics-group-input');
+            const group_id = el ? el.value.trim() : '';
+            const res = await fetch('/api/system/logistics-group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ group_id })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.detail || "تعذر الحفظ");
+            await loadLogisticsGroup();
+            alert("تم حفظ مجموعة اللوجستيك ✓");
+        };
+
         // ---------------- دوال رقم هاتف الاختبار للوكلاء ----------------
         window.saveGlobalTestPhone = function(showNotice = false) {
             const el = document.getElementById('global-test-phone');
@@ -2232,8 +2376,9 @@
             loadAnalyticsData();
         };
 
-        window.addEventListener('DOMContentLoaded', () => {
-            if (checkSessionPersisted()) {
+        window.addEventListener('DOMContentLoaded', async () => {
+            const status = await checkServerSession();
+            if (status.authenticated) {
                 document.getElementById('auth-overlay')?.classList.add('hidden');
                 loadAllData();
                 loadExhibitionConfig();

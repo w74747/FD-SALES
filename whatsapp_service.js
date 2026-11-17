@@ -26,6 +26,16 @@ app.use(express.json({ limit: '60mb' }));
 
 const PORT = 3001;
 
+// كل الاستدعاءات إلى FastAPI تحمل التوكن الداخلي السري (يرثه هذا الـ process من main.py)
+// حتى لا تُقبل مسارات الجلسة والـ webhook من خارج الخادم
+const coreApi = axios.create({
+  baseURL: 'http://127.0.0.1:8000',
+  headers: { 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || '' }
+});
+if (!process.env.INTERNAL_API_TOKEN) {
+  console.error('[Baileys] INTERNAL_API_TOKEN missing - calls to the CRM core will be rejected.');
+}
+
 function snapshotFolder(folderPath) {
   const snapshot = {};
   if (!fs.existsSync(folderPath)) return snapshot;
@@ -48,7 +58,7 @@ function restoreFolder(folderPath, snapshot) {
 
 async function restoreSessionFromDB(sessionName, folderPath) {
   try {
-    const res = await axios.get(`http://127.0.0.1:8000/api/internal/session-snapshot/${sessionName}`, { timeout: 4000 });
+    const res = await coreApi.get(`/api/internal/session-snapshot/${sessionName}`, { timeout: 4000 });
     if (res.data && res.data.snapshot && Object.keys(res.data.snapshot).length > 0) {
       restoreFolder(folderPath, res.data.snapshot);
       console.log(`[DB Restore] Successfully restored '${sessionName}' from PostgreSQL.`);
@@ -65,7 +75,7 @@ function debouncedSaveSessionToDB(sessionName, folderPath) {
     try {
       const snapshot = snapshotFolder(folderPath);
       if (Object.keys(snapshot).length > 0) {
-        await axios.post('http://127.0.0.1:8000/api/internal/session-snapshot', {
+        await coreApi.post('/api/internal/session-snapshot', {
           session_name: sessionName,
           snapshot: snapshot
         }, { timeout: 6000 });
@@ -153,7 +163,7 @@ async function startOperationsWhatsApp() {
           console.log(`[Operations WA] Clearing corrupted session files to generate fresh QR.`);
           try {
             fs.rmSync(authFolder, { recursive: true, force: true });
-            await axios.delete('http://127.0.0.1:8000/api/internal/session-snapshot/operations_main');
+            await coreApi.delete('/api/internal/session-snapshot/operations_main');
           } catch (e) {}
           consecutiveDisconnects = 0;
           setTimeout(startOperationsWhatsApp, 2000);
@@ -173,9 +183,26 @@ async function startOperationsWhatsApp() {
     });
 
     sock.ev.on('messages.upsert', async (m) => {
-      try {
-        if (!m.messages || m.messages.length === 0) return;
-        const msg = m.messages[0];
+      if (!m.messages || m.messages.length === 0) return;
+      // معالجة كل الرسائل في الدفعة (كان يُعالج الأول فقط فتضيع طلبيات تصل معاً)
+      for (const msg of m.messages) {
+        try {
+          await processIncomingMessage(sock, msg);
+        } catch (e) {
+          console.error('[Operations WA] Message processing error:', e.message);
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error('[Operations WA] Startup error:', err.message);
+    sessions.operations.isStarting = false;
+    setTimeout(startOperationsWhatsApp, 5000);
+  }
+}
+
+async function processIncomingMessage(sock, msg) {
+      {
 
         if (msg.key && msg.key.id && msg.message) {
           messageStore.set(msg.key.id, msg.message);
@@ -209,7 +236,7 @@ async function startOperationsWhatsApp() {
         const isRevoked = msg.message?.protocolMessage?.type === 0;
         if (isRevoked) {
           const targetMsgId = msg.message.protocolMessage.key?.id;
-          await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
+          const delResp = await coreApi.post('/api/whatsapp/webhook', {
             chat_id: chatId,
             sender_phone: `+${senderPhone}`,
             sender_name: senderName,
@@ -217,6 +244,12 @@ async function startOperationsWhatsApp() {
             message_id: targetMsgId,
             event_type: 'MESSAGE_DELETED'
           }, { timeout: 8000 });
+          // إرسال تنبيه إلغاء الطلبية لمجموعة اللوجستيك (كان الرد يُتجاهل فلا يصل التنبيه)
+          if (delResp.data && delResp.data.forward_to_logistics && delResp.data.logistics_text) {
+            let logJid = delResp.data.forward_to_logistics.trim();
+            if (!logJid.endsWith('@g.us') && !logJid.endsWith('@s.whatsapp.net')) logJid = `${logJid}@g.us`;
+            await sock.sendMessage(logJid, { text: delResp.data.logistics_text });
+          }
           return;
         }
 
@@ -249,7 +282,7 @@ async function startOperationsWhatsApp() {
 
         const originalMsgId = isEdited ? msg.message.protocolMessage.key?.id : msg.key.id;
 
-        const resp = await axios.post('http://127.0.0.1:8000/api/whatsapp/webhook', {
+        const resp = await coreApi.post('/api/whatsapp/webhook', {
           chat_id: chatId,
           sender_phone: `+${senderPhone}`,
           sender_name: senderName,
@@ -282,13 +315,7 @@ async function startOperationsWhatsApp() {
           }
           await sock.sendMessage(logJid, { text: resp.data.logistics_text });
         }
-      } catch (e) {}
-    });
-
-  } catch (err) {
-    sessions.operations.isStarting = false;
-    setTimeout(startOperationsWhatsApp, 5000);
-  }
+      }
 }
 
 app.get('/qr-status', (req, res) => {
@@ -416,7 +443,7 @@ app.post('/disconnect', async (req, res) => {
     }
     const authFolder = path.join(__dirname, 'auth_info');
     try { fs.rmSync(authFolder, { recursive: true, force: true }); } catch (e) {}
-    try { await axios.delete('http://127.0.0.1:8000/api/internal/session-snapshot/operations_main'); } catch (e) {}
+    try { await coreApi.delete('/api/internal/session-snapshot/operations_main'); } catch (e) {}
     setTimeout(startOperationsWhatsApp, 1500);
     return res.json({ status: 'DISCONNECTED' });
   } catch (e) {
