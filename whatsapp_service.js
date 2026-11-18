@@ -124,15 +124,19 @@ function toJid(target) {
 
 const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
 const ORDER_DOC_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                         'application/vnd.ms-excel', 'image/jpeg', 'image/png', 'image/webp'];
+                         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                         'text/csv', 'text/plain', 'image/jpeg', 'image/png', 'image/webp'];
+const MAX_VOICE_SECONDS = 300;
 
 // تنزيل صورة أو ملف الطلب (جدول الفروع والأصناف) لقراءته بالذكاء الاصطناعي
 async function extractOrderMedia(sock, msg, mMsg) {
   const image = mMsg?.imageMessage;
   const doc = mMsg?.documentMessage || mMsg?.documentWithCaptionMessage?.message?.documentMessage;
-  const media = image || doc;
+  const audio = mMsg?.audioMessage;  // الرسائل الصوتية تُفرَّغ إلى نص في الخادم
+  const media = image || doc || audio;
   if (!media) return null;
-  const mimetype = (media.mimetype || (image ? 'image/jpeg' : '')).split(';')[0];
+  if (audio && Number(audio.seconds || 0) > MAX_VOICE_SECONDS) return null;
+  const mimetype = (media.mimetype || (image ? 'image/jpeg' : audio ? 'audio/ogg' : '')).split(';')[0];
   if (doc && !ORDER_DOC_TYPES.includes(mimetype)) return null;
   if (Number(media.fileLength || 0) > MAX_MEDIA_BYTES) return null;
   try {
@@ -147,7 +151,7 @@ async function extractOrderMedia(sock, msg, mMsg) {
 
 function extractQuoted(mMsg) {
   const ctx = mMsg?.extendedTextMessage?.contextInfo || mMsg?.imageMessage?.contextInfo ||
-              mMsg?.documentMessage?.contextInfo || mMsg?.videoMessage?.contextInfo;
+              mMsg?.documentMessage?.contextInfo || mMsg?.videoMessage?.contextInfo || mMsg?.audioMessage?.contextInfo;
   if (!ctx || !ctx.stanzaId) return { quoted_message_id: null, quoted_text: null };
   const q = ctx.quotedMessage;
   let qText = extractMessageText(q);

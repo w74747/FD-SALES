@@ -29,7 +29,7 @@ import random
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Response, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Response, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -37,6 +37,7 @@ import security
 import db_pool
 import ai_client
 import order_engine
+import knowledge
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pyotp
@@ -768,6 +769,7 @@ def init_database():
     """)
     run_isolated_ddl("ALTER TABLE customer_accounts ALTER COLUMN contact_person SET DEFAULT '';")
     order_engine.init_schema(run_isolated_ddl)
+    knowledge.init_schema(run_isolated_ddl)
     run_isolated_ddl("""
         CREATE TABLE IF NOT EXISTS stored_files (
             file_key VARCHAR(100) PRIMARY KEY,
@@ -1404,6 +1406,23 @@ class OrderProfilePayload(BaseModel):
     reminder_days: Optional[str] = "0,1,2,3,4,5,6"
     reminder_time: Optional[str] = "09:00"
     reminder_text: Optional[str] = ""
+    reminder_frequency: Optional[str] = "daily"
+    products: Optional[List[dict]] = None
+    auto_reply_enabled: Optional[bool] = True
+
+
+class AssistantSettingsPayload(BaseModel):
+    admin_alert_phone: Optional[str] = ""
+    auto_reply_enabled: Optional[bool] = False
+
+
+class KnowledgeTextPayload(BaseModel):
+    title: str
+    content: str
+
+
+class IssueStatusPayload(BaseModel):
+    status: str
 
 
 async def dispatch_actions(actions: list):
@@ -1526,6 +1545,14 @@ def save_order_profile(customer_id: int, payload: OrderProfilePayload):
         raise HTTPException(status_code=400, detail="وقت التذكير يجب أن يكون بصيغة HH:MM")
     data["reminder_days"] = ",".join(sorted(set(re.findall(r"[0-6]", data.get("reminder_days") or ""))))
     data["lead_days"] = max(0, min(int(data.get("lead_days") or 1), 14))
+    data["reminder_frequency"] = "weekly" if data.get("reminder_frequency") == "weekly" else "daily"
+    if data.get("products") is None:
+        data.pop("products", None)
+    else:
+        data["products"] = [
+            {"alias": str(p.get("alias") or "").strip()[:120], "product": str(p.get("product") or "").strip()[:200],
+             "unit": str(p.get("unit") or "").strip()[:30], "notes": str(p.get("notes") or "").strip()[:200]}
+            for p in data["products"] if str(p.get("product") or "").strip()][:100]
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database unreachable")
@@ -1609,6 +1636,199 @@ async def approval_submit(token: str, request: Request):
     await _resolve_pending_by_id(pending["id"], approve, "rep-link")
     pending, company = _pending_for_token(token)
     return HTMLResponse(_render_approval(pending, company, token))
+
+
+# ======================= إعدادات المساعد، قاعدة المعرفة، الشكاوى =======================
+
+@app.get("/api/system/assistant-settings")
+def get_assistant_settings():
+    conn = get_db_connection()
+    if not conn:
+        return {"admin_alert_phone": "", "auto_reply_enabled": False}
+    try:
+        with conn.cursor() as cur:
+            return {
+                "admin_alert_phone": order_engine.get_setting(cur, "admin_alert_phone"),
+                "auto_reply_enabled": order_engine.get_setting(cur, "auto_reply_enabled", "false").lower() == "true",
+                "ai_enabled": ai_client.is_enabled(),
+                "voice_enabled": bool(os.getenv("TOGETHER_API_KEY", "").strip()),
+            }
+    finally:
+        conn.close()
+
+
+@app.post("/api/system/assistant-settings")
+def save_assistant_settings(payload: AssistantSettingsPayload):
+    phone = re.sub(r"[^0-9]", "", payload.admin_alert_phone or "")
+    if phone and not (8 <= len(phone) <= 15):
+        raise HTTPException(status_code=400, detail="رقم الهاتف غير صحيح (مثال: 96890000000)")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            for k, v in (("admin_alert_phone", phone), ("auto_reply_enabled", "true" if payload.auto_reply_enabled else "false")):
+                cur.execute("""INSERT INTO system_config (key_name, key_value) VALUES (%s, %s)
+                               ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;""", (k, v))
+        conn.commit()
+        return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+
+MAX_KB_UPLOAD = 15 * 1024 * 1024
+
+
+@app.get("/api/knowledge")
+def list_knowledge():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT id, title, file_name, mime_type, is_active, created_at, updated_at,
+                                  LENGTH(content_text) AS char_count, LEFT(content_text, 300) AS preview
+                           FROM knowledge_documents ORDER BY id DESC;""")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+@app.get("/api/knowledge/{doc_id}")
+def get_knowledge_doc(doc_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM knowledge_documents WHERE id = %s;", (doc_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="غير موجود")
+            return row
+    finally:
+        conn.close()
+
+
+def _save_knowledge(title: str, file_name: str, mime: str, text: str) -> dict:
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO knowledge_documents (title, file_name, mime_type, content_text)
+                           VALUES (%s, %s, %s, %s) RETURNING id, LENGTH(content_text) AS char_count;""",
+                        (title[:200], file_name[:255], mime[:120], text))
+            row = cur.fetchone()
+        conn.commit()
+        return {"status": "SUCCESS", "id": row["id"], "char_count": row["char_count"]}
+    finally:
+        conn.close()
+
+
+@app.post("/api/knowledge/upload")
+async def upload_knowledge(file: UploadFile = File(...), title: str = Form("")):
+    """رفع ملف معلومات للبوت: PDF، Word، Excel، CSV/نص، أو صورة"""
+    raw = await file.read()
+    if len(raw) > MAX_KB_UPLOAD:
+        raise HTTPException(status_code=400, detail="الحد الأقصى لحجم الملف 15 ميجابايت")
+    mime = file.content_type or "application/octet-stream"
+    text = await knowledge.extract_document_text(raw, mime, file.filename or "")
+    if len(text) < 20:
+        raise HTTPException(status_code=400, detail="تعذر استخراج نص من الملف. جرّب PDF نصياً أو Word أو Excel، أو الصق المحتوى كنص.")
+    return _save_knowledge(title.strip() or (file.filename or "ملف"), file.filename or "", mime, text)
+
+
+@app.post("/api/knowledge/text")
+def add_knowledge_text(payload: KnowledgeTextPayload):
+    if len(payload.content.strip()) < 5:
+        raise HTTPException(status_code=400, detail="المحتوى قصير جداً")
+    return _save_knowledge(payload.title.strip() or "ملاحظة", "", "text/plain", payload.content.strip()[:knowledge.MAX_DOC_CHARS])
+
+
+@app.post("/api/knowledge/{doc_id}/toggle")
+def toggle_knowledge(doc_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE knowledge_documents SET is_active = NOT is_active, updated_at = NOW() WHERE id = %s RETURNING is_active;", (doc_id,))
+            row = cur.fetchone()
+        conn.commit()
+        return {"status": "SUCCESS", "is_active": bool(row and row["is_active"])}
+    finally:
+        conn.close()
+
+
+@app.delete("/api/knowledge/{doc_id}")
+def delete_knowledge(doc_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM knowledge_documents WHERE id = %s;", (doc_id,))
+        conn.commit()
+        return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+
+@app.get("/api/issues")
+def list_issues(status: str = "", issue_type: str = ""):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT i.*, c.company_name FROM customer_issues i JOIN customer_accounts c ON c.id = i.customer_id
+                WHERE (%s = '' OR i.status = %s) AND (%s = '' OR i.issue_type = %s)
+                ORDER BY i.created_at DESC LIMIT 200;
+            """, (status, status, issue_type, issue_type))
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+@app.post("/api/issues/{issue_id}/status")
+def update_issue_status(issue_id: int, payload: IssueStatusPayload):
+    if payload.status not in ("open", "escalated", "answered_by_bot", "resolved"):
+        raise HTTPException(status_code=400, detail="حالة غير صحيحة")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE customer_issues SET status = %s,
+                           resolved_at = CASE WHEN %s = 'resolved' THEN NOW() ELSE NULL END WHERE id = %s;""",
+                        (payload.status, payload.status, issue_id))
+        conn.commit()
+        return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+
+@app.get("/api/issues/summary")
+def issues_summary(days: int = 90):
+    """ملخص الشكاوى حسب المنتج ونوع المشكلة (لتقارير الجودة والبحث والتطوير)"""
+    conn = get_db_connection()
+    if not conn:
+        return {"by_product": [], "by_category": []}
+    try:
+        with conn.cursor() as cur:
+            since = (" AND created_at > NOW() - (%s || ' days')::interval", (str(max(1, min(days, 365))),))
+            cur.execute("SELECT COALESCE(NULLIF(product, ''), 'غير محدد') AS product, COUNT(*) AS n, "
+                        "SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) AS high "
+                        "FROM customer_issues WHERE issue_type = 'complaint'" + since[0] +
+                        " GROUP BY 1 ORDER BY n DESC LIMIT 20;", since[1])
+            by_product = cur.fetchall()
+            cur.execute("SELECT category, issue_type, COUNT(*) AS n FROM customer_issues WHERE TRUE" + since[0] +
+                        " GROUP BY 1, 2 ORDER BY n DESC;", since[1])
+            return {"by_product": by_product, "by_category": cur.fetchall()}
+    finally:
+        conn.close()
 
 
 async def order_scheduler_loop():

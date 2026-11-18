@@ -25,7 +25,10 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import ai_client
+import knowledge
+import media_tools
 import security
+from psycopg2.extras import Json
 
 logger = logging.getLogger("SalesCRM.orders")
 
@@ -46,6 +49,13 @@ AFFIRMATIVE_RE = re.compile(
     re.IGNORECASE,
 )
 NEGATIVE_RE = re.compile(r"^\s*(no|nope|cancel|لا|لأ|كنسل|الغ|ألغ|خطأ|غلط)\b", re.IGNORECASE)
+TRIVIAL_RE = re.compile(
+    r"^[\s\W]*(السلام عليكم|سلام عليكم|وعليكم السلام|وعليكم السلام ورحمة الله( وبركاته)?|صباح الخير|صباح النور|مساء الخير|مساء النور|"
+    r"شكرا|شكراً|مشكور|مشكورين|يعطيكم العافية|الله يعافيك|تمام|اوكي|ok|okay|thanks|thank you|thx|good morning|good evening|"
+    r"hi|hello|welcome|noted|sure|👍|🙏|❤️|🌹)[\s\W]*$",
+    re.IGNORECASE,
+)
+STAFF_ACTIVE_MINUTES = 10
 ORDER_HINT_RE = re.compile(
     r"\d|order|box|ctn|carton|cartoon|packet|pkt|same|usual|repeat|"
     r"طلب|اوردر|أوردر|كرتون|كراتين|كيس|اكياس|نفس|المعتاد|العادي|كالعادة|زي",
@@ -118,6 +128,27 @@ SCHEMA = [
         resolved_at TIMESTAMP WITH TIME ZONE
     );""",
     "CREATE INDEX IF NOT EXISTS idx_pending_chat ON pending_order_confirmations (chat_id, status, created_at DESC);",
+    "ALTER TABLE customer_order_profiles ADD COLUMN IF NOT EXISTS products JSONB DEFAULT '[]'::jsonb;",
+    "ALTER TABLE customer_order_profiles ADD COLUMN IF NOT EXISTS auto_reply_enabled BOOLEAN DEFAULT TRUE;",
+    "ALTER TABLE customer_order_profiles ADD COLUMN IF NOT EXISTS reminder_frequency VARCHAR(10) DEFAULT 'daily';",
+    # الشكاوى والاستفسارات: تُصنَّف حسب المنتج والنوع لتقارير الجودة والبحث والتطوير
+    """CREATE TABLE IF NOT EXISTS customer_issues (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+        chat_id VARCHAR(100) NOT NULL,
+        message_id VARCHAR(120),
+        issue_type VARCHAR(20) NOT NULL,
+        category VARCHAR(40) DEFAULT 'other',
+        product VARCHAR(200) DEFAULT '',
+        severity VARCHAR(10) DEFAULT 'medium',
+        summary TEXT DEFAULT '',
+        customer_text TEXT DEFAULT '',
+        bot_reply TEXT DEFAULT '',
+        status VARCHAR(20) DEFAULT 'open',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        resolved_at TIMESTAMP WITH TIME ZONE
+    );""",
+    "CREATE INDEX IF NOT EXISTS idx_issues_status ON customer_issues (status, created_at DESC);",
 ]
 
 
@@ -140,6 +171,7 @@ PROFILE_DEFAULTS = {
     "product_aliases": "", "default_branch": "", "default_unit": "Cartons", "ai_notes": "",
     "lead_days": 1, "reminder_enabled": False, "reminder_days": "0,1,2,3,4,5,6",
     "reminder_time": "09:00", "reminder_text": "", "last_reminder_date": None,
+    "products": [], "auto_reply_enabled": True, "reminder_frequency": "daily",
 }
 
 
@@ -163,8 +195,24 @@ def save_profile(cur, customer_id: int, data: dict):
     cur.execute(
         f"INSERT INTO customer_order_profiles ({cols}) VALUES ({vals}) "
         f"ON CONFLICT (customer_id) DO UPDATE SET {updates};",
-        [customer_id] + [data[f] for f in fields],
+        [customer_id] + [Json(data[f]) if f == "products" else data[f] for f in fields],
     )
+
+
+def product_map(profile: dict) -> list:
+    """
+    منتجات العميل: من قائمة "منتجات العميل" في ملفه (الاسم الذي يستخدمه العميل ← منتجنا ← الوحدة)،
+    إضافة إلى الصيغة النصية القديمة إن وُجدت.
+    """
+    out = []
+    for p in profile.get("products") or []:
+        product = (p.get("product") or "").strip()
+        if not product:
+            continue
+        out.append({"alias": (p.get("alias") or product).strip(), "product": product,
+                    "unit": (p.get("unit") or "").strip(), "notes": (p.get("notes") or "").strip()})
+    out += parse_aliases(profile.get("product_aliases", ""))
+    return out
 
 
 def parse_aliases(text: str) -> list:
@@ -355,7 +403,7 @@ def apply_proposal(cur, customer: dict, profile: dict, proposal: dict, source_me
     """
     kind = proposal.get("kind")
     delivery = resolve_delivery_date(proposal.get("delivery_date"), profile)
-    aliases = parse_aliases(profile.get("product_aliases", ""))
+    aliases = product_map(profile)
     cur.execute("SELECT branch_name FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
     registered = [r["branch_name"] for r in cur.fetchall()]
 
@@ -527,14 +575,17 @@ INTERPRET_TOOL = {
         "properties": {
             "kind": {
                 "type": "string",
-                "enum": ["new_order", "addition", "modification", "cancellation", "confirm_yes", "confirm_no", "not_order"],
+                "enum": ["new_order", "addition", "modification", "cancellation", "confirm_yes", "confirm_no",
+                         "complaint", "inquiry", "not_order"],
                 "description": (
                     "new_order: a (re)statement of the order for the branches it mentions. "
                     "addition: adds quantities on top of an existing order (e.g. 'Additional', 'could you add'). "
                     "modification: sets new absolute quantities for specific items (e.g. '5 packets only'). "
                     "cancellation: cancel items or the whole order. "
                     "confirm_yes / confirm_no: answer to a pending confirmation question from us. "
-                    "not_order: greetings, thanks, stickers, questions, payments, complaints, anything else."
+                    "complaint: any dissatisfaction about product quality, freshness, size, taste, packaging, delivery time, missing/short quantities, wrong items, staff. "
+                    "inquiry: a question we should answer (product info, prices, availability, delivery schedule, ordering process, company info, account/invoice). "
+                    "not_order: greetings, thanks, chit-chat, acknowledgements, or messages between the customer's own staff."
                 ),
             },
             "delivery_date": {"type": "string", "description": "Delivery date YYYY-MM-DD if stated or clearly implied (e.g. 'Coming 19.11', 'tomorrow', table header). Empty if unknown."},
@@ -557,6 +608,13 @@ INTERPRET_TOOL = {
                           "description": "interpretation: we guessed and should ask the customer. availability: the customer asked us to confirm we can supply."},
             "clarification_question": {"type": "string", "description": "If ambiguity=interpretation: one short polite question to the customer IN THE CUSTOMER'S LANGUAGE restating your best interpretation, e.g. 'هل تقصدون 45 كرتون بريوش لفرع صلالة لتسليم الخميس 19/11؟'"},
             "customer_language": {"type": "string", "enum": ["ar", "en"]},
+            "issue_category": {"type": "string",
+                               "enum": ["quality", "freshness", "size_weight", "packaging", "delivery", "quantity", "wrong_item",
+                                        "price", "product_info", "availability", "account_invoice", "company_info", "other"],
+                               "description": "For complaint/inquiry only."},
+            "issue_product": {"type": "string", "description": "For complaint/inquiry: our product concerned, if any."},
+            "issue_severity": {"type": "string", "enum": ["low", "medium", "high"], "description": "For complaints: high = food safety, mould, foreign object, or customer threatens to stop ordering."},
+            "issue_summary": {"type": "string", "description": "For complaint/inquiry: one-sentence summary IN ARABIC for our team."},
             "reasoning": {"type": "string", "description": "One short sentence."},
         },
         "required": ["kind", "lines", "confidence", "needs_confirmation", "ambiguity", "customer_language"],
@@ -584,8 +642,9 @@ Rules:
 def build_interpretation_request(customer: dict, profile: dict, branches: list, habitual: list, upcoming: list,
                                  context_rows: list, pending: Optional[dict], msg) -> tuple:
     now = now_local()
-    aliases = parse_aliases(profile.get("product_aliases", ""))
-    alias_txt = "\n".join(f'  "{a["alias"]}" => {a["product"]}' + (f' [{a["unit"]}]' if a["unit"] else "") for a in aliases) or "  (none)"
+    aliases = product_map(profile)
+    alias_txt = "\n".join(f'  "{a["alias"]}" => {a["product"]}' + (f' [{a["unit"]}]' if a["unit"] else "")
+                          + (f' ({a["notes"]})' if a.get("notes") else "") for a in aliases) or "  (none)"
     upcoming_txt = "\n".join(
         f"  {b['delivery_date']}: " + (summarize_lines([{**l, 'quantity': float(l['quantity'])} for l in b["lines"]], "en") or "(empty)")
         for b in upcoming) or "  (none)"
@@ -601,7 +660,7 @@ def build_interpretation_request(customer: dict, profile: dict, branches: list, 
 CUSTOMER: {customer['company_name']} (brand: {customer.get('brand_name') or '-'})
 REGISTERED BRANCHES: {', '.join(branches) or '(none)'}
 DEFAULT BRANCH: {profile.get('default_branch') or '(none)'}   DEFAULT UNIT: {profile.get('default_unit') or 'Cartons'}
-CUSTOMER PRODUCT NAMES => OUR PRODUCTS:
+PRODUCTS THIS CUSTOMER ORDERS (customer's name => our product [unit]):
 {alias_txt}
 HABITUAL PRODUCTS (most frequent first):
   {chr(10).join('  ' + h for h in habitual).strip() or '(no history)'}
@@ -623,18 +682,26 @@ LATEST CUSTOMER MESSAGE from {msg.sender_name}:{quoted}
             content.append(block)
             use_vision = True
             info += "\n(The attached image/document IS the latest customer message.)"
-        elif "sheet" in (msg.media_mimetype or "") or (msg.media_filename or "").lower().endswith((".xlsx", ".xlsm")):
-            sheet = ai_client.spreadsheet_to_text(msg.media_base64)
-            if sheet:
-                info += f"\nATTACHED SPREADSHEET ({msg.media_filename}):\n{sheet[:6000]}"
+        else:
+            # Word / Excel / CSV: يُستخرج النص محلياً ويُرفق
+            doc_text = media_tools.extract_text_locally(base64.b64decode(msg.media_base64), msg.media_mimetype or "",
+                                                        msg.media_filename or "")
+            if doc_text:
+                info += f"\nATTACHED FILE ({msg.media_filename or msg.media_mimetype}) IS the latest customer message:\n{doc_text[:8000]}"
     content.append({"type": "text", "text": info})
     return content, use_vision
 
 
 def should_interpret(text: str, has_media: bool, has_pending: bool) -> bool:
+    """التحيات والشكر والرموز فقط لا تحتاج النموذج؛ أي رسالة أخرى قد تكون طلباً أو شكوى أو استفساراً"""
     if has_media or has_pending:
         return True
-    return bool(ORDER_HINT_RE.search(text or ""))
+    text = (text or "").strip()
+    if ORDER_HINT_RE.search(text):
+        return True
+    if len(text) < 4 or TRIVIAL_RE.match(text):
+        return False
+    return True
 
 
 def get_latest_pending(cur, chat_id: str) -> Optional[dict]:
@@ -694,13 +761,34 @@ def _dispatch_change(cur, customer: dict, change: dict, logistics_target: str) -
     return actions
 
 
-def _rep_phone(cur, customer: dict) -> str:
+def get_setting(cur, key: str, default: str = "") -> str:
+    cur.execute("SELECT key_value FROM system_config WHERE key_name = %s;", (key,))
+    row = cur.fetchone()
+    return (row["key_value"] if row and row["key_value"] is not None else default).strip()
+
+
+def alert_target(cur, customer: dict) -> str:
+    """
+    من يستلم التنبيهات الخاصة (اعتماد طلب، شكوى، استفسار يحتاج رداً):
+    المندوب المسؤول عن العميل إن وُجد وله رقم، وإلا مسؤول النظام (admin_alert_phone).
+    ربط المندوب اختياري.
+    """
     if customer.get("assigned_rep_id"):
         cur.execute("SELECT phone_number FROM sales_executives WHERE id = %s;", (customer["assigned_rep_id"],))
         row = cur.fetchone()
-        if row and row["phone_number"]:
+        if row and row["phone_number"] and re.sub(r"[^0-9]", "", row["phone_number"]):
             return re.sub(r"[^0-9]", "", row["phone_number"])
-    return ""
+    return re.sub(r"[^0-9]", "", get_setting(cur, "admin_alert_phone"))
+
+
+def staff_active_recently(cur, chat_id: str, minutes: int = STAFF_ACTIVE_MINUTES) -> bool:
+    """أحد أعضاء الفريق يتحدث في المجموعة الآن: البوت لا يقاطعه بردود آلية"""
+    cur.execute("""
+        SELECT 1 FROM group_messages
+        WHERE chat_id = %s AND is_staff = TRUE AND sender_name <> %s
+          AND created_at > NOW() - (%s || ' minutes')::interval LIMIT 1;
+    """, (chat_id, BOT_NAME, str(minutes)))
+    return cur.fetchone() is not None
 
 
 def create_pending(cur, customer: dict, chat_id: str, source_message_id: str, proposal: dict) -> tuple:
@@ -727,7 +815,7 @@ def create_pending(cur, customer: dict, chat_id: str, source_message_id: str, pr
         actions.append(_action(chat_id, question))
         record_bot_message(cur, chat_id, question)
 
-    rep = _rep_phone(cur, customer)
+    rep = alert_target(cur, customer)
     if rep:
         link = f"{public_base_url()}/approve/{make_approval_token(pid)}" if public_base_url() else ""
         reason = "العميل يطلب تأكيد التوفر" if proposal.get("ambiguity") == "availability" else "البوت غير متأكد من فهم الطلب وسأل العميل"
@@ -764,12 +852,102 @@ def resolve_pending(cur, pending: dict, approve: bool, resolved_by: str, custome
     return actions
 
 
+# ======================= الشكاوى والاستفسارات =======================
+
+CATEGORY_AR = {
+    "quality": "الجودة", "freshness": "الطزاجة", "size_weight": "الحجم/الوزن", "packaging": "التغليف",
+    "delivery": "التوصيل", "quantity": "نقص الكمية", "wrong_item": "صنف خاطئ", "price": "الأسعار",
+    "product_info": "معلومات منتج", "availability": "التوفر", "account_invoice": "الحساب/الفواتير",
+    "company_info": "عن الشركة", "other": "أخرى",
+}
+SEVERITY_AR = {"low": "منخفضة", "medium": "متوسطة", "high": "🔴 عالية"}
+
+
+def record_issue(cur, customer: dict, chat_id: str, message_id: str, kind: str, result: dict, text: str) -> int:
+    cur.execute("""
+        INSERT INTO customer_issues (customer_id, chat_id, message_id, issue_type, category, product, severity,
+                                     summary, customer_text)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;
+    """, (customer["id"], chat_id, message_id, kind, (result.get("issue_category") or "other")[:40],
+          (result.get("issue_product") or "")[:200], result.get("issue_severity") or ("medium" if kind == "complaint" else "low"),
+          result.get("issue_summary") or "", (text or "")[:2000]))
+    return cur.fetchone()["id"]
+
+
+async def handle_issue(conn, customer: dict, profile: dict, msg, kind: str, result: dict, context_rows: list) -> list:
+    """
+    شكوى: تُسجَّل وتُنبَّه الفريق فوراً؛ مع تفعيل الرد الآلي يُرسل اعتذار وتأكيد استلام فقط (بدون وعود).
+    استفسار: مع تفعيل الرد الآلي يجيب البوت من قاعدة المعرفة فقط؛ ما لا يعرفه يُحوَّل للفريق مع رد مؤقت للعميل.
+    لا يرد البوت آلياً إذا كان أحد من الفريق يتحدث في المجموعة خلال آخر 10 دقائق.
+    """
+    chat_id = msg.chat_id.strip()
+    text = (msg.message_text or "").strip()
+    lang = result.get("customer_language", "ar")
+    actions = []
+    with conn.cursor() as cur:
+        issue_id = record_issue(cur, customer, chat_id, msg.message_id, kind, result, text)
+        auto = (get_setting(cur, "auto_reply_enabled", "false").lower() == "true"
+                and profile.get("auto_reply_enabled", True) and not staff_active_recently(cur, chat_id))
+        target = alert_target(cur, customer)
+        kb_text = knowledge.build_context(cur) if (auto and kind == "inquiry") else ""
+    conn.commit()
+
+    category = CATEGORY_AR.get(result.get("issue_category") or "other", "أخرى")
+    product = result.get("issue_product") or "-"
+    summary = result.get("issue_summary") or text[:200]
+    bot_reply, status, alert = "", "open", None
+
+    if kind == "complaint":
+        alert = (f"🚨 *شكوى من عميل* — {customer['company_name']}\n"
+                 f"النوع: {category} · المنتج: {product} · الخطورة: {SEVERITY_AR.get(result.get('issue_severity'), 'متوسطة')}\n"
+                 f"الملخص: {summary}\nنص العميل ({msg.sender_name}): {text[:400]}")
+        if auto:
+            bot_reply = ("نعتذر عن ذلك 🙏 تم تحويل ملاحظتكم للفريق المختص وسيتواصل معكم في أقرب وقت."
+                         if lang != "en" else
+                         "We're sorry about this 🙏 Your feedback has been passed to the responsible team and they will contact you shortly.")
+    else:  # inquiry
+        answer = None
+        if auto:
+            answer = await knowledge.answer_question(kb_text, customer["company_name"], text,
+                                                     format_context(context_rows), lang)
+        if answer and answer.get("can_answer") and (answer.get("answer") or "").strip():
+            bot_reply, status = answer["answer"].strip(), "answered_by_bot"
+        else:
+            reason = (answer or {}).get("escalation_reason") or ("الرد الآلي غير مفعّل" if not auto else "")
+            alert = (f"❓ *استفسار يحتاج ردكم* — {customer['company_name']}\n"
+                     f"الموضوع: {category} · المنتج: {product}\n"
+                     f"السؤال ({msg.sender_name}): {text[:400]}" + (f"\nسبب التحويل: {reason}" if reason else ""))
+            status = "escalated"
+            if auto:
+                bot_reply = ("شكراً لتواصلكم 🌷 سيقوم أحد أعضاء فريقنا بالرد على استفساركم قريباً."
+                             if lang != "en" else "Thank you for reaching out 🌷 A member of our team will get back to you shortly.")
+
+    with conn.cursor() as cur:
+        if bot_reply:
+            actions.append(_action(chat_id, bot_reply))
+            record_bot_message(cur, chat_id, bot_reply)
+        if alert and target:
+            actions.append(_action(target, alert))
+        cur.execute("UPDATE customer_issues SET status = %s, bot_reply = %s WHERE id = %s;", (status, bot_reply, issue_id))
+    conn.commit()
+    return actions
+
+
 async def handle_customer_message(conn, customer: dict, msg, logistics_target: str) -> dict:
     """رسالة من العميل في مجموعته: تُفهم في سياق المحادثة وتُطبق على طلبية تاريخ التسليم"""
     chat_id = msg.chat_id.strip()
     message_id = msg.message_id or f"nomsg-{uuid.uuid4().hex[:12]}"
+
+    # الرسائل الصوتية: تُحوَّل إلى نص ثم تُعامل كرسالة نصية عادية
+    if getattr(msg, "media_base64", None) and media_tools.kind_of(msg.media_mimetype or "") == "audio":
+        transcript = await media_tools.transcribe_audio(msg.media_base64, msg.media_mimetype)
+        msg.message_text = (f"[رسالة صوتية] {transcript}" if transcript else "[رسالة صوتية - تعذر التفريغ]") + \
+                           (f" {msg.message_text}" if msg.message_text else "")
+        msg.media_base64 = None
+        msg.media_mimetype = "audio"
+
     has_media = bool(getattr(msg, "media_base64", None))
-    media_type = (msg.media_mimetype or "media").split("/")[0] if has_media else None
+    media_type = (msg.media_mimetype or "media").split("/")[0] if (has_media or msg.media_mimetype == "audio") else None
 
     with conn.cursor() as cur:
         profile = load_profile(cur, customer["id"])
@@ -829,6 +1007,9 @@ async def handle_customer_message(conn, customer: dict, msg, logistics_target: s
         elif kind == "confirm_no" and pending:
             actions += resolve_pending(cur, pending, False, f"customer:{msg.sender_name}", customer, profile,
                                        logistics_target, announce_in_group=False)
+        elif kind in ("complaint", "inquiry"):
+            conn.commit()
+            actions += await handle_issue(conn, customer, profile, msg, kind, result, context_rows)
         elif kind in ORDER_KINDS and (result.get("lines") or kind == "cancellation"):
             proposal = {
                 "kind": kind,
@@ -904,7 +1085,8 @@ def due_reminders(cur) -> list:
     """, (today,))
     due = []
     for p in cur.fetchall():
-        days = {int(d) for d in re.findall(r"\d", p["reminder_days"] or "")}
+        days = set(range(7)) if (p.get("reminder_frequency") or "daily") == "daily" else \
+            {int(d) for d in re.findall(r"\d", p["reminder_days"] or "")}
         try:
             hh, mm = [int(x) for x in (p["reminder_time"] or "09:00").split(":")[:2]]
         except Exception:
