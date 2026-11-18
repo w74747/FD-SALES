@@ -69,6 +69,9 @@
             if (cleanId === 'agents') {
                 if (typeof window.loadOrderKeywords === 'function') window.loadOrderKeywords();
                 if (typeof window.loadLogisticsGroup === 'function') window.loadLogisticsGroup();
+                if (typeof window.loadSmartOrders === 'function') window.loadSmartOrders();
+                if (typeof window.loadAssistantSettings === 'function') window.loadAssistantSettings();
+                if (typeof window.loadIssues === 'function') window.loadIssues();
             }
             if (cleanId === 'analytics') {
                 if (typeof window.loadAnalyticsData === 'function') window.loadAnalyticsData();
@@ -221,6 +224,17 @@
                 </button>
                 <button onclick="switchTab('reps')" id="nav-reps" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>الفريق</span>
+                </button>
+                <button onclick="switchTab('smart-orders'); loadSmartOrders();" id="nav-smart-orders" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>الطلبيات الذكية</span>
+                    <span id="pending-orders-badge" class="hidden mr-auto bg-amber-400 text-[#3A056A] text-[10px] font-bold rounded-full px-2">0</span>
+                </button>
+                <button onclick="switchTab('issues'); loadIssues();" id="nav-issues" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>الشكاوى والاستفسارات</span>
+                    <span id="open-issues-badge" class="hidden mr-auto bg-red-400 text-white text-[10px] font-bold rounded-full px-2">0</span>
+                </button>
+                <button onclick="switchTab('knowledge'); loadKnowledge();" id="nav-knowledge" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>قاعدة معرفة البوت</span>
                 </button>
                 <button onclick="switchTab('customers')" id="nav-customers" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>العملاء</span>
@@ -414,6 +428,70 @@
             </div>
 
             <!-- العملاء -->
+            <!-- الطلبيات الذكية: طلبات بانتظار الاعتماد + طلبيات الأيام القادمة -->
+            <div id="tab-smart-orders" class="tab-content hidden space-y-4">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-amber-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-sm text-[#3A056A]">⚠️ طلبات بانتظار التأكيد</h3>
+                        <button onclick="loadSmartOrders()" class="px-3 py-1.5 bg-purple-50 text-[#3A056A] rounded-lg text-xs font-bold border border-purple-200">تحديث</button>
+                    </div>
+                    <p class="text-[11px] text-gray-500 mb-3">طلبات لم يتأكد منها البوت أو طلب العميل تأكيد توفرها. أول من يعتمد (العميل في المجموعة، المندوب برابط الاعتماد، أو من هنا) يُرسل الطلب للوجستيك.</p>
+                    <div id="pending-orders-list" class="space-y-2 text-xs"><div class="text-gray-400">لا توجد طلبات معلّقة</div></div>
+                </div>
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-purple-100">
+                    <h3 class="font-bold text-sm text-[#3A056A] mb-3">📦 الطلبيات حسب تاريخ التسليم</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs text-right">
+                            <thead class="bg-purple-50 text-[#3A056A]"><tr>
+                                <th class="p-2">التسليم</th><th class="p-2">العميل</th><th class="p-2">الفرع</th><th class="p-2">الصنف</th><th class="p-2">الكمية</th><th class="p-2">الحالة</th>
+                            </tr></thead>
+                            <tbody id="order-batches-body"><tr><td colspan="6" class="p-4 text-center text-gray-400">لا توجد طلبيات</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- الشكاوى والاستفسارات من مجموعات العملاء -->
+            <div id="tab-issues" class="tab-content hidden space-y-4">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-purple-100">
+                    <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
+                        <h3 class="font-bold text-sm text-[#3A056A]">💬 الشكاوى والاستفسارات</h3>
+                        <div class="flex gap-2 text-xs">
+                            <select id="issues-type" onchange="loadIssues()" class="p-1.5 border rounded-lg"><option value="">الكل</option><option value="complaint">شكاوى</option><option value="inquiry">استفسارات</option></select>
+                            <select id="issues-status" onchange="loadIssues()" class="p-1.5 border rounded-lg"><option value="">كل الحالات</option><option value="open">مفتوحة</option><option value="escalated">محوّلة للفريق</option><option value="answered_by_bot">أجاب البوت</option><option value="resolved">مغلقة</option></select>
+                        </div>
+                    </div>
+                    <div id="issues-list" class="space-y-2 text-xs"><div class="text-gray-400">لا توجد سجلات</div></div>
+                </div>
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-purple-100">
+                    <h3 class="font-bold text-sm text-[#3A056A] mb-1">🧪 الشكاوى حسب المنتج (آخر 90 يوماً) — لتقارير الإنتاج والبحث والتطوير</h3>
+                    <div id="issues-summary" class="text-xs"></div>
+                </div>
+            </div>
+
+            <!-- قاعدة معرفة البوت: ملفات ومعلومات يجيب منها على استفسارات العملاء -->
+            <div id="tab-knowledge" class="tab-content hidden space-y-4">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-purple-100 space-y-3">
+                    <h3 class="font-bold text-sm text-[#3A056A]">📚 قاعدة معرفة البوت</h3>
+                    <p class="text-[11px] text-gray-600">يجيب البوت على استفسارات العملاء <b>من هذه المعلومات فقط</b> (قائمة المنتجات، الأسعار، عن الشركة، مواعيد التوصيل...). أي سؤال خارجها يُحوَّل لمسؤول النظام أو المندوب. ارفع فقط ما يُسمح بمشاركته مع العملاء. كتالوج المنتجات في النظام يُضاف تلقائياً.</p>
+                    <div class="grid md:grid-cols-2 gap-3">
+                        <div class="p-3 bg-purple-50 rounded-xl border border-purple-100 space-y-2">
+                            <div class="font-bold text-xs">رفع ملف (PDF، Word، Excel، CSV، صورة)</div>
+                            <input id="kb-file" type="file" accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,image/*" class="w-full text-xs">
+                            <input id="kb-file-title" placeholder="عنوان (مثال: قائمة الأسعار 2026)" class="w-full p-2 border rounded-lg text-xs">
+                            <button onclick="uploadKnowledgeFile()" id="kb-upload-btn" class="w-full py-2 bg-[#3A056A] text-white rounded-lg text-xs font-bold">رفع واستخراج المعلومات</button>
+                        </div>
+                        <div class="p-3 bg-purple-50 rounded-xl border border-purple-100 space-y-2">
+                            <div class="font-bold text-xs">أو اكتب معلومة نصية</div>
+                            <input id="kb-text-title" placeholder="عنوان (مثال: مواعيد التوصيل)" class="w-full p-2 border rounded-lg text-xs">
+                            <textarea id="kb-text-content" rows="3" class="w-full p-2 border rounded-lg text-xs" placeholder="مثال: التوصيل يومياً من السبت إلى الخميس، آخر موعد للطلب 8 مساءً لتسليم اليوم التالي."></textarea>
+                            <button onclick="addKnowledgeText()" class="w-full py-2 bg-white text-[#3A056A] border border-purple-300 rounded-lg text-xs font-bold">إضافة</button>
+                        </div>
+                    </div>
+                    <div id="kb-list" class="space-y-2 text-xs"></div>
+                </div>
+            </div>
+
             <div id="tab-customers" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
                     <div class="flex justify-between items-center mb-4 no-print">
@@ -528,6 +606,18 @@
                             </select>
                             <input id="logistics-group-input" type="text" dir="ltr" placeholder="120363000000000000@g.us" class="w-1/2 p-2 border rounded-lg text-xs font-mono">
                         </div>
+                    </div>
+
+                    <!-- مسؤول النظام والرد الآلي -->
+                    <div class="p-3.5 bg-gray-50 border border-purple-200 rounded-xl space-y-2">
+                        <div class="font-bold text-xs text-[#3A056A]">مسؤول النظام والرد الآلي</div>
+                        <div class="text-[10px] text-gray-500">التنبيهات (اعتماد الطلبات، الشكاوى، الاستفسارات) تذهب لمندوب العميل إن رُبط به، وإلا لهذا الرقم.</div>
+                        <div class="grid grid-cols-2 gap-2 items-center">
+                            <input id="admin-alert-phone" dir="ltr" placeholder="96890000000" class="p-2 border rounded-lg text-xs font-mono">
+                            <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="auto-reply-enabled"> الرد الآلي على الاستفسارات والشكاوى</label>
+                        </div>
+                        <div id="assistant-capabilities" class="text-[10px] text-gray-500"></div>
+                        <button onclick="saveAssistantSettings()" class="px-3.5 py-1.5 bg-[#3A056A] text-white font-bold rounded-lg text-xs">حفظ</button>
                     </div>
 
                     <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between">
@@ -674,6 +764,52 @@
 
         </div>
     </main>
+
+    <!-- ملف طلب العميل: أسماء أصنافه، الفرع والوحدة الافتراضية، والتذكير المجدول -->
+    <div id="order-profile-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
+        <div class="bg-white rounded-2xl p-5 w-full max-w-xl space-y-3 text-xs max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm brand-primary-text">ملف الطلب — <span id="op-company"></span></h3>
+                <button onclick="closeModal('order-profile-modal')" class="text-gray-400 hover:text-gray-600 text-base font-bold">✕</button>
+            </div>
+            <input type="hidden" id="op-customer-id">
+            <div>
+                <div class="flex justify-between items-center">
+                    <label class="font-bold text-[#3A056A]">المنتجات التي يطلبها العميل</label>
+                    <button onclick="addProfileProductRow()" class="px-2 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] font-bold text-[#3A056A]">+ منتج</button>
+                </div>
+                <p class="text-[10px] text-gray-500">الاسم الذي يستخدمه العميل في رسائله أو جدوله ← منتجنا ← الوحدة. يساعد البوت على فهم طلباته المختصرة وقراءة جداوله.</p>
+                <table class="w-full text-[11px] mt-1"><thead class="text-gray-500"><tr><th class="text-right p-1">اسم العميل</th><th class="text-right p-1">منتجنا</th><th class="text-right p-1">الوحدة</th><th class="text-right p-1">ملاحظة</th><th></th></tr></thead>
+                    <tbody id="op-products"></tbody></table>
+                <datalist id="op-catalog"></datalist>
+                <input type="hidden" id="op-aliases">
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <div><label class="font-bold">الفرع الافتراضي</label><input id="op-default-branch" list="op-branches" class="w-full p-2 border rounded-lg"><datalist id="op-branches"></datalist></div>
+                <div><label class="font-bold">الوحدة الافتراضية</label>
+                    <select id="op-default-unit" class="w-full p-2 border rounded-lg"><option>Cartons</option><option>Packets</option><option>Boxes</option><option>Pieces</option></select></div>
+                <div><label class="font-bold">التسليم بعد (أيام)</label><input id="op-lead-days" type="number" min="0" max="14" class="w-full p-2 border rounded-lg"></div>
+            </div>
+            <div>
+                <label class="font-bold">ملاحظات للبوت عن هذا العميل</label>
+                <textarea id="op-ai-notes" rows="2" class="w-full p-2 border rounded-lg" placeholder="مثال: يرسل جدولاً مصوراً لفروع Kucu يومياً؛ الأعمدة بالكيس؛ الفروع المظللة بالأحمر مغلقة."></textarea>
+            </div>
+            <div class="p-3 bg-purple-50 rounded-xl space-y-2 border border-purple-100">
+                <label class="flex items-center gap-2 font-bold text-[#3A056A]"><input type="checkbox" id="op-reminder-enabled"> تذكير العميل بالطلب في مجموعته</label>
+                <select id="op-reminder-frequency" onchange="document.getElementById('op-reminder-days').classList.toggle('hidden', this.value !== 'weekly')" class="p-2 border rounded-lg">
+                    <option value="daily">يومي</option><option value="weekly">أسبوعي (أيام محددة)</option>
+                </select>
+                <div class="flex flex-wrap gap-2" id="op-reminder-days"></div>
+                <div class="grid grid-cols-3 gap-2 items-end">
+                    <div><label class="font-bold">الساعة (مسقط)</label><input id="op-reminder-time" type="time" class="w-full p-2 border rounded-lg"></div>
+                    <div class="col-span-2 text-[10px] text-gray-500">لا يُرسل إذا كتب أحد من فريقنا في المجموعة اليوم، أو إذا وصل طلب ذلك اليوم مسبقاً.</div>
+                </div>
+                <textarea id="op-reminder-text" rows="2" class="w-full p-2 border rounded-lg" placeholder="اتركه فارغاً للنص الافتراضي. متغيرات: {day} {day_en} {date}"></textarea>
+            </div>
+            <label class="flex items-center gap-2 font-bold"><input type="checkbox" id="op-auto-reply"> السماح بالرد الآلي في مجموعة هذا العميل (عند تفعيله عاماً)</label>
+            <button onclick="saveOrderProfile()" class="w-full py-2.5 bg-[#3A056A] text-white font-bold rounded-xl">حفظ ملف الطلب</button>
+        </div>
+    </div>
 
     <!-- نافذة إدارة جلسة الواتساب ومسح الرمز / قطع الاتصال -->
     <div id="whatsapp-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
@@ -1456,6 +1592,262 @@
             if (res.ok && showNotice) {
                 alert("تم تحديث الكلمات المفتاحية الحية بنجاح ✓");
             }
+        };
+
+        // ---------------- الطلبيات الذكية ----------------
+        const escHtml = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        const fmtQty = (q) => { const n = Number(q); return Number.isInteger(n) ? String(n) : String(+n.toFixed(2)); };
+        const DAY_NAMES = ['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'];
+
+        window.loadSmartOrders = async function() {
+            try {
+                const [pRes, bRes] = await Promise.all([fetch('/api/orders/pending'), fetch('/api/orders/batches')]);
+                const pending = pRes.ok ? await pRes.json() : [];
+                const batches = bRes.ok ? await bRes.json() : [];
+                const badge = document.getElementById('pending-orders-badge');
+                if (badge) { badge.textContent = pending.length; badge.classList.toggle('hidden', pending.length === 0); }
+
+                const list = document.getElementById('pending-orders-list');
+                if (list) {
+                    list.innerHTML = pending.map(p => {
+                        const pr = p.proposal || {};
+                        const lines = (pr.lines || []).map(l => escHtml(l.branch) + ': ' + fmtQty(l.quantity) + ' ' + escHtml(l.unit) + ' ' + escHtml(l.product)).join('<br>');
+                        const reason = pr.ambiguity === 'availability' ? 'العميل طلب تأكيد التوفر' : 'البوت سأل العميل للتأكد';
+                        return '<div class="p-3 rounded-xl border border-amber-200 bg-amber-50 flex justify-between gap-3">' +
+                            '<div><div class="font-bold text-[#3A056A]">' + escHtml(p.company_name) + ' — تسليم ' + escHtml(pr.delivery_date || '') + '</div>' +
+                            '<div class="text-[10px] text-amber-800 mb-1">' + reason + (p.question_text ? ' · ' + escHtml(p.question_text) : '') + '</div>' +
+                            '<div class="font-mono text-[11px]">' + (lines || '—') + '</div></div>' +
+                            '<div class="flex flex-col gap-1 flex-shrink-0">' +
+                            '<button onclick="resolvePendingOrder(' + p.id + ', true)" class="px-3 py-1.5 bg-[#3A056A] text-white rounded-lg font-bold">اعتماد</button>' +
+                            '<button onclick="resolvePendingOrder(' + p.id + ', false)" class="px-3 py-1.5 bg-white text-red-600 border border-red-200 rounded-lg font-bold">رفض</button>' +
+                            '</div></div>';
+                    }).join('') || '<div class="text-gray-400">لا توجد طلبات معلّقة ✓</div>';
+                }
+
+                const body = document.getElementById('order-batches-body');
+                if (body) {
+                    const rows = [];
+                    batches.forEach(b => {
+                        const status = b.status === 'cancelled' ? '<span class="text-red-600">ملغاة</span>' : '<span class="text-emerald-700">نشطة</span>';
+                        (b.lines.length ? b.lines : [{branch: '—', product: '—', quantity: '', unit: ''}]).forEach((l, i) => {
+                            rows.push('<tr class="border-b">' +
+                                '<td class="p-2 font-mono">' + (i === 0 ? escHtml(b.delivery_date) : '') + '</td>' +
+                                '<td class="p-2 font-bold">' + (i === 0 ? escHtml(b.company_name) : '') + '</td>' +
+                                '<td class="p-2">' + escHtml(l.branch) + '</td><td class="p-2">' + escHtml(l.product) + '</td>' +
+                                '<td class="p-2 font-bold">' + (l.quantity === '' ? '' : fmtQty(l.quantity) + ' ' + escHtml(l.unit)) + '</td>' +
+                                '<td class="p-2">' + (i === 0 ? status : '') + '</td></tr>');
+                        });
+                    });
+                    body.innerHTML = rows.join('') || '<tr><td colspan="6" class="p-4 text-center text-gray-400">لا توجد طلبيات</td></tr>';
+                }
+            } catch (e) {}
+        };
+
+        window.resolvePendingOrder = async function(id, approve) {
+            if (!approve && !confirm('رفض هذا الطلب؟ لن يُرسل للوجستيك.')) return;
+            const res = await fetch('/api/orders/pending/' + id + '/' + (approve ? 'approve' : 'reject'), { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (data.already_resolved) alert('تم البت في هذا الطلب مسبقاً (' + (data.resolved_by || data.status) + ')');
+            loadSmartOrders();
+        };
+
+        window.openOrderProfileModal = async function(customerId) {
+            const res = await fetch('/api/customers/' + customerId + '/order-profile');
+            if (!res.ok) return alert('تعذر تحميل ملف الطلب');
+            const p = await res.json();
+            const cust = (window.appState && window.appState.customers || []).find(c => c.id === customerId);
+            document.getElementById('op-company').textContent = cust ? cust.company_name : ('#' + customerId);
+            document.getElementById('op-customer-id').value = customerId;
+            document.getElementById('op-aliases').value = p.product_aliases || '';
+            // المنتجات: من القائمة المنظمة، مع تحويل الصيغة النصية القديمة إن وُجدت
+            const legacy = String(p.product_aliases || '').split('\n').filter(l => l.includes('=')).map(l => {
+                const [alias, rest] = [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)];
+                const [product, unit] = rest.split('|');
+                return { alias: alias.trim(), product: (product || '').trim(), unit: (unit || '').trim(), notes: '' };
+            });
+            document.getElementById('op-products').innerHTML = '';
+            ((p.products && p.products.length) ? p.products : legacy).forEach(addProfileProductRow);
+            if (!document.getElementById('op-products').children.length) addProfileProductRow();
+            try {
+                const cat = await (await fetch('/api/products')).json();
+                document.getElementById('op-catalog').innerHTML = (cat || []).map(c =>
+                    '<option value="' + escHtml(c.name_en || c.name_ar) + '">' + escHtml((c.sku || '') + ' ' + (c.name_ar || '')) + '</option>').join('');
+            } catch (e) {}
+            document.getElementById('op-reminder-frequency').value = p.reminder_frequency || 'daily';
+            document.getElementById('op-auto-reply').checked = p.auto_reply_enabled !== false;
+            document.getElementById('op-default-branch').value = p.default_branch || '';
+            document.getElementById('op-default-unit').value = p.default_unit || 'Cartons';
+            document.getElementById('op-lead-days').value = p.lead_days == null ? 1 : p.lead_days;
+            document.getElementById('op-ai-notes').value = p.ai_notes || '';
+            document.getElementById('op-reminder-enabled').checked = !!p.reminder_enabled;
+            document.getElementById('op-reminder-time').value = p.reminder_time || '09:00';
+            document.getElementById('op-reminder-text').value = p.reminder_text || '';
+            const dl = document.getElementById('op-branches');
+            dl.innerHTML = '';
+            (p.branches || []).forEach(b => { const o = document.createElement('option'); o.value = b; dl.appendChild(o); });
+            const days = String(p.reminder_days || '').split(',');
+            document.getElementById('op-reminder-days').innerHTML = DAY_NAMES.map((d, i) =>
+                '<label class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border"><input type="checkbox" class="op-day" value="' + i + '"' +
+                (days.includes(String(i)) ? ' checked' : '') + '> ' + d + '</label>').join('');
+            document.getElementById('op-reminder-days').classList.toggle('hidden', (p.reminder_frequency || 'daily') !== 'weekly');
+            document.getElementById('order-profile-modal').classList.remove('hidden');
+        };
+
+        window.addProfileProductRow = function(row) {
+            row = row || {};
+            const units = ['Cartons', 'Packets', 'Boxes', 'Pieces', 'Trays'];
+            const tr = document.createElement('tr');
+            tr.className = 'op-product-row';
+            tr.innerHTML =
+                '<td class="p-0.5"><input class="op-alias w-full p-1.5 border rounded" placeholder="5&quot; / بريوش"></td>' +
+                '<td class="p-0.5"><input class="op-product w-full p-1.5 border rounded" list="op-catalog" placeholder="اسم منتجنا"></td>' +
+                '<td class="p-0.5"><select class="op-unit w-full p-1.5 border rounded">' + units.map(u => '<option>' + u + '</option>').join('') + '</select></td>' +
+                '<td class="p-0.5"><input class="op-notes w-full p-1.5 border rounded" placeholder="3pc/pkt"></td>' +
+                '<td class="p-0.5"><button type="button" class="text-red-500 font-bold px-1" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+            tr.querySelector('.op-alias').value = row.alias || '';
+            tr.querySelector('.op-product').value = row.product || '';
+            tr.querySelector('.op-unit').value = units.includes(row.unit) ? row.unit : 'Cartons';
+            tr.querySelector('.op-notes').value = row.notes || '';
+            document.getElementById('op-products').appendChild(tr);
+        };
+
+        window.saveOrderProfile = async function() {
+            const id = document.getElementById('op-customer-id').value;
+            const payload = {
+                product_aliases: '',
+                products: Array.from(document.querySelectorAll('.op-product-row')).map(tr => ({
+                    alias: tr.querySelector('.op-alias').value.trim(),
+                    product: tr.querySelector('.op-product').value.trim(),
+                    unit: tr.querySelector('.op-unit').value,
+                    notes: tr.querySelector('.op-notes').value.trim()
+                })).filter(x => x.product),
+                reminder_frequency: document.getElementById('op-reminder-frequency').value,
+                auto_reply_enabled: document.getElementById('op-auto-reply').checked,
+                default_branch: document.getElementById('op-default-branch').value.trim(),
+                default_unit: document.getElementById('op-default-unit').value,
+                lead_days: parseInt(document.getElementById('op-lead-days').value || '1', 10),
+                ai_notes: document.getElementById('op-ai-notes').value,
+                reminder_enabled: document.getElementById('op-reminder-enabled').checked,
+                reminder_days: Array.from(document.querySelectorAll('.op-day:checked')).map(x => x.value).join(','),
+                reminder_time: document.getElementById('op-reminder-time').value || '09:00',
+                reminder_text: document.getElementById('op-reminder-text').value
+            };
+            const res = await fetch('/api/customers/' + id + '/order-profile', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.detail || 'تعذر الحفظ');
+            closeModal('order-profile-modal');
+            alert('تم حفظ ملف الطلب ✓');
+        };
+
+        setInterval(() => { if (!document.getElementById('auth-overlay')?.classList.contains('hidden')) return; loadSmartOrders(); }, 60000);
+
+        // ---------------- مسؤول النظام والرد الآلي ----------------
+        window.loadAssistantSettings = async function() {
+            try {
+                const d = await (await fetch('/api/system/assistant-settings')).json();
+                document.getElementById('admin-alert-phone').value = d.admin_alert_phone || '';
+                document.getElementById('auto-reply-enabled').checked = !!d.auto_reply_enabled;
+                document.getElementById('assistant-capabilities').textContent =
+                    'فهم الطلبات والصور (Claude): ' + (d.ai_enabled ? '✓ مفعّل' : '✗ يحتاج ANTHROPIC_API_KEY') +
+                    ' · الرسائل الصوتية (Together): ' + (d.voice_enabled ? '✓ مفعّل' : '✗ يحتاج TOGETHER_API_KEY');
+            } catch (e) {}
+        };
+        window.saveAssistantSettings = async function() {
+            const res = await fetch('/api/system/assistant-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_alert_phone: document.getElementById('admin-alert-phone').value.trim(),
+                                       auto_reply_enabled: document.getElementById('auto-reply-enabled').checked }) });
+            const d = await res.json().catch(() => ({}));
+            alert(res.ok ? 'تم الحفظ ✓' : (d.detail || 'تعذر الحفظ'));
+        };
+
+        // ---------------- قاعدة المعرفة ----------------
+        window.loadKnowledge = async function() {
+            const list = document.getElementById('kb-list');
+            try {
+                const docs = await (await fetch('/api/knowledge')).json();
+                list.innerHTML = docs.map(d =>
+                    '<div class="p-3 rounded-xl border ' + (d.is_active ? 'border-purple-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-60') + ' flex justify-between gap-3">' +
+                    '<div class="min-w-0"><div class="font-bold text-[#3A056A]">' + escHtml(d.title) + (d.file_name ? ' <span class="text-gray-400 font-normal">· ' + escHtml(d.file_name) + '</span>' : '') + '</div>' +
+                    '<div class="text-[10px] text-gray-500">' + d.char_count + ' حرف · ' + (d.is_active ? 'مفعّل' : 'موقوف') + '</div>' +
+                    '<div class="text-[11px] text-gray-600 truncate">' + escHtml(d.preview) + '</div></div>' +
+                    '<div class="flex flex-col gap-1 flex-shrink-0">' +
+                    '<button onclick="viewKnowledge(' + d.id + ')" class="px-2 py-1 border rounded">عرض</button>' +
+                    '<button onclick="toggleKnowledge(' + d.id + ')" class="px-2 py-1 border rounded">' + (d.is_active ? 'إيقاف' : 'تفعيل') + '</button>' +
+                    '<button onclick="deleteKnowledge(' + d.id + ')" class="px-2 py-1 border border-red-200 text-red-600 rounded">حذف</button></div></div>'
+                ).join('') || '<div class="text-gray-400">لا توجد معلومات بعد. ابدأ برفع قائمة المنتجات والأسعار.</div>';
+            } catch (e) {}
+        };
+        window.uploadKnowledgeFile = async function() {
+            const f = document.getElementById('kb-file').files[0];
+            if (!f) return alert('اختر ملفاً');
+            const btn = document.getElementById('kb-upload-btn');
+            btn.disabled = true; btn.textContent = 'جاري الاستخراج...';
+            const fd = new FormData(); fd.append('file', f); fd.append('title', document.getElementById('kb-file-title').value.trim());
+            try {
+                const res = await fetch('/api/knowledge/upload', { method: 'POST', body: fd });
+                const d = await res.json().catch(() => ({}));
+                alert(res.ok ? ('تمت الإضافة ✓ (' + d.char_count + ' حرف)') : (d.detail || 'تعذر الرفع'));
+                if (res.ok) { document.getElementById('kb-file').value = ''; document.getElementById('kb-file-title').value = ''; }
+            } finally { btn.disabled = false; btn.textContent = 'رفع واستخراج المعلومات'; loadKnowledge(); }
+        };
+        window.addKnowledgeText = async function() {
+            const title = document.getElementById('kb-text-title').value.trim();
+            const content = document.getElementById('kb-text-content').value.trim();
+            const res = await fetch('/api/knowledge/text', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, content }) });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(d.detail || 'تعذر الإضافة');
+            document.getElementById('kb-text-title').value = ''; document.getElementById('kb-text-content').value = '';
+            loadKnowledge();
+        };
+        window.viewKnowledge = async function(id) {
+            const d = await (await fetch('/api/knowledge/' + id)).json();
+            const w = window.open('', '_blank');
+            if (w) { w.document.title = d.title; const pre = w.document.createElement('pre'); pre.style.whiteSpace = 'pre-wrap'; pre.style.direction = 'auto'; pre.textContent = d.content_text; w.document.body.appendChild(pre); }
+        };
+        window.toggleKnowledge = async function(id) { await fetch('/api/knowledge/' + id + '/toggle', { method: 'POST' }); loadKnowledge(); };
+        window.deleteKnowledge = async function(id) { if (!confirm('حذف هذه المعلومات من قاعدة المعرفة؟')) return; await fetch('/api/knowledge/' + id, { method: 'DELETE' }); loadKnowledge(); };
+
+        // ---------------- الشكاوى والاستفسارات ----------------
+        const ISSUE_CAT = { quality: 'الجودة', freshness: 'الطزاجة', size_weight: 'الحجم/الوزن', packaging: 'التغليف', delivery: 'التوصيل', quantity: 'نقص الكمية',
+            wrong_item: 'صنف خاطئ', price: 'الأسعار', product_info: 'معلومات منتج', availability: 'التوفر', account_invoice: 'الحساب/الفواتير', company_info: 'عن الشركة', other: 'أخرى' };
+        const ISSUE_STATUS = { open: ['مفتوحة', 'bg-amber-100 text-amber-800'], escalated: ['محوّلة للفريق', 'bg-red-100 text-red-700'],
+            answered_by_bot: ['أجاب البوت', 'bg-blue-100 text-blue-700'], resolved: ['مغلقة', 'bg-emerald-100 text-emerald-700'] };
+        window.loadIssues = async function() {
+            const type = document.getElementById('issues-type')?.value || '';
+            const status = document.getElementById('issues-status')?.value || '';
+            try {
+                const [issues, summary, openOnes] = await Promise.all([
+                    fetch('/api/issues?status=' + status + '&issue_type=' + type).then(r => r.json()),
+                    fetch('/api/issues/summary').then(r => r.json()),
+                    fetch('/api/issues?status=escalated').then(r => r.json())
+                ]);
+                const badge = document.getElementById('open-issues-badge');
+                if (badge) { badge.textContent = openOnes.length; badge.classList.toggle('hidden', !openOnes.length); }
+                const list = document.getElementById('issues-list');
+                if (list) list.innerHTML = issues.map(i => {
+                    const st = ISSUE_STATUS[i.status] || [i.status, 'bg-gray-100'];
+                    return '<div class="p-3 rounded-xl border ' + (i.issue_type === 'complaint' ? 'border-red-200' : 'border-purple-100') + '">' +
+                        '<div class="flex justify-between gap-2"><div class="font-bold">' + (i.issue_type === 'complaint' ? '🚨 شكوى' : '❓ استفسار') + ' — ' + escHtml(i.company_name) +
+                        ' <span class="text-gray-500 font-normal">· ' + escHtml(ISSUE_CAT[i.category] || i.category) + (i.product ? ' · ' + escHtml(i.product) : '') + (i.severity === 'high' ? ' · 🔴 عالية' : '') + '</span></div>' +
+                        '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold ' + st[1] + '">' + st[0] + '</span></div>' +
+                        '<div class="text-gray-700 mt-1">' + escHtml(i.summary) + '</div>' +
+                        '<div class="text-[11px] text-gray-500 mt-1">نص العميل: ' + escHtml(i.customer_text) + '</div>' +
+                        (i.bot_reply ? '<div class="text-[11px] text-blue-700 mt-1">رد البوت: ' + escHtml(i.bot_reply) + '</div>' : '') +
+                        '<div class="flex justify-between items-center mt-2"><span class="text-[10px] text-gray-400">' + new Date(i.created_at).toLocaleString('ar-OM') + '</span>' +
+                        (i.status !== 'resolved' ? '<button onclick="setIssueStatus(' + i.id + ', \'resolved\')" class="px-2 py-1 bg-emerald-600 text-white rounded text-[10px] font-bold">تم الحل / إغلاق</button>' : '') +
+                        '</div></div>';
+                }).join('') || '<div class="text-gray-400">لا توجد سجلات</div>';
+                const sm = document.getElementById('issues-summary');
+                if (sm) sm.innerHTML = (summary.by_product || []).length ? '<table class="w-full mt-2"><thead class="text-gray-500"><tr><th class="text-right p-1">المنتج</th><th class="text-right p-1">عدد الشكاوى</th><th class="text-right p-1">عالية الخطورة</th></tr></thead><tbody>' +
+                    summary.by_product.map(r => '<tr class="border-t"><td class="p-1 font-bold">' + escHtml(r.product) + '</td><td class="p-1">' + r.n + '</td><td class="p-1 text-red-600">' + (r.high || 0) + '</td></tr>').join('') + '</tbody></table>'
+                    : '<div class="text-gray-400 mt-2">لا توجد شكاوى مسجلة</div>';
+            } catch (e) {}
+        };
+        window.setIssueStatus = async function(id, status) {
+            await fetch('/api/issues/' + id + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+            loadIssues();
         };
 
         // ---------------- مجموعة اللوجستيك ----------------
@@ -2259,6 +2651,7 @@
                                     '<div class="flex items-center justify-center gap-1.5 whitespace-nowrap">' +
                                         '<button onclick="openBranchesModal(' + c.id + ')" class="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-[#3A056A] rounded text-[10px] font-bold border border-purple-300">الفروع</button>' +
                                         '<button onclick="openEditCustomerModal(' + c.id + ')" class="px-2 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-[10px] font-bold border border-purple-200">تعديل</button>' +
+                                        '<button onclick="openOrderProfileModal(' + c.id + ')" class="px-2 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded text-[10px] font-bold border border-amber-200">ملف الطلب</button>' +
                                         '<button onclick="deleteItem(\'/api/customers/' + c.id + '\')" class="text-red-600 font-bold text-[10px] px-1">حذف</button>' +
                                     '</div>' +
                                 '</td>' +

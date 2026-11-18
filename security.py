@@ -105,6 +105,8 @@ def classify_path(path: str) -> str:
         return "public"
     if any(path.startswith(p) for p in INTERNAL_PREFIXES):
         return "internal"
+    if path.startswith("/approve/"):
+        return "public"  # محمي برابط موقّع ومؤقت (HMAC) بدل الجلسة
     if path.startswith("/api/"):
         return "protected"
     return "static"
