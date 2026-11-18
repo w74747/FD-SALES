@@ -25,6 +25,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import ai_client
+import catalog
 import knowledge
 import media_tools
 import security
@@ -209,7 +210,7 @@ def product_map(profile: dict) -> list:
         product = (p.get("product") or "").strip()
         if not product:
             continue
-        out.append({"alias": (p.get("alias") or product).strip(), "product": product,
+        out.append({"alias": (p.get("alias") or product).strip(), "product": product, "sku": (p.get("sku") or "").strip(),
                     "unit": (p.get("unit") or "").strip(), "notes": (p.get("notes") or "").strip()})
     out += parse_aliases(profile.get("product_aliases", ""))
     return out
@@ -351,11 +352,12 @@ def canonical_branch(cur, customer_id: int, name: str, registered: list, default
 
 
 def canonical_product(name: str, aliases: list) -> tuple:
+    """(اسم منتجنا، الوحدة المعتادة، كود الكتالوج) من قائمة منتجات العميل"""
     key = _norm(name)
     for a in aliases:
-        if _norm(a["alias"]) == key or _norm(a["product"]) == key:
-            return a["product"], a["unit"]
-    return (name or "").strip(), ""
+        if _norm(a["alias"]) == key or _norm(a["product"]) == key or (a.get("sku") and _norm(a["sku"]) == key):
+            return a["product"], a["unit"], a.get("sku") or ""
+    return (name or "").strip(), "", ""
 
 
 def get_or_create_batch(cur, customer_id: int, delivery: date) -> dict:
@@ -373,11 +375,33 @@ def get_or_create_batch(cur, customer_id: int, delivery: date) -> dict:
 
 def batch_lines(cur, batch_id: int) -> list:
     cur.execute("""
-        SELECT branch_name, product, quantity, unit FROM order_lines
+        SELECT branch_name, product, quantity, unit, product_sku FROM order_lines
         WHERE batch_id = %s ORDER BY branch_name, product;
     """, (batch_id,))
-    return [{"branch": r["branch_name"], "product": r["product"], "quantity": float(r["quantity"]), "unit": r["unit"]}
-            for r in cur.fetchall()]
+    return [{"branch": r["branch_name"], "product": r["product"], "quantity": float(r["quantity"]), "unit": r["unit"],
+             "sku": r["product_sku"]} for r in cur.fetchall()]
+
+
+def lines_totals(cur, lines: list) -> dict:
+    """
+    مجموع الطلبية بوحدة موحدة: عدد الحبات والوزن بالكيلوجرام (من مواصفات الكتالوج)،
+    حتى تُجمع طلبيات الكرتون والكيس في رقم واحد. الأصناف بلا مواصفات تُذكر في unconverted.
+    """
+    pieces = weight = 0.0
+    unconverted, cache = [], {}
+    for ln in lines:
+        sku = ln.get("sku")
+        if sku not in cache:
+            cache[sku] = catalog.get_by_sku(cur, sku)
+        m = catalog.line_metrics(cache[sku], float(ln["quantity"]), ln["unit"])
+        if m["pieces"] is None:
+            unconverted.append(ln["product"])
+            continue
+        pieces += m["pieces"]
+        weight += m["weight_kg"] or 0
+    return {"pieces": round(pieces) if lines and not unconverted else (round(pieces) if pieces else None),
+            "weight_kg": round(weight, 1) if weight else None,
+            "complete": bool(lines) and not unconverted, "unconverted": sorted(set(unconverted))}
 
 
 def resolve_delivery_date(value: Optional[str], profile: dict) -> date:
@@ -416,12 +440,13 @@ def apply_proposal(cur, customer: dict, profile: dict, proposal: dict, source_me
             qty = float(ln.get("quantity") or 0)
         except (TypeError, ValueError):
             continue
-        product, alias_unit = canonical_product(ln.get("product", ""), aliases)
+        product, alias_unit, sku = canonical_product(ln.get("product", ""), aliases)
         if not product:
             continue
+        sku = sku or catalog.find_sku(cur, product)
         branch = canonical_branch(cur, customer["id"], ln.get("branch", ""), registered, profile.get("default_branch", ""))
         unit = (ln.get("unit") or alias_unit or profile.get("default_unit") or "Cartons").strip()[:30]
-        norm_lines.append({"branch": branch, "product": product[:200], "quantity": qty, "unit": unit})
+        norm_lines.append({"branch": branch, "product": product[:200], "quantity": qty, "unit": unit, "sku": sku})
 
     if kind == "cancellation" and not norm_lines:
         cur.execute("DELETE FROM order_lines WHERE batch_id = %s;", (batch["id"],))
@@ -437,12 +462,12 @@ def apply_proposal(cur, customer: dict, profile: dict, proposal: dict, source_me
             continue
         on_conflict = "order_lines.quantity + EXCLUDED.quantity" if kind == "addition" else "EXCLUDED.quantity"
         cur.execute(f"""
-            INSERT INTO order_lines (batch_id, branch_name, product, quantity, unit, source_message_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO order_lines (batch_id, branch_name, product, quantity, unit, source_message_id, product_sku)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (batch_id, branch_name, product) DO UPDATE SET
-                quantity = {on_conflict}, unit = EXCLUDED.unit,
+                quantity = {on_conflict}, unit = EXCLUDED.unit, product_sku = EXCLUDED.product_sku,
                 source_message_id = EXCLUDED.source_message_id, updated_at = NOW();
-        """, (batch["id"], ln["branch"], ln["product"], ln["quantity"], ln["unit"], source_message_id))
+        """, (batch["id"], ln["branch"], ln["product"], ln["quantity"], ln["unit"], source_message_id, ln.get("sku") or None))
 
     after = batch_lines(cur, batch["id"])
     if after == before:
@@ -503,11 +528,14 @@ def _group_by_branch(lines: list) -> dict:
     return out
 
 
-def _totals(lines: list) -> str:
+def _totals(lines: list, metrics: Optional[dict] = None) -> str:
     totals = {}
     for ln in lines:
         totals[ln["unit"]] = totals.get(ln["unit"], 0) + ln["quantity"]
-    return " + ".join(f"{_qty(v)} {k}" for k, v in totals.items()) or "0"
+    text = " + ".join(f"{_qty(v)} {k}" for k, v in totals.items()) or "0"
+    if metrics and metrics.get("complete") and metrics.get("pieces"):
+        text += f"  (≈ {metrics['pieces']:,} pcs" + (f" · {metrics['weight_kg']:,} kg" if metrics.get("weight_kg") else "") + ")"
+    return text
 
 
 def format_logistics_message(customer: dict, change: dict) -> str:
@@ -532,7 +560,7 @@ def format_logistics_message(customer: dict, change: dict) -> str:
         return (f"📦 *NEW ORDER* | {header_name}\n{date_line}\n"
                 f"----------------------------------------\n{current}\n"
                 f"----------------------------------------\n"
-                f"*Total:* {_totals(after)}\nRef: B-{change['batch_id']}")
+                f"*Total:* {_totals(after, change.get('totals'))}\nRef: B-{change['batch_id']}")
 
     prev = {(l["branch"], l["product"]): l for l in snapshot}
     now = {(l["branch"], l["product"]): l for l in after}
@@ -548,7 +576,7 @@ def format_logistics_message(customer: dict, change: dict) -> str:
     return (f"🔄 *ORDER UPDATE* | {header_name}\n{date_line}\n"
             f"----------------------------------------\n*Changes:*\n" + "\n".join(changes) +
             f"\n----------------------------------------\n*Full order now:*\n{current}\n"
-            f"*Total:* {_totals(after)}\nRef: B-{change['batch_id']}")
+            f"*Total:* {_totals(after, change.get('totals'))}\nRef: B-{change['batch_id']}")
 
 
 def mark_dispatched(cur, change: dict):
@@ -643,7 +671,8 @@ def build_interpretation_request(customer: dict, profile: dict, branches: list, 
                                  context_rows: list, pending: Optional[dict], msg) -> tuple:
     now = now_local()
     aliases = product_map(profile)
-    alias_txt = "\n".join(f'  "{a["alias"]}" => {a["product"]}' + (f' [{a["unit"]}]' if a["unit"] else "")
+    alias_txt = "\n".join(f'  "{a["alias"]}" => {a["product"]}' + (f' (code {a["sku"]})' if a.get("sku") else "")
+                          + (f' [{a["unit"]}]' if a["unit"] else "")
                           + (f' ({a["notes"]})' if a.get("notes") else "") for a in aliases) or "  (none)"
     upcoming_txt = "\n".join(
         f"  {b['delivery_date']}: " + (summarize_lines([{**l, 'quantity': float(l['quantity'])} for l in b["lines"]], "en") or "(empty)")
@@ -755,6 +784,7 @@ def _dispatch_change(cur, customer: dict, change: dict, logistics_target: str) -
     if not change:
         return []
     actions = []
+    change["totals"] = lines_totals(cur, change["after"])
     if logistics_target:
         actions.append(_action(logistics_target, format_logistics_message(customer, change)))
     mark_dispatched(cur, change)

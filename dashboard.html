@@ -392,19 +392,43 @@
             <!-- المنتجات -->
             <div id="tab-products-catalog" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs space-y-4">
-                    <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة</h3>
+                    <div class="flex flex-wrap justify-between items-center gap-2">
+                        <h3 class="font-bold text-sm brand-primary-text">قائمة المنتجات ومواصفات التعبئة</h3>
+                        <div class="flex flex-wrap gap-2 text-xs">
+                            <label class="px-3 py-1.5 bg-[#3A056A] text-white rounded-lg font-bold cursor-pointer">
+                                ⬆ استيراد ملف المنتجات (Excel)
+                                <input type="file" id="products-import-file" accept=".xlsx,.xlsm" class="hidden" onchange="importProductsFile(this)">
+                            </label>
+                            <a href="/api/products/export" class="px-3 py-1.5 bg-white border border-purple-300 text-[#3A056A] rounded-lg font-bold">⬇ تصدير Excel</a>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-gray-500">ارفع ملف الـ Assortment كما هو: يُحدَّث كل منتج بكوده ويُضاف الجديد. مواصفات التعبئة (حبات/كيس، أكياس/كرتون، وزن الحبة) تُستخدم لتحويل كل الطلبيات إلى عدد حبات ووزن موحّد في التقارير، وللرد على استفسارات العملاء.</p>
+                    <div id="products-import-result" class="hidden text-xs p-3 rounded-xl border"></div>
+                    <div class="flex flex-wrap gap-2 items-center text-xs">
+                        <input id="products-search" oninput="renderProductsCatalog()" placeholder="بحث بالاسم أو الكود..." class="p-2 border rounded-lg w-56">
+                        <select id="products-category" onchange="renderProductsCatalog()" class="p-2 border rounded-lg"><option value="">كل الفئات</option></select>
+                        <label class="flex items-center gap-1"><input type="checkbox" id="products-incomplete" onchange="renderProductsCatalog()"> المواصفات الناقصة فقط</label>
+                        <span id="products-count" class="text-gray-500 mr-auto"></span>
+                    </div>
+                    <div class="overflow-x-auto max-h-[65vh] overflow-y-auto">
                     <table class="w-full text-right text-xs border border-[#E4D9F5]">
-                        <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold">
+                        <thead class="bg-[#F5F0FC] text-[#3A056A] font-bold sticky top-0">
                             <tr>
-                                <th class="p-3">كود الصنف (SKU)</th>
-                                <th class="p-3">اسم المنتج (بالعربي)</th>
-                                <th class="p-3">الوزن / الحجم</th>
-                                <th class="p-3">التغليف الأساسي</th>
-                                <th class="p-3">مواصفة الكرتون</th>
+                                <th class="p-2">الكود</th>
+                                <th class="p-2">المنتج</th>
+                                <th class="p-2">الفئة</th>
+                                <th class="p-2">وزن الحبة (g)</th>
+                                <th class="p-2">حبات/كيس</th>
+                                <th class="p-2">أكياس/كرتون</th>
+                                <th class="p-2">حبات/كرتون</th>
+                                <th class="p-2">كرتون/طبلية</th>
+                                <th class="p-2">الصلاحية</th>
+                                <th class="p-2"></th>
                             </tr>
                         </thead>
                         <tbody class="divide-y brand-border" id="products-catalog-tbody"></tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 
@@ -1635,7 +1659,7 @@
                                 '<td class="p-2 font-bold">' + (i === 0 ? escHtml(b.company_name) : '') + '</td>' +
                                 '<td class="p-2">' + escHtml(l.branch) + '</td><td class="p-2">' + escHtml(l.product) + '</td>' +
                                 '<td class="p-2 font-bold">' + (l.quantity === '' ? '' : fmtQty(l.quantity) + ' ' + escHtml(l.unit)) + '</td>' +
-                                '<td class="p-2">' + (i === 0 ? status : '') + '</td></tr>');
+                                '<td class="p-2">' + (i === 0 ? status + (b.totals && b.totals.pieces ? '<div class="text-[10px] text-gray-500">≈ ' + Number(b.totals.pieces).toLocaleString() + ' حبة' + (b.totals.weight_kg ? ' · ' + b.totals.weight_kg + ' كجم' : '') + (b.totals.complete ? '' : ' (جزئي)') + '</div>' : '') : '') + '</td></tr>');
                         });
                     });
                     body.innerHTML = rows.join('') || '<tr><td colspan="6" class="p-4 text-center text-gray-400">لا توجد طلبيات</td></tr>';
@@ -1671,7 +1695,7 @@
             try {
                 const cat = await (await fetch('/api/products')).json();
                 document.getElementById('op-catalog').innerHTML = (cat || []).map(c =>
-                    '<option value="' + escHtml(c.name_en || c.name_ar) + '">' + escHtml((c.sku || '') + ' ' + (c.name_ar || '')) + '</option>').join('');
+                    '<option value="' + escHtml((c.name_en || c.name_ar) + ' [' + c.sku + ']') + '">' + escHtml(c.category || '') + '</option>').join('');
             } catch (e) {}
             document.getElementById('op-reminder-frequency').value = p.reminder_frequency || 'daily';
             document.getElementById('op-auto-reply').checked = p.auto_reply_enabled !== false;
@@ -1700,12 +1724,12 @@
             tr.className = 'op-product-row';
             tr.innerHTML =
                 '<td class="p-0.5"><input class="op-alias w-full p-1.5 border rounded" placeholder="5&quot; / بريوش"></td>' +
-                '<td class="p-0.5"><input class="op-product w-full p-1.5 border rounded" list="op-catalog" placeholder="اسم منتجنا"></td>' +
+                '<td class="p-0.5"><input class="op-product w-full p-1.5 border rounded" list="op-catalog" placeholder="اختر من الكتالوج"></td>' +
                 '<td class="p-0.5"><select class="op-unit w-full p-1.5 border rounded">' + units.map(u => '<option>' + u + '</option>').join('') + '</select></td>' +
                 '<td class="p-0.5"><input class="op-notes w-full p-1.5 border rounded" placeholder="3pc/pkt"></td>' +
                 '<td class="p-0.5"><button type="button" class="text-red-500 font-bold px-1" onclick="this.closest(\'tr\').remove()">✕</button></td>';
             tr.querySelector('.op-alias').value = row.alias || '';
-            tr.querySelector('.op-product').value = row.product || '';
+            tr.querySelector('.op-product').value = (row.product || '') + (row.sku ? ' [' + row.sku + ']' : '');
             tr.querySelector('.op-unit').value = units.includes(row.unit) ? row.unit : 'Cartons';
             tr.querySelector('.op-notes').value = row.notes || '';
             document.getElementById('op-products').appendChild(tr);
@@ -1742,6 +1766,80 @@
         };
 
         setInterval(() => { if (!document.getElementById('auth-overlay')?.classList.contains('hidden')) return; loadSmartOrders(); }, 60000);
+
+        // ---------------- كتالوج المنتجات ----------------
+        window.productsCatalog = [];
+        const numOrDash = (v) => (v === null || v === undefined || v === '') ? '' : fmtQty(v);
+        const isIncomplete = (p) => !p.piece_weight_g || !p.pieces_per_pack || !p.packs_per_box;
+
+        window.loadProductsCatalog = async function() {
+            window.productsCatalog = await (await fetch('/api/products')).json();
+            const sel = document.getElementById('products-category');
+            if (sel) {
+                const cur = sel.value;
+                const cats = [...new Set(window.productsCatalog.map(p => p.category).filter(Boolean))];
+                sel.innerHTML = '<option value="">كل الفئات</option>' + cats.map(c => '<option>' + escHtml(c) + '</option>').join('');
+                sel.value = cur;
+            }
+            renderProductsCatalog();
+        };
+
+        window.renderProductsCatalog = function() {
+            const tbody = document.getElementById('products-catalog-tbody');
+            if (!tbody) return;
+            const q = (document.getElementById('products-search')?.value || '').toLowerCase();
+            const cat = document.getElementById('products-category')?.value || '';
+            const onlyInc = document.getElementById('products-incomplete')?.checked;
+            const list = window.productsCatalog.filter(p =>
+                (!q || (String(p.sku) + ' ' + (p.name_en || '') + ' ' + (p.name_ar || '')).toLowerCase().includes(q)) &&
+                (!cat || p.category === cat) && (!onlyInc || isIncomplete(p)));
+            const inc = window.productsCatalog.filter(isIncomplete).length;
+            document.getElementById('products-count').textContent = list.length + ' من ' + window.productsCatalog.length + ' منتج' + (inc ? ' · ' + inc + ' بمواصفات ناقصة' : '');
+            const cell = (p, f) => isIncomplete(p) && !p[f]
+                ? '<input type="number" step="any" min="0" data-sku="' + escHtml(p.sku) + '" data-f="' + f + '" class="spec-input w-16 p-1 border border-amber-300 bg-amber-50 rounded" placeholder="؟">'
+                : numOrDash(p[f]);
+            tbody.innerHTML = list.slice(0, 400).map(p =>
+                '<tr class="' + (isIncomplete(p) ? 'bg-amber-50/40' : '') + '">' +
+                '<td class="p-2 font-mono font-bold">' + escHtml(p.sku) + '</td>' +
+                '<td class="p-2 font-bold text-[#3A056A]">' + escHtml(p.name_en || p.name_ar) + (p.name_ar && p.name_en && p.name_ar !== p.name_en ? '<div class="text-[10px] text-gray-500 font-normal">' + escHtml(p.name_ar) + '</div>' : '') + '</td>' +
+                '<td class="p-2 text-[10px]">' + escHtml(p.category || '') + '<div class="text-gray-400">' + escHtml(p.product_range || '') + '</div></td>' +
+                '<td class="p-2">' + cell(p, 'piece_weight_g') + '</td>' +
+                '<td class="p-2">' + cell(p, 'pieces_per_pack') + '</td>' +
+                '<td class="p-2">' + cell(p, 'packs_per_box') + '</td>' +
+                '<td class="p-2 font-bold">' + numOrDash(p.pieces_per_box) + '</td>' +
+                '<td class="p-2">' + numOrDash(p.boxes_per_pallet) + '</td>' +
+                '<td class="p-2 text-[10px]">' + escHtml(p.shelf_life_frozen || '') + '</td>' +
+                '<td class="p-2">' + (isIncomplete(p) ? '<button onclick="saveProductSpecs(\'' + escHtml(p.sku) + '\')" class="px-2 py-1 bg-amber-500 text-white rounded text-[10px] font-bold">حفظ</button>' : '') + '</td>' +
+                '</tr>').join('') || '<tr><td colspan="10" class="p-4 text-center text-gray-400">لا توجد منتجات — ارفع ملف المنتجات</td></tr>';
+        };
+
+        window.saveProductSpecs = async function(sku) {
+            const payload = {};
+            document.querySelectorAll('.spec-input[data-sku="' + CSS.escape(sku) + '"]').forEach(i => { if (i.value) payload[i.dataset.f] = parseFloat(i.value); });
+            if (!Object.keys(payload).length) return alert('أدخل القيم الناقصة أولاً');
+            const res = await fetch('/api/products/' + encodeURIComponent(sku) + '/specs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(d.detail || 'تعذر الحفظ');
+            loadProductsCatalog();
+        };
+
+        window.importProductsFile = async function(input) {
+            const f = input.files[0];
+            if (!f) return;
+            const box = document.getElementById('products-import-result');
+            box.className = 'text-xs p-3 rounded-xl border border-purple-200 bg-purple-50';
+            box.textContent = 'جاري قراءة الملف...';
+            const fd = new FormData(); fd.append('file', f);
+            const res = await fetch('/api/products/import', { method: 'POST', body: fd });
+            const d = await res.json().catch(() => ({}));
+            input.value = '';
+            if (!res.ok) { box.className = 'text-xs p-3 rounded-xl border border-red-200 bg-red-50'; box.textContent = d.detail || 'تعذر الاستيراد'; return; }
+            box.innerHTML = '<b>✓ تم استيراد ' + d.total + ' منتجاً</b> من ورقة "' + escHtml(d.sheet) + '": ' + d.created + ' جديد، ' + d.updated + ' محدّث.' +
+                (d.incomplete.length ? '<div class="mt-1 text-amber-800">⚠️ ' + d.incomplete.length + ' منتج بمواصفات ناقصة (يمكن إكمالها من الجدول بتفعيل "المواصفات الناقصة فقط"): ' +
+                    d.incomplete.slice(0, 8).map(x => escHtml(x.sku) + ' ' + escHtml(x.name) + ' (' + x.missing.join('، ') + ')').join(' · ') + (d.incomplete.length > 8 ? ' …' : '') + '</div>' : '') +
+                (d.inconsistent.length ? '<div class="mt-1 text-red-700">✖ تعارض في الملف: ' + d.inconsistent.map(x => escHtml(x.sku) + ' ' + escHtml(x.name) + ' (صف ' + x.row + ': ' + escHtml(x.detail) + ')').join(' · ') + '</div>' : '');
+            loadProductsCatalog();
+        };
 
         // ---------------- مسؤول النظام والرد الآلي ----------------
         window.loadAssistantSettings = async function() {
@@ -2759,22 +2857,7 @@
             } catch(e) {}
 
             // 7. المنتجات
-            try {
-                const pRes = await fetch('/api/products');
-                const prods = await pRes.json();
-                const tbody = document.getElementById('products-catalog-tbody');
-                if (tbody) {
-                    tbody.innerHTML = prods.map(p => {
-                        return '<tr>' +
-                                '<td class="p-3 font-mono font-bold">' + p.sku + '</td>' +
-                                '<td class="p-3 font-bold text-[#3A056A]">' + p.name_ar + '</td>' +
-                                '<td class="p-3">' + (p.weight_spec || '—') + '</td>' +
-                                '<td class="p-3">' + (p.primary_packaging || '—') + '</td>' +
-                                '<td class="p-3">' + (p.carton_pack_spec || '—') + '</td>' +
-                            '</tr>';
-                    }).join('') || '<tr><td colspan="5" class="p-4 text-center text-gray-400">لا توجد منتجات مسجلة</td></tr>';
-                }
-            } catch(e) {}
+            try { await loadProductsCatalog(); } catch(e) {}
 
             // 8. المصاريف
             try {

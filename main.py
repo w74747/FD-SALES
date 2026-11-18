@@ -38,6 +38,7 @@ import db_pool
 import ai_client
 import order_engine
 import knowledge
+import catalog
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pyotp
@@ -770,6 +771,7 @@ def init_database():
     run_isolated_ddl("ALTER TABLE customer_accounts ALTER COLUMN contact_person SET DEFAULT '';")
     order_engine.init_schema(run_isolated_ddl)
     knowledge.init_schema(run_isolated_ddl)
+    catalog.init_schema(run_isolated_ddl)
     run_isolated_ddl("""
         CREATE TABLE IF NOT EXISTS stored_files (
             file_key VARCHAR(100) PRIMARY KEY,
@@ -1509,7 +1511,7 @@ def list_order_batches(days_back: int = 1):
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT b.id, b.delivery_date, b.status, c.company_name, c.brand_name,
-                       COALESCE(json_agg(json_build_object('branch', l.branch_name, 'product', l.product,
+                       COALESCE(json_agg(json_build_object('branch', l.branch_name, 'product', l.product, 'sku', l.product_sku,
                                 'quantity', l.quantity, 'unit', l.unit) ORDER BY l.branch_name, l.product)
                                 FILTER (WHERE l.id IS NOT NULL), '[]') AS lines
                 FROM order_batches b JOIN customer_accounts c ON c.id = b.customer_id
@@ -1518,7 +1520,10 @@ def list_order_batches(days_back: int = 1):
                 GROUP BY b.id, c.company_name, c.brand_name
                 ORDER BY b.delivery_date ASC, c.company_name ASC LIMIT 200;
             """, (order_engine.today_local() - timedelta(days=max(0, min(days_back, 60))),))
-            return cur.fetchall()
+            batches = [dict(r) for r in cur.fetchall()]
+            for b in batches:
+                b["totals"] = order_engine.lines_totals(cur, b["lines"])
+            return batches
     finally:
         conn.close()
 
@@ -1549,10 +1554,18 @@ def save_order_profile(customer_id: int, payload: OrderProfilePayload):
     if data.get("products") is None:
         data.pop("products", None)
     else:
-        data["products"] = [
-            {"alias": str(p.get("alias") or "").strip()[:120], "product": str(p.get("product") or "").strip()[:200],
-             "unit": str(p.get("unit") or "").strip()[:30], "notes": str(p.get("notes") or "").strip()[:200]}
-            for p in data["products"] if str(p.get("product") or "").strip()][:100]
+        cleaned = []
+        for p in data["products"]:
+            product = str(p.get("product") or "").strip()
+            if not product:
+                continue
+            # القيمة المختارة من الكتالوج بصيغة "اسم المنتج [الكود]"
+            m = re.search(r"\s*\[([A-Za-z0-9\-]+)\]\s*$", product)
+            sku = (p.get("sku") or (m.group(1) if m else "")).strip()
+            cleaned.append({"alias": str(p.get("alias") or "").strip()[:120], "product": product[:m.start()].strip() if m else product[:200],
+                            "sku": sku[:100], "unit": str(p.get("unit") or "").strip()[:30],
+                            "notes": str(p.get("notes") or "").strip()[:200]})
+        data["products"] = cleaned[:100]
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database unreachable")
@@ -2613,6 +2626,87 @@ def delete_sample(sample_id: int):
         conn.close()
 
 # ----------------- مسارات المنتجات والمصاريف -----------------
+class ProductSpecsPayload(BaseModel):
+    name_ar: Optional[str] = None
+    piece_weight_g: Optional[float] = None
+    pieces_per_pack: Optional[float] = None
+    packs_per_box: Optional[float] = None
+
+
+@app.post("/api/products/import")
+async def import_products(file: UploadFile = File(...)):
+    """
+    استيراد ملف المنتجات (Assortment) كما هو: يُحدَّث المنتج الموجود بكوده ويُضاف الجديد.
+    يعيد ملخصاً بالمنتجات ذات المواصفات الناقصة أو المتعارضة لاستكمالها.
+    """
+    raw = await file.read()
+    if len(raw) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="الحد الأقصى لحجم الملف 20 ميجابايت")
+    try:
+        parsed = catalog.parse_assortment(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Product import parse failed: {e}")
+        raise HTTPException(status_code=400, detail="تعذر قراءة الملف. تأكد أنه Excel (.xlsx)")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            counts = catalog.upsert_products(cur, parsed["products"])
+        conn.commit()
+    finally:
+        conn.close()
+    return {"status": "SUCCESS", "sheet": parsed["sheet"], "total": len(parsed["products"]), **counts,
+            "incomplete": parsed["incomplete"], "inconsistent": parsed["inconsistent"]}
+
+
+@app.get("/api/products/export")
+def export_products():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM products_catalog ORDER BY category NULLS LAST, sku;")
+            rows = [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+    data = catalog.export_xlsx(rows)
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="FDC_Products_{datetime.now():%Y-%m-%d}.xlsx"'})
+
+
+@app.post("/api/products/{sku}/specs")
+def update_product_specs(sku: str, payload: ProductSpecsPayload):
+    """استكمال مواصفات التعبئة الناقصة يدوياً (مثل عدد الأكياس في الكرتون)"""
+    data = {k: v for k, v in payload.dict().items() if v is not None}
+    for k in ("piece_weight_g", "pieces_per_pack", "packs_per_box"):
+        if k in data and not (0 < float(data[k]) < 100000):
+            raise HTTPException(status_code=400, detail="قيمة غير صحيحة")
+    if not data:
+        return {"status": "NO_CHANGE"}
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            sets = ", ".join(f"{k} = %s" for k in data)
+            cur.execute(f"UPDATE products_catalog SET {sets}, updated_at = NOW() WHERE sku = %s RETURNING *;",
+                        list(data.values()) + [sku])
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="المنتج غير موجود")
+            # عدد الحبات في الكرتون يُعاد حسابه من المواصفات المحدّثة
+            if row["pieces_per_pack"] and row["packs_per_box"]:
+                cur.execute("UPDATE products_catalog SET pieces_per_box = pieces_per_pack * packs_per_box WHERE sku = %s;", (sku,))
+        conn.commit()
+        return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+
 @app.get("/api/products")
 def get_products():
     conn = get_db_connection()
@@ -2620,7 +2714,7 @@ def get_products():
         return []
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM products_catalog ORDER BY name_ar ASC;")
+            cur.execute("SELECT * FROM products_catalog ORDER BY category NULLS LAST, sku ASC;")
             return cur.fetchall()
     finally:
         conn.close()
