@@ -11,6 +11,7 @@ reports.py - التقارير الدورية للإدارة (شهري / ربع �
 import io
 import json
 import logging
+import re
 import statistics
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -472,29 +473,62 @@ def _omr(v) -> str:
     return "—" if v is None else f"{v:,.3f} ر.ع"
 
 
+EASTERN = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
+
+
+def to_eastern(text: str) -> str:
+    """
+    الأرقام في النص الجاري بالأرقام العربية الشرقية (حسب الهوية)، مع إبقاء الأرقام الملتصقة
+    بأسماء لاتينية أو مواصفات منتجات (مثل 4pcs أو 5" أو 0131) كما هي.
+    """
+    if not text:
+        return text
+
+    def conv(m):
+        s = m.group(0)
+        before = text[max(0, m.start() - 1):m.start()]
+        after = text[m.end():m.end() + 1]
+        if re.match(r'[A-Za-z"\'#/_\-]', before or " ") or re.match(r'[A-Za-z"\'#/_]', after or " "):
+            return s
+        if len(s) == 4 and s.startswith("0"):  # أكواد المنتجات
+            return s
+        return s.translate(EASTERN).replace(".", "٫").replace(",", "٬").replace("%", "٪")
+    return re.sub(r"\d[\d,.]*%?", conv, text)
+
+
+def _esc_ar(text) -> str:
+    return escape(to_eastern(str(text or "")))
+
+
 def _delta(pct) -> str:
-    """التغير: سهم + نسبة (اللون عامل مساعد وليس الوحيد)"""
+    """التغير بالأرقام الغربية (جداول وأرقام): سهم + نسبة، ولون الحالة وظيفي فقط"""
     if pct is None:
-        return '<span class="chg na">لا تتوفر مقارنة</span>'
-    arrow, cls = ("▲", "up") if pct > 0 else ("▼", "down") if pct < 0 else ("●", "flat")
-    return f'<span class="chg {cls}">{arrow} {abs(pct):.1f}%</span>'
+        return '<span class="chg na">—</span>'
+    arrow, cls = ("▲", "up") if pct > 0 else ("▼", "down") if pct < 0 else ("■", "flat")
+    return f'<span class="chg {cls}">{arrow}&#8239;{abs(pct):.1f}%</span>'
 
 
 def _date_ar(d) -> str:
     if isinstance(d, str):
         d = date.fromisoformat(d)
-    return f"{d.day} {MONTHS_AR[d.month - 1]} {d.year}"
+    return to_eastern(f"{d.day} {MONTHS_AR[d.month - 1]} {d.year}")
+
+
+def _date_mono(d) -> str:
+    if isinstance(d, str):
+        d = date.fromisoformat(d)
+    return d.strftime("%d.%m.%Y")
 
 
 def _bar_chart(items: list, label_key: str, value_key: str, fmt=_n, title: str = "", max_items: int = 10) -> str:
     """
-    أعمدة أفقية (سلسلة واحدة): الأسماء في عمود على اليمين، والأعمدة تمتد من خط أساس واحد نحو اليسار
-    (اتجاه القراءة العربية)، والقيمة بجانب نهاية العمود. اتجاه SVG ثابت LTR حتى لا تنقلب المحاذاة.
+    أعمدة أفقية (سلسلة واحدة): الأسماء على اليمين، والأعمدة تمتد من خط أساس واحد نحو اليسار،
+    والقيمة بجانب نهاية العمود. بلا زوايا مستديرة (الهوية). اتجاه SVG ثابت LTR.
     """
     items = [i for i in items if (i.get(value_key) or 0) > 0][:max_items]
     if not items:
         return '<p class="empty">لا توجد بيانات كافية للرسم.</p>'
-    w, row_h, label_w, value_w = 680, 24, 220, 100
+    w, row_h, label_w, value_w = 680, 24, 220, 104
     h = row_h * len(items) + 6
     top = max(i[value_key] for i in items) or 1
     base = w - label_w - 10
@@ -508,29 +542,29 @@ def _bar_chart(items: list, label_key: str, value_key: str, fmt=_n, title: str =
         bars.append(
             f'<g class="bar"><title>{escape(name)}: {val}</title>'
             f'<text x="{w}" y="{y + 15}" text-anchor="end" class="lbl">{lab}</text>'
-            f'<rect x="{base - bw:.1f}" y="{y + 4}" width="{bw:.1f}" height="14" rx="4" class="mark"/>'
+            f'<rect x="{base - bw:.1f}" y="{y + 5}" width="{bw:.1f}" height="12" class="mark"/>'
             f'<text x="{base - bw - 6:.1f}" y="{y + 15}" text-anchor="end" class="val">{val}</text></g>')
     return (f'<figure><figcaption>{escape(title)}</figcaption><svg viewBox="0 0 {w} {h}" width="100%" role="img" '
             f'direction="ltr" style="direction:ltr" aria-label="{escape(title)}">'
-            f'<line x1="{base + 1}" y1="0" x2="{base + 1}" y2="{h}" class="axis"/>{"".join(bars)}</svg></figure>')
+            f'<line x1="{base + 0.5}" y1="0" x2="{base + 0.5}" y2="{h}" class="axis"/>{"".join(bars)}</svg></figure>')
 
 
 def _column_chart(items: list, label_key: str, value_key: str, title: str) -> str:
     if not items or not any(i.get(value_key) for i in items):
         return '<p class="empty">لا توجد بيانات كافية للرسم.</p>'
-    w, h, pad_b = 680, 170, 26
+    w, h, pad_b = 680, 160, 24
     n = len(items)
     slot = w / n
-    bar_w = min(slot * 0.56, 46)
+    bar_w = min(slot * 0.5, 40)
     top = max(i[value_key] for i in items) or 1
     cols = []
     for idx, i in enumerate(items):
-        cx = w - (idx + 0.5) * slot  # الأحدث/الأخير على اليسار (اتجاه القراءة العربية)
+        cx = w - (idx + 0.5) * slot
         bh = (h - pad_b - 18) * i[value_key] / top
         lab, val = escape(str(i[label_key])), _n(i[value_key])
         cols.append(f'<g class="bar"><title>{lab}: {val}</title>'
-                    + (f'<rect x="{cx - bar_w / 2:.1f}" y="{h - pad_b - bh:.1f}" width="{bar_w:.1f}" height="{bh:.1f}" rx="4" class="mark"/>' if bh > 0 else '')
-                    + f'<text x="{cx:.1f}" y="{h - 8}" text-anchor="middle" class="lbl">{lab}</text>'
+                    + (f'<rect x="{cx - bar_w / 2:.1f}" y="{h - pad_b - bh:.1f}" width="{bar_w:.1f}" height="{bh:.1f}" class="mark"/>' if bh > 0 else '')
+                    + f'<text x="{cx:.1f}" y="{h - 7}" text-anchor="middle" class="lbl">{lab}</text>'
                     + (f'<text x="{cx:.1f}" y="{h - pad_b - bh - 5:.1f}" text-anchor="middle" class="val">{val}</text>' if n <= 14 and i[value_key] else "")
                     + '</g>')
     return (f'<figure><figcaption>{escape(title)}</figcaption><svg viewBox="0 0 {w} {h}" width="100%" role="img" '
@@ -539,7 +573,7 @@ def _column_chart(items: list, label_key: str, value_key: str, title: str) -> st
 
 
 def _table(headers: list, rows: list, empty: str = "لا توجد بيانات", num_cols: tuple = ()) -> str:
-    """جدول: الأعمدة الرقمية (num_cols) بمحاذاة واحدة وأرقام متساوية العرض"""
+    """جداول الهوية: خط 0.75pt تحت العناوين، فواصل 0.5pt، بلا تعبئة؛ الأعمدة الرقمية بخط Mono"""
     if not rows:
         return f'<p class="empty">{escape(empty)}</p>' if empty else ""
     cls = lambda i: ' class="num"' if i in num_cols else ""
@@ -549,121 +583,149 @@ def _table(headers: list, rows: list, empty: str = "لا توجد بيانات",
 
 
 def _list(items: list, cls: str = "") -> str:
-    return (f'<ul class="{cls}">' + "".join(f"<li>{escape(str(i))}</li>" for i in items) + "</ul>") if items else '<p class="empty">لا يوجد</p>'
+    return (f'<ul class="{cls}">' + "".join(f"<li>{_esc_ar(i)}</li>" for i in items) + "</ul>") if items else '<p class="empty">لا يوجد</p>'
 
 
-def _stats(pairs: list) -> str:
-    """صف مؤشرات صغيرة (بدل سلاسل نصية مفصولة بنقاط)"""
-    return '<dl class="stats">' + "".join(f'<div><dt>{escape(k)}</dt><dd>{v}</dd></div>' for k, v in pairs) + '</dl>'
+def _band(cells: list) -> str:
+    """شريط مؤشرات: الرقم بخط العرض والتسمية تحته"""
+    return '<div class="band">' + "".join(
+        f'<div class="cell"><div class="fig">{v}</div><div class="eyebrow">{escape(k)}</div>{extra}</div>'
+        for k, v, extra in cells) + '</div>'
 
 
+def _callout(title: str, body: str) -> str:
+    return f'<aside class="callout"><div class="eyebrow">{escape(title)}</div><p>{body}</p></aside>'
+
+
+def _face(family: str, sub: str, w: int, file: str, rng: str) -> str:
+    return (f"@font-face{{font-family:'{family}';font-style:normal;font-weight:{w};font-display:swap;"
+            f"src:url(/report-fonts/{file}.woff2) format('woff2');unicode-range:{rng};}}")
+
+
+AR_RANGE = "U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC"
+LA_RANGE = "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD"
+
+# عائلات مركّبة: الحرف العربي من الخط العربي واللاتيني من نظيره (حسب الهوية)
 FONT_FACES = "".join(
-    f"@font-face{{font-family:'Plex Arabic';font-style:normal;font-weight:{w};font-display:swap;"
-    f"src:url(/report-fonts/plex-arabic-{sub}-{w}.woff2) format('woff2');unicode-range:{rng};}}"
-    for w in (400, 500, 700)
-    for sub, rng in (("arabic", "U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC"),
-                     ("latin", "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD")))
+    [_face("DC Text", "ar", w, f"text-ar-{w}", AR_RANGE) for w in (400, 500, 600)]
+    + [_face("DC Text", "la", w, f"text-la-{w}", LA_RANGE) for w in (400, 500, 600)]
+    + [_face("DC Display", "ar", w, f"disp-ar-{w}", AR_RANGE) for w in (300, 400, 700, 800)]
+    + [_face("DC Display", "la", w, f"disp-la-{w}", LA_RANGE) for w in (300, 400, 600)]
+    + [_face("DC Mono", "la", w, f"mono-{w}", LA_RANGE) for w in (400, 500)])
 
 CSS = FONT_FACES + """
-/* الطباعة: A4 مع ترقيم الصفحات */
-@page { size: A4; margin: 17mm 15mm 18mm;
-  @bottom-left { content: counter(page) " / " counter(pages); font: 400 7.5pt 'Plex Arabic', sans-serif; color: #8a8794; }
-  @bottom-right { content: "شركة تنمية الغذاء — للاستخدام الداخلي"; font: 400 7.5pt 'Plex Arabic', sans-serif; color: #8a8794; } }
-@page :first { @bottom-right { content: none; } @bottom-left { content: none; } }
+/* إطار الصفحة: A4، هوامش 18/20/20/20 ملم، تذييل بسطر واحد (الهوية) */
+@page { size: A4; margin: 18mm 20mm 20mm;
+  @bottom-right { content: "شركة تنمية الغذاء · للاستخدام الداخلي"; font: 400 7.5pt/1.4 'DC Text', sans-serif; color: #6B7688; vertical-align: top; padding-top: 3mm; }
+  @bottom-center { content: "__FOOTER_MID__"; font: 400 7.5pt/1.4 'DC Text', sans-serif; color: #6B7688; vertical-align: top; padding-top: 3mm; }
+  @bottom-left { content: "\\202A" counter(page) " / " counter(pages) "\\202C"; font: 400 7.5pt/1.4 'DC Mono', monospace; color: #6B7688; vertical-align: top; padding-top: 3mm; } }
+@page :first { @bottom-right { content: none; } @bottom-center { content: none; } @bottom-left { content: none; } }
 
-:root { --brand:#3A056A; --mark:#6250d6; --ink:#1d1a22; --ink-2:#52514e; --muted:#8a8794; --line:#e7e2ef; --tint:#f6f2fb;
-        --up:#0a7a2f; --up-bg:#e9f6ee; --down:#b42318; --down-bg:#fdecea; }
-* { box-sizing: border-box; }
+:root {
+  --ink:#0B1020; --steel:#2F4368; --graphite:#414C61; --mist:#6B7688;
+  --canvas:#F6F8FB; --mesa:#EDF1F7; --frost:#DCE2EC; --frost-deep:#C3CCDA; --paper:#FFFFFF;
+  --accent:#3A056A;   /* لون FDC يحل محل Castle Blue كلون الختم المؤسسي */
+  --mark:#6250d6;     /* لون الرسوم البيانية (تم التحقق منه) */
+  --ok:#0F7A5A; --warn:#B0731A; --crit:#C0342B;
+  --hair:.5pt; --rule:.75pt; --emph:1.5pt;
+}
+* { box-sizing: border-box; border-radius: 0; }
 html { color-scheme: light; }
-body { margin: 0; background: #e9e7ee; color: var(--ink);
-       font-family: 'Plex Arabic', 'Segoe UI', Tahoma, sans-serif; font-size: 10pt; line-height: 1.75;
-       font-variant-numeric: tabular-nums lining-nums; -webkit-font-smoothing: antialiased; }
-.sheet { max-width: 210mm; margin: 16px auto 32px; background: #fff; padding: 18mm 16mm 16mm; box-shadow: 0 1px 3px #0000001a, 0 8px 24px #3a056a14; }
+body { margin: 0; background: var(--canvas); color: var(--ink);
+       font: 400 10pt/1.9 'DC Text', Tahoma, sans-serif; text-align: right; }
+.sheet { width: 210mm; max-width: 100%; margin: 14px auto 28px; background: var(--paper); padding: 18mm 20mm 20mm; }
 
-/* شريط الأدوات (لا يُطبع) */
-.toolbar { max-width: 210mm; margin: 16px auto 0; display: flex; gap: 8px; }
-.toolbar button, .toolbar a { font: 500 9.5pt 'Plex Arabic', sans-serif; background: var(--brand); color: #fff; border: 0;
-  padding: 7px 14px; border-radius: 6px; text-decoration: none; cursor: pointer; }
-.toolbar a { background: #fff; color: var(--brand); box-shadow: inset 0 0 0 1px var(--line); }
+/* شريط أدوات الشاشة (لا يُطبع) */
+.toolbar { width: 210mm; max-width: 100%; margin: 14px auto 0; display: flex; gap: 6px; }
+.toolbar button, .toolbar a { font: 500 9pt 'DC Text', sans-serif; padding: 2mm 4mm; border: var(--rule) solid var(--ink); background: var(--ink); color: #fff; text-decoration: none; cursor: pointer; }
+.toolbar a { background: var(--paper); color: var(--ink); }
 .toolbar :focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
 
-/* الغلاف: اسم الفترة هو العنصر البارز الوحيد */
-.cover { border-bottom: 2px solid var(--brand); padding-bottom: 9mm; margin-bottom: 8mm; }
-.brandline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12mm; }
-.brandline img { height: 13mm; }
-.brandline .conf { font-size: 8pt; color: var(--muted); }
-.cover .kind { font-size: 11pt; font-weight: 500; color: var(--ink-2); margin: 0; }
-.cover h1 { font-size: 34pt; line-height: 1.15; font-weight: 700; color: var(--brand); margin: 1mm 0 3mm; letter-spacing: -0.2pt; }
-.cover .range { font-size: 9pt; color: var(--ink-2); margin: 0; }
+/* تسميات صغيرة: في العربية بلا تباعد ولا أحرف كبيرة، Almarai 700 بلون رمادي */
+.eyebrow { font: 700 7.5pt/1.5 'DC Display', sans-serif; color: var(--mist); letter-spacing: 0; }
+.figure, .num, .mono { font-family: 'DC Mono', monospace; font-variant-numeric: tabular-nums; }
 
-/* العناوين */
-h2 { font-size: 15pt; line-height: 1.3; font-weight: 700; color: var(--brand); margin: 11mm 0 4mm; padding-bottom: 2mm; border-bottom: 1px solid var(--line); }
-h2.first { margin-top: 0; }
-h3 { font-size: 10.5pt; font-weight: 700; color: var(--ink); margin: 6mm 0 2mm; }
-p { margin: 0 0 3mm; max-width: 68ch; }
+/* الترويسة */
+.docheader { display: flex; align-items: center; justify-content: space-between; height: 14mm; border-bottom: var(--hair) solid var(--accent); margin-bottom: 14mm; }
+.docheader img { height: 11mm; }
+.docheader .eyebrow { color: var(--mist); }
 
-/* الملخص */
-.headline { font-size: 13pt; line-height: 1.6; font-weight: 500; color: var(--ink); margin: 0 0 3mm; max-width: 60ch; }
-.summary { color: var(--ink-2); }
-.reading { border-inline-start: 2px solid var(--mark); padding-inline-start: 4mm; color: var(--ink-2); margin: 0 0 5mm; }
+/* الغلاف: سطر التصنيف، عنوان هو جملة الحجة، المقدمة، شريط البيانات */
+.cover .eyebrow.class { color: var(--accent); margin-bottom: 4mm; }
+.cover h1 { font: 400 30pt/1.3 'DC Display', sans-serif; letter-spacing: -0.01em; margin: 0 0 6mm; max-width: 150mm; color: var(--ink); }
+.lede { font: 400 11.5pt/1.85 'DC Text', sans-serif; color: var(--graphite); max-width: 140mm; margin: 0 0 9mm; }
+.rail { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 5mm; border-top: var(--hair) solid var(--frost); border-bottom: var(--hair) solid var(--frost); padding: 4mm 0; margin-bottom: 9mm; }
+.rail .value { font: 500 8.5pt/1.6 'DC Mono', monospace; color: var(--ink); margin-top: 1mm; }
+.rail .value.text { font: 500 9pt/1.6 'DC Text', sans-serif; }
 
-/* المؤشرات: شبكة بفواصل رفيعة بدل البطاقات */
-.kpis { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); margin: 6mm 0; }
-.kpi { padding: 4mm 0 4mm 5mm; border-bottom: 1px solid var(--line); }
-.kpi:not(:nth-child(3n)) { border-inline-end: 1px solid var(--line); }
-.kpi:not(:nth-child(3n+1)) { padding-inline-start: 5mm; }
-.kpi .label { font-size: 8.5pt; color: var(--ink-2); }
-.kpi .value { font-size: 19pt; line-height: 1.25; font-weight: 500; margin: 1mm 0 2mm; }
-.kpi .cmp { font-size: 8pt; color: var(--muted); line-height: 1.9; display: flex; justify-content: space-between; gap: 2mm; }
-.chg { font-weight: 500; white-space: nowrap; padding: 0 1.5mm; border-radius: 3px; }
-.chg.up { color: var(--up); background: var(--up-bg); } .chg.down { color: var(--down); background: var(--down-bg); }
-.chg.flat { color: var(--ink-2); } .chg.na { color: var(--muted); font-weight: 400; padding: 0; }
+/* شريط المؤشرات: خلايا بفواصل رفيعة */
+.band { display: grid; grid-template-columns: repeat(3, 1fr); border: var(--hair) solid var(--frost-deep); margin: 0 0 8mm; }
+.band .cell { padding: 5mm 5mm 4mm; border-inline-start: var(--hair) solid var(--frost-deep); border-top: var(--hair) solid var(--frost-deep); }
+.band .cell:nth-child(3n+1) { border-inline-start: 0; } .band .cell:nth-child(-n+3) { border-top: 0; }
+.band .fig { font: 300 21pt/1.2 'DC Display', sans-serif; color: var(--ink); margin-bottom: 1.5mm; white-space: nowrap; }
+.band .cmp { display: flex; justify-content: space-between; gap: 2mm; font-size: 7.5pt; line-height: 1.9; color: var(--mist); }
+.band.small { grid-template-columns: repeat(4, 1fr); } .band.small .cell:nth-child(3n+1) { border-inline-start: var(--hair) solid var(--frost-deep); }
+.band.small .cell:nth-child(4n+1) { border-inline-start: 0; } .band.small .cell { border-top: 0; } .band.small .fig { font-size: 16pt; }
+.chg { font: 500 7.5pt 'DC Mono', monospace; white-space: nowrap; }
+.chg.up { color: var(--ok); } .chg.down { color: var(--crit); } .chg.flat, .chg.na { color: var(--mist); }
 
-.twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; }
-ul { margin: 0; padding-inline-start: 5mm; } li { margin-bottom: 1.5mm; }
-ul.good li::marker { content: "✓  "; color: var(--up); } ul.bad li::marker { content: "!  "; color: var(--down); font-weight: 700; }
-ol.recs { margin: 0; padding-inline-start: 6mm; } ol.recs li { margin-bottom: 2.5mm; padding-inline-start: 1mm; }
-ol.recs li::marker { color: var(--brand); font-weight: 700; }
+/* الأقسام: رقم القسم كتسمية صغيرة، عنوان Almarai، ثم جملة الخلاصة */
+section { margin-top: 12mm; }
+.secno { color: var(--accent); margin-bottom: 1mm; }
+h2 { font: 400 21pt/1.4 'DC Display', sans-serif; letter-spacing: -0.01em; color: var(--ink); margin: 0 0 3mm; }
+h3 { font: 600 11pt/1.5 'DC Text', sans-serif; color: var(--ink); margin: 7mm 0 2mm; }
+p { margin: 0 0 3mm; max-width: 140mm; }
+.thesis { font-size: 11.5pt; line-height: 1.85; color: var(--graphite); margin-bottom: 6mm; }
 
-/* مؤشرات صغيرة */
-.stats { display: flex; flex-wrap: wrap; gap: 2mm 9mm; margin: 0 0 5mm; }
-.stats div { min-width: 26mm; } .twocol .stats { gap: 2mm 6mm; } .twocol .stats div { min-width: 18mm; } .stats dt { font-size: 8pt; color: var(--ink-2); }
-.stats dd { margin: 0; font-size: 12.5pt; font-weight: 500; }
+/* كتلة التنبيه: واحدة لكل قسم كحد أقصى */
+.callout { background: var(--mesa); border-inline-start: var(--emph) solid var(--accent); padding: 5mm 6mm; margin: 6mm 0; break-inside: avoid; }
+.callout .eyebrow { color: var(--ink); margin-bottom: 1.5mm; }
+.callout p { margin: 0; max-width: none; font-size: 10.5pt; }
 
-/* الجداول */
-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; line-height: 1.5; margin: 2mm 0 6mm; }
-th { text-align: right; font-weight: 500; color: var(--brand); padding: 1.6mm 2mm; border-bottom: 1.5px solid var(--brand); white-space: nowrap; }
-td { padding: 1.6mm 2mm; border-bottom: 1px solid var(--line); vertical-align: top; }
-td:first-child { font-weight: 500; }
-th.num, td.num { text-align: left; white-space: nowrap; }
-tbody tr:last-child td { border-bottom-color: #cfc6dc; }
+.twocol { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10mm; }
+ul { margin: 0; padding-inline-start: 5mm; } li { margin-bottom: 1mm; }
+ul.good li::marker { content: "+  "; color: var(--ok); font-weight: 600; }
+ul.bad li::marker { content: "!  "; color: var(--crit); font-weight: 600; }
+ol.recs { margin: 0; padding: 0; list-style: none; counter-reset: rec; }
+ol.recs li { counter-increment: rec; display: grid; grid-template-columns: 10mm 1fr; padding: 3mm 0; border-bottom: var(--hair) solid var(--frost); margin: 0; }
+ol.recs li::before { content: counter(rec, arabic-indic); font: 300 15pt/1.4 'DC Display', sans-serif; color: var(--accent); }
+
+/* الجداول: بلا تعبئة ولا إطار خارجي */
+table { width: 100%; border-collapse: collapse; font: 400 8.5pt/1.65 'DC Text', sans-serif; margin: 2mm 0 7mm; }
+th { font: 700 7.5pt/1.5 'DC Display', sans-serif; color: var(--mist); text-align: right; padding: 0 0 2mm 3mm; border-bottom: var(--rule) solid var(--ink); white-space: nowrap; }
+td { padding: 2.2mm 0 2.2mm 3mm; border-bottom: var(--hair) solid var(--frost); vertical-align: top; }
+th.num, td.num { text-align: left; white-space: nowrap; font-family: 'DC Mono', monospace; font-size: 8pt; }
+th.num { font: 700 7.5pt/1.5 'DC Display', sans-serif; }
 
 /* الرسوم */
-figure { margin: 3mm 0 5mm; }
-figcaption { font-size: 9pt; font-weight: 500; color: var(--ink-2); margin-bottom: 2mm; }
-svg text { font-family: 'Plex Arabic', sans-serif; }
-svg .mark { fill: var(--mark); } svg .bar:hover .mark { fill: var(--brand); }
-svg .lbl { font-size: 11px; fill: var(--ink); } svg .val { font-size: 10.5px; fill: var(--ink-2); }
-svg .axis { stroke: #cfc6dc; stroke-width: 1; }
+figure { margin: 3mm 0 6mm; }
+figcaption { margin-bottom: 2mm; font: 700 7.5pt/1.5 'DC Display', sans-serif; color: var(--mist); }
+svg text { font-family: 'DC Text', sans-serif; }
+svg .mark { fill: var(--mark); } svg .bar:hover .mark { fill: var(--accent); }
+svg .lbl { font-size: 11px; fill: var(--ink); } svg .val { font-family: 'DC Mono', monospace; font-size: 10px; fill: var(--graphite); }
+svg .axis { stroke: var(--frost-deep); stroke-width: 1; }
 
-.empty { color: var(--muted); font-size: 9pt; }
-.note { font-size: 7.5pt; line-height: 1.7; color: var(--muted); border-top: 1px solid var(--line); padding-top: 3mm; margin-top: 8mm; max-width: none; }
+.empty { color: var(--mist); font-size: 9pt; }
+.disclaimer { font: 400 7.5pt/1.8 'DC Text', sans-serif; color: var(--mist); max-width: none; border-top: var(--hair) solid var(--frost); padding-top: 3mm; margin-top: 10mm; }
 
 /* الطباعة */
-section { break-inside: auto; } h2, h3, figcaption { break-after: avoid; }
-figure, table, .kpis, .stats, .twocol { break-inside: avoid; }
+h2, h3, .secno, figcaption, .sechead, .thesis { break-after: avoid; }
+.sechead { break-inside: avoid; }
+/* رأس القسم لا يبقى وحيداً أسفل الصفحة: يُحجز له مع أول محتوى ارتفاع كافٍ */
+.sechead::after { content: ""; display: block; height: 0; }
+section:not(.newpage) { break-before: auto; }
+section > .thesis { break-inside: avoid; }
+figure, table, .band, .twocol, .rail, .callout { break-inside: avoid; }
 section.closing { break-inside: avoid; }
-section > h2 + .reading, section > h2 + .stats { break-before: avoid; }
 @media print {
   body { background: #fff; }
-  .sheet { box-shadow: none; margin: 0; padding: 0; max-width: none; }
+  .sheet { margin: 0; padding: 0; width: auto; }
   .toolbar { display: none; }
-  h2.newpage { break-before: page; margin-top: 0; }
+  section.newpage { break-before: page; margin-top: 0; }
 }
-@media screen and (max-width: 720px) {
-  .sheet { padding: 8mm 5mm; } .kpis { grid-template-columns: 1fr 1fr; } .twocol { grid-template-columns: 1fr; }
-  .kpi:not(:nth-child(3n)) { border-inline-end: 0; } .cover h1 { font-size: 26pt; }
-  table { display: block; overflow-x: auto; }
+@media screen and (max-width: 760px) {
+  .sheet { padding: 10mm 6mm; } .band, .band.small { grid-template-columns: 1fr 1fr; } .twocol, .rail { grid-template-columns: 1fr 1fr; }
+  .cover h1 { font-size: 22pt; } table { display: block; overflow-x: auto; }
 }
 """
 
@@ -679,18 +741,29 @@ def render_html(metrics: dict, text: dict, title: str, report_id: Optional[int] 
     metric_key = "value" if basis_value else "pieces"
     metric_fmt = _omr if basis_value else _n
     pct = lambda v: f"{v:.1f}%" if v is not None else "—"
+    period_name = per.get("label") or title
+    ref = f"FDC-RPT-{per['start'][:7].replace('-', '')}-{per['kind'][0].upper()}{report_id or ''}"
 
     def kpi(label, key, fmt):
         x = k[key]
-        return (f'<div class="kpi"><div class="label">{label}</div><div class="value">{fmt(x["current"])}</div>'
+        return (label, fmt(x["current"]),
                 f'<div class="cmp"><span>عن {escape(per["previous_label"])}</span>{_delta(x["vs_previous_pct"])}</div>'
-                f'<div class="cmp"><span>عن {escape(per["last_year_label"])}</span>{_delta(x["vs_last_year_pct"])}</div></div>')
+                f'<div class="cmp"><span>عن {escape(per["last_year_label"])}</span>{_delta(x["vs_last_year_pct"])}</div>')
 
-    kpis = (kpi("قيمة الطلبيات", "value", _omr) + kpi("الكمية بالحبة", "pieces", _n) + kpi("الوزن بالكيلوجرام", "kg", lambda v: _n(v, 1))
-            + kpi("عدد الطلبيات", "orders", _n) + kpi("العملاء النشطون", "customers", _n) + kpi("الفروع المخدومة", "branches", _n))
+    def small(pairs):
+        return _band([(lbl, val, "") for lbl, val in pairs]).replace('class="band"', 'class="band small"', 1)
 
-    def reading(key):
-        return f'<p class="reading">{escape(text.get(key) or "")}</p>' if text.get(key) else ""
+    def thesis(key):
+        return f'<p class="thesis">{_esc_ar(text.get(key))}</p>' if text.get(key) else ""
+
+    def section(no, name, body, newpage=False):
+        # جملة الخلاصة تبقى مع العنوان في كتلة واحدة لا تنقسم
+        lead = ""
+        if body.startswith('<p class="thesis">'):
+            cut = body.index("</p>") + 4
+            lead, body = body[:cut], body[cut:]
+        return (f'<section class="{"newpage" if newpage else ""}"><div class="sechead"><div class="eyebrow secno">القسم {to_eastern(f"{no:02d}")}</div>'
+                f'<h2>{escape(name)}</h2>{lead}</div>{body}</section>')
 
     value_cell = lambda x: _omr(x["value"]) if basis_value else "—"
     cust_rows = [[escape(x["customer"]), value_cell(x), _n(x["pieces"]), _n(x["kg"], 1), _n(x["orders"]), _n(x["branches"]),
@@ -699,90 +772,117 @@ def render_html(metrics: dict, text: dict, title: str, report_id: Optional[int] 
                   value_cell(x), _n(x["customers"]), _delta(x.get("vs_previous_pct"))] for x in s["by_product"][:15]]
     team_rows = [[escape(x["rep"]), _n(x["assigned_customers"]), _n(x["active_customers"]), _n(x["new_customers"]), _n(x["pieces"]),
                   _omr(x["value"]), _omr(x["target"]) if x["target"] else "—", pct(x["achievement_pct"]),
-                  f'{x["samples_converted"]} من {x["samples"]}', _omr(x["expenses"]),
-                  f'{x["response_median_min"]} دقيقة' if x["response_median_min"] is not None else "—"] for x in t]
+                  f'{x["samples_converted"]}/{x["samples"]}', _omr(x["expenses"]),
+                  f'{x["response_median_min"]} د' if x["response_median_min"] is not None else "—"] for x in t]
     change_rows = lambda lst: [[escape(x["customer"]), metric_fmt(x["current"]), metric_fmt(x["previous"]), _delta(x["change_pct"])] for x in lst]
     conc = s["concentration_top3"]
 
-    period_name = per.get("label") or title
-    generated = _date_ar(datetime.now(order_engine.BUSINESS_TZ).date())
+    # كتلة تنبيه واحدة لكل قسم (من الأرقام المحسوبة، دون نص مولّد)
+    top3 = "، ".join(x["customer"] for x in s["by_customer"][:3])
+    sales_call = (_callout("تركّز الطلب", f'يمثل أكبر ثلاثة عملاء ({escape(top3)}) <b>{to_eastern(pct(conc))}</b> من '
+                           + ("قيمة الطلبيات" if basis_value else "الكمية") + '. أي تراجع لأحدهم ينعكس مباشرة على الإجمالي.')
+                  if conc is not None and conc >= 60 and len(s["by_customer"]) > 3 else "")
+    watch = [x["customer"] for x in c["lost"]] + [x["customer"] for x in c["declining"]]
+    cust_call = _callout("عملاء يحتاجون زيارة هذا الشهر", escape("، ".join(watch))) if watch else ""
+    high = [x for x in q["complaints_by_product"] if x["high"]]
+    qual_call = (_callout("شكاوى عالية الخطورة", "، ".join(f'{escape(x["product"])} ({to_eastern(_n(x["high"]))})' for x in high)
+                          + "، تحتاج متابعة فورية مع الإنتاج.").replace("(", "(").replace(")", ")") if high else "")
+    team_call = (_callout("رسائل عملاء بلا رد",
+                          f'<b>{to_eastern(_n(r["unanswered_24h"]))}</b> محادثة لم يرد عليها أحد من الفريق خلال {to_eastern("24")} ساعة.')
+                 if r["unanswered_24h"] else "")
+
+    sales_body = (thesis("sales_comment")
+                  + (_column_chart(s["daily"], "date", "pieces", "الكمية المسلّمة في كل يوم تسليم · حبة") if per["kind"] == "month" else "")
+                  + _bar_chart(s["by_customer"], "customer", metric_key, metric_fmt, "أكبر العملاء · " + ("قيمة الطلبيات" if basis_value else "الكمية بالحبة"))
+                  + sales_call
+                  + _table(["العميل", "القيمة", "حبة", "كجم", "طلبيات", "فروع", "عن الفترة السابقة"], cust_rows, num_cols=(1, 2, 3, 4, 5, 6))
+                  + _bar_chart(s["by_product"], "product", metric_key, metric_fmt, "أكثر المنتجات طلباً · " + ("القيمة" if basis_value else "الكمية بالحبة"))
+                  + _table(["المنتج", "الكود", "الفئة", "حبة", "كجم", "القيمة", "عملاء", "عن الفترة السابقة"], prod_rows, num_cols=(1, 3, 4, 5, 6, 7))
+                  + '<div class="twocol"><div><h3>حسب فئة المنتج</h3>'
+                  + _table(["الفئة", "حبة", "القيمة"], [[escape(x["category"]), _n(x["pieces"]), value_cell(x)] for x in s["by_category"]], num_cols=(1, 2))
+                  + '</div><div><h3>حسب المنطقة</h3>'
+                  + _table(["المنطقة", "حبة", "القيمة", "عملاء"], [[escape(x["region"]), _n(x["pieces"]), value_cell(x), _n(x["customers"])] for x in s["by_region"]], num_cols=(1, 2, 3))
+                  + '</div></div>'
+                  + _column_chart(s["by_weekday"], "weekday", "pieces", "توزيع الكمية على أيام التسليم · حبة · لتخطيط الإنتاج والتوصيل"))
+
+    cust_body = (thesis("customers_comment")
+                 + small([("العملاء المسجلون", _n(c["registered"])), ("النشطون في الفترة", _n(c["active"])),
+                          ("النشطون في الفترة السابقة", _n(c["active_prev"])), ("متوسط الأيام بين الطلبيات", _n(c["avg_days_between_orders"], 1))])
+                 + cust_call
+                 + f'<div class="twocol"><div><h3>عملاء جدد</h3>{_list(c["new"], "good")}</div>'
+                 + f'<div><h3>عملاء توقفوا عن الطلب</h3>{_list([x["customer"] for x in c["lost"]], "bad")}</div></div>'
+                 + '<h3>عملاء متراجعون بنسبة 30% أو أكثر</h3>'.replace("30%", to_eastern("30%"))
+                 + _table(["العميل", "الفترة الحالية", "الفترة السابقة", "التغير"], change_rows(c["declining"]), "لا يوجد عملاء متراجعون", num_cols=(1, 2, 3))
+                 + '<h3>عملاء متنامون بنسبة 30% أو أكثر</h3>'.replace("30%", to_eastern("30%"))
+                 + _table(["العميل", "الفترة الحالية", "الفترة السابقة", "التغير"], change_rows(c["growing"]), "لا يوجد", num_cols=(1, 2, 3)))
+
+    team_body = (thesis("team_comment")
+                 + _table(["المندوب", "مسندون", "نشطون", "جدد", "حبة", "القيمة", "الهدف", "التحقيق", "عينات", "المصاريف", "زمن الرد"], team_rows, num_cols=tuple(range(1, 11)))
+                 + '<h3>سرعة الرد على العملاء في المجموعات</h3>'
+                 + small([("وسيط زمن أول رد", f'{r["median_min"]} د' if r["median_min"] is not None else "—"),
+                          ("الرد خلال 30 دقيقة", pct(r["within_30min_pct"])),
+                          ("محادثات بلا رد خلال 24 ساعة", _n(r["unanswered_24h"])),
+                          ("إجمالي المحادثات", _n(r["turns"] + r["unanswered_24h"]))])
+                 + team_call)
+
+    qual_body = (thesis("quality_comment")
+                 + small([("الشكاوى", _n(q["complaints_total"])), ("عالية الخطورة", _n(q["complaints_high"])),
+                          ("نسبة المغلقة", pct(q["complaints_resolved_pct"])), ("الاستفسارات", _n(q["inquiries_total"]))])
+                 + qual_call
+                 + _bar_chart(q["complaints_by_category"], "category", "count", _n, "الشكاوى حسب النوع")
+                 + '<h3>الشكاوى حسب المنتج، للإنتاج والبحث والتطوير</h3>'
+                 + _table(["المنتج", "شكاوى", "عالية الخطورة", "المباع · حبة", "لكل 10,000 حبة"], [[escape(x["product"]), _n(x["complaints"]), _n(x["high"]), _n(x["pieces_sold"]), _n(x["per_10k_pieces"], 2)] for x in q["complaints_by_product"]], "لا توجد شكاوى في هذه الفترة", num_cols=(1, 2, 3, 4))
+                 + '<div class="twocol"><div><h3>الاستفسارات</h3>'
+                 + _table(["الموضوع", "العدد"], [[escape(x["category"]), _n(x["count"])] for x in q["inquiries_by_category"]]
+                          + [["<span class='eyebrow'>أجاب البوت</span>", _n(q["inquiries_answered_by_bot"])], ["<span class='eyebrow'>حُوّلت للفريق</span>", _n(q["inquiries_escalated"])]], "", num_cols=(1,))
+                 + '</div><div><h3>العينات</h3>'
+                 + _table(["الحالة", "العدد", "قيمة الطلبيات"], [[escape(x["status"]), _n(x["count"]), _omr(x["po_value"])] for x in q["samples_by_status"]], "لا توجد عينات في هذه الفترة", num_cols=(1, 2))
+                 + _table(["المنتج", "عينات", "تحولت"], [[escape(x["product_name"] or "—"), _n(x["n"]), _n(x["conv"])] for x in q["samples_by_product"]], "", num_cols=(1, 2))
+                 + '</div></div>')
+
+    ops_body = (small([("الطلبيات", _n(o["orders_total"])), ("الملغاة", _n(o["orders_cancelled"])),
+                       ("احتاجت تأكيداً", _n(o["confirmations"])), ("وسيط زمن الاعتماد", f'{o["median_minutes_to_confirm"]} د' if o["median_minutes_to_confirm"] is not None else "—")])
+                + _table(["المؤشر", "العدد"], [["اعتُمدت", _n(o["confirmations_approved"])], ["رُفضت", _n(o["confirmations_rejected"])],
+                                               ["انتهت دون رد", _n(o["confirmations_expired"])], ["طلبات تأكيد توفر", _n(o["confirmations_availability"])],
+                                               ["رسائل العملاء في المجموعات", _n(o["customer_messages"])], ["رسائل البوت", _n(o["bot_messages"])]]
+                         + [[f"اعتمدها: {escape(k_)}", _n(v)] for k_, v in o["approved_by"].items()], "", num_cols=(1,)))
+
+    recs = text.get("recommendations") or []
+    footer_mid = f'{KIND_TITLE.get(per["kind"], "")} · {period_name}'.replace('"', "")
 
     return f"""<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{escape(title)}</title><style>{CSS}</style></head><body>
+<title>{escape(title)}</title><style>{CSS.replace("__FOOTER_MID__", footer_mid.replace(chr(92), "").replace('"', ""))}</style></head><body>
 <nav class="toolbar"><button onclick="window.print()">طباعة أو حفظ PDF</button>{f'<a href="/api/reports/{report_id}/excel">تنزيل البيانات Excel</a>' if report_id else ''}</nav>
 <main class="sheet">
-<header class="cover">
-  <div class="brandline">{f'<img src="{logo}" alt="شركة تنمية الغذاء">' if logo else '<b>شركة تنمية الغذاء</b>'}<span class="conf">للاستخدام الداخلي</span></div>
-  <p class="kind">{escape(KIND_TITLE.get(per["kind"], title))}</p>
-  <h1>{escape(period_name)}</h1>
-  <p class="range">الفترة من {_date_ar(per["start"])} إلى {_date_ar(per["end"])}، أُعدّ في {generated}</p>
-</header>
+<header class="docheader">{f'<img src="{logo}" alt="شركة تنمية الغذاء">' if logo else '<b>شركة تنمية الغذاء</b>'}<span class="eyebrow">تقرير الإدارة · للاستخدام الداخلي</span></header>
 
-<section><h2 class="first">الملخص التنفيذي</h2>
-  {f'<p class="headline">{escape(text.get("headline") or "")}</p>' if text.get("headline") else ''}
-  {f'<p class="summary">{escape(text.get("executive_summary") or "")}</p>' if text.get("executive_summary") else ''}
-  <div class="kpis">{kpis}</div>
+<div class="cover">
+  <div class="eyebrow class">{escape(KIND_TITLE.get(per["kind"], title))} · {escape(period_name)}</div>
+  <h1>{_esc_ar(text.get("headline") or period_name)}</h1>
+  {f'<p class="lede">{_esc_ar(text.get("executive_summary"))}</p>' if text.get("executive_summary") else ''}
+  <div class="rail">
+    <div><div class="eyebrow">الفترة</div><div class="value" dir="ltr" style="text-align:right">{(date.fromisoformat(per["start"]).strftime("%d.%m") if per["start"][:4] == per["end"][:4] else _date_mono(per["start"]))} – {_date_mono(per["end"])}</div></div>
+    <div><div class="eyebrow">تاريخ الإصدار</div><div class="value">{datetime.now(order_engine.BUSINESS_TZ):%d.%m.%Y}</div></div>
+    <div><div class="eyebrow">مُعدّ لـ</div><div class="value text">الإدارة العليا</div></div>
+    <div><div class="eyebrow">المرجع</div><div class="value">{escape(ref)}</div></div>
+  </div>
+  {_band([kpi("قيمة الطلبيات · ر.ع", "value", lambda v: f"{v:,.3f}"), kpi("الكمية · حبة", "pieces", _n), kpi("الوزن · كجم", "kg", lambda v: _n(v, 1)),
+          kpi("عدد الطلبيات", "orders", _n), kpi("العملاء النشطون", "customers", _n), kpi("الفروع المخدومة", "branches", _n)])}
   <div class="twocol"><div><h3>أبرز الإنجازات</h3>{_list(text.get("highlights") or [], "good")}</div>
   <div><h3>المخاطر والتنبيهات</h3>{_list(text.get("risks") or [], "bad")}</div></div>
-</section>
+</div>
 
-<section><h2 class="newpage">١. المبيعات والطلبيات</h2>{reading("sales_comment")}
-  {_column_chart(s["daily"], "date", "pieces", "الكمية المسلّمة في كل يوم تسليم (حبة)") if per["kind"] == "month" else ''}
-  {_bar_chart(s["by_customer"], "customer", metric_key, metric_fmt, "أكبر العملاء " + ("بقيمة الطلبيات" if basis_value else "بالكمية (حبة)"))}
-  {_stats([("حصة أكبر 3 عملاء من الإجمالي", pct(conc) + (' <span class="chg down">تركّز مرتفع</span>' if (conc or 0) >= 60 else ''))])}
-  {_table(["العميل", "القيمة", "حبة", "كجم", "طلبيات", "فروع", "عن الفترة السابقة"], cust_rows, num_cols=(1, 2, 3, 4, 5, 6))}
-  {_bar_chart(s["by_product"], "product", metric_key, metric_fmt, "أكثر المنتجات طلباً " + ("بالقيمة" if basis_value else "بالكمية (حبة)"))}
-  {_table(["المنتج", "الكود", "الفئة", "حبة", "كجم", "القيمة", "عملاء", "عن الفترة السابقة"], prod_rows, num_cols=(3, 4, 5, 6, 7))}
-  <div class="twocol"><div><h3>حسب فئة المنتج</h3>{_table(["الفئة", "حبة", "القيمة"], [[escape(x["category"]), _n(x["pieces"]), value_cell(x)] for x in s["by_category"]], num_cols=(1, 2))}</div>
-  <div><h3>حسب المنطقة</h3>{_table(["المنطقة", "حبة", "القيمة", "عملاء"], [[escape(x["region"]), _n(x["pieces"]), value_cell(x), _n(x["customers"])] for x in s["by_region"]], num_cols=(1, 2, 3))}</div></div>
-  {_column_chart(s["by_weekday"], "weekday", "pieces", "توزيع الكمية على أيام التسليم (حبة)، لتخطيط الإنتاج والتوصيل")}
-</section>
+{section(1, "المبيعات والطلبيات", sales_body, newpage=True)}
+{section(2, "صحة قاعدة العملاء", cust_body)}
+{section(3, "أداء فريق المبيعات", team_body)}
+{section(4, "الجودة وملاحظات العملاء", qual_body)}
+{section(5, "العمليات والمساعد الذكي", ops_body)}
 
-<section><h2>٢. صحة قاعدة العملاء</h2>{reading("customers_comment")}
-  {_stats([("العملاء المسجلون", _n(c["registered"])), ("النشطون في الفترة", _n(c["active"])), ("النشطون في الفترة السابقة", _n(c["active_prev"])),
-           ("متوسط الأيام بين الطلبيات", _n(c["avg_days_between_orders"], 1))])}
-  <div class="twocol"><div><h3>عملاء جدد ({len(c["new"])})</h3>{_list(c["new"], "good")}</div>
-  <div><h3>عملاء توقفوا عن الطلب ({len(c["lost"])})</h3>{_list([x["customer"] for x in c["lost"]], "bad")}</div></div>
-  <h3>عملاء متراجعون بنسبة 30% أو أكثر</h3>
-  {_table(["العميل", "الفترة الحالية", "الفترة السابقة", "التغير"], change_rows(c["declining"]), "لا يوجد عملاء متراجعون", num_cols=(1, 2, 3))}
-  <h3>عملاء متنامون بنسبة 30% أو أكثر</h3>
-  {_table(["العميل", "الفترة الحالية", "الفترة السابقة", "التغير"], change_rows(c["growing"]), "لا يوجد", num_cols=(1, 2, 3))}
-</section>
-
-<section><h2>٣. أداء فريق المبيعات</h2>{reading("team_comment")}
-  {_table(["المندوب", "عملاء مسندون", "نشطون", "جدد", "حبة", "القيمة", "الهدف", "التحقيق", "عينات تحولت", "المصاريف", "زمن الرد"], team_rows, num_cols=tuple(range(1, 11)))}
-  <h3>سرعة الرد على العملاء في المجموعات</h3>
-  {_stats([("وسيط زمن أول رد", f'{r["median_min"]} دقيقة' if r["median_min"] is not None else "—"),
-           ("الرد خلال 30 دقيقة", pct(r["within_30min_pct"])),
-           ("محادثات بلا رد خلال 24 ساعة", f'{_n(r["unanswered_24h"])} من {_n(r["turns"] + r["unanswered_24h"])}')])}
-</section>
-
-<section><h2>٤. الجودة وملاحظات العملاء</h2>{reading("quality_comment")}
-  {_stats([("الشكاوى", _n(q["complaints_total"])), ("عالية الخطورة", _n(q["complaints_high"])), ("نسبة المغلقة", pct(q["complaints_resolved_pct"]))])}
-  {_bar_chart(q["complaints_by_category"], "category", "count", _n, "الشكاوى حسب النوع")}
-  <h3>الشكاوى حسب المنتج، للإنتاج والبحث والتطوير</h3>
-  {_table(["المنتج", "شكاوى", "عالية الخطورة", "الكمية المباعة (حبة)", "لكل 10,000 حبة"], [[escape(x["product"]), _n(x["complaints"]), _n(x["high"]), _n(x["pieces_sold"]), _n(x["per_10k_pieces"], 2)] for x in q["complaints_by_product"]], "لا توجد شكاوى في هذه الفترة", num_cols=(1, 2, 3, 4))}
-  <div class="twocol"><div><h3>الاستفسارات</h3>
-    {_stats([("الإجمالي", _n(q["inquiries_total"])), ("أجاب البوت", _n(q["inquiries_answered_by_bot"])), ("حُوّلت للفريق", _n(q["inquiries_escalated"]))])}
-    {_table(["الموضوع", "العدد"], [[escape(x["category"]), _n(x["count"])] for x in q["inquiries_by_category"]], "", num_cols=(1,))}</div>
-  <div><h3>العينات</h3>
-    {_table(["الحالة", "العدد", "قيمة الطلبيات الناتجة"], [[escape(x["status"]), _n(x["count"]), _omr(x["po_value"])] for x in q["samples_by_status"]], "لا توجد عينات في هذه الفترة", num_cols=(1, 2))}
-    {_table(["المنتج", "عينات", "تحولت لطلب"], [[escape(x["product_name"] or "—"), _n(x["n"]), _n(x["conv"])] for x in q["samples_by_product"]], "", num_cols=(1, 2))}</div></div>
-</section>
-
-<section><h2>٥. العمليات والمساعد الذكي</h2>
-  {_stats([("الطلبيات", _n(o["orders_total"])), ("الملغاة", _n(o["orders_cancelled"])), ("احتاجت تأكيداً", _n(o["confirmations"])),
-           ("منها طلب تأكيد توفر", _n(o["confirmations_availability"])), ("وسيط زمن الاعتماد", f'{o["median_minutes_to_confirm"]} دقيقة' if o["median_minutes_to_confirm"] is not None else "—")])}
-  {_stats([("اعتُمدت", _n(o["confirmations_approved"])), ("رُفضت", _n(o["confirmations_rejected"])), ("انتهت دون رد", _n(o["confirmations_expired"])),
-           ("رسائل العملاء في المجموعات", _n(o["customer_messages"])), ("رسائل البوت", _n(o["bot_messages"]))])}
-  {_table(["من اعتمد الطلبات المعلّقة", "العدد"], [[escape(k_), _n(v)] for k_, v in o["approved_by"].items()], "", num_cols=(1,))}
-</section>
-
-<section class="closing"><h2>٦. التوصيات</h2>
-  {('<ol class="recs">' + "".join(f"<li>{escape(x)}</li>" for x in text.get("recommendations") or []) + '</ol>') if text.get("recommendations") else '<p class="empty">لا توجد توصيات.</p>'}
-  <p class="note">الأرقام محسوبة مباشرة من سجلات النظام، والنص التحليلي مكتوب آلياً اعتماداً على هذه الأرقام فقط.
+<section class="closing"><div class="sechead"><div class="eyebrow secno">القسم {to_eastern("06")}</div><h2>التوصيات والخطوات التالية</h2></div>
+  {('<ol class="recs">' + "".join(f"<li><span>{_esc_ar(x)}</span></li>" for x in recs) + '</ol>') if recs else '<p class="empty">لا توجد توصيات.</p>'}
+  <p class="disclaimer">الأرقام محسوبة مباشرة من سجلات النظام، والنص التحليلي مكتوب آلياً اعتماداً على هذه الأرقام فقط.
   البيانات متوفرة منذ {_date_ar(notes["data_since"]) if notes["data_since"] else "—"}.
-  نسبة أسطر الطلبات المحوّلة إلى حبات وكيلوجرام {pct(notes["converted_share"])}، والمسعّرة {pct(notes["priced_share"])}.
+  نسبة أسطر الطلبات المحوّلة إلى حبات وكيلوجرام {to_eastern(pct(notes["converted_share"]))}، والمسعّرة {to_eastern(pct(notes["priced_share"]))}.
   {'' if notes["has_last_year"] else 'لا تتوفر بعد بيانات لنفس الفترة من العام الماضي. '}{'' if notes["has_previous"] else 'لا تتوفر بعد بيانات للفترة السابقة.'}</p>
 </section>
 </main></body></html>"""

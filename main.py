@@ -1913,8 +1913,8 @@ REPORT_FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fon
 
 @app.get("/report-fonts/{name}")
 def report_font(name: str):
-    """خط التقارير (IBM Plex Sans Arabic، رخصة OFL) - ملفات محددة فقط"""
-    if not re.fullmatch(r"plex-arabic-(arabic|latin)-(400|500|700)\.woff2", name):
+    """خطوط التقارير حسب الهوية (IBM Plex Sans Arabic، Plus Jakarta Sans، Almarai، Spectral، IBM Plex Mono - رخصة OFL)"""
+    if not re.fullmatch(r"(text-(ar|la)-(400|500|600)|disp-ar-(300|400|700|800)|disp-la-(300|400|600)|mono-(400|500))\.woff2", name):
         raise HTTPException(status_code=404)
     return FileResponse(os.path.join(REPORT_FONTS_DIR, name), media_type="font/woff2",
                         headers={"Cache-Control": "public, max-age=31536000, immutable"})
