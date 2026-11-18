@@ -693,6 +693,9 @@
             </div>
 
             <div class="pt-2 border-t flex flex-col gap-2">
+                <button onclick="requestNewWhatsAppQR()" id="wa-request-qr-btn" class="hidden w-full py-2.5 bg-[#3A056A] hover:bg-purple-900 text-white font-bold rounded-xl shadow-xs transition">
+                    توليد رمز QR للربط
+                </button>
                 <button onclick="forceDisconnectWhatsAppDirect()" id="wa-disconnect-btn" class="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-xs transition">
                     تسجيل الخروج وإعادة مسح الرمز (QR Code)
                 </button>
@@ -1158,16 +1161,41 @@
                 } else {
                     if (btn) btn.className = "flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition border bg-amber-50 text-amber-800 border-amber-300 cursor-pointer";
                     if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
-                    if (text) text.innerText = "واتساب: بانتظار المسح";
-                    if (modalStatusText) modalStatusText.innerHTML = '<span class="text-amber-800">⚠️ الجلسة غير متصلة. يرجى مسح رمز الاستجابة السريعة (QR) أدناه:</span>';
+                    const reqBtn = document.getElementById('wa-request-qr-btn');
+                    const isPaused = data.state === 'paused' || data.state === 'replaced';
+                    if (reqBtn) reqBtn.classList.toggle('hidden', !isPaused);
 
-                    if (data.qr && qrImg) {
-                        qrImg.src = data.qr;
-                        if (qrContainer) qrContainer.classList.remove('hidden');
+                    if (isPaused) {
+                        // تم إيقاف المحاولات التلقائية بعد انتهاء رمز QR عدة مرات دون مسح
+                        if (text) text.innerText = "واتساب: متوقف - اطلب رمز QR";
+                        if (modalStatusText) modalStatusText.innerHTML = data.state === 'replaced'
+                            ? '<span class="text-red-700">⚠️ تم فتح الجلسة من جهاز آخر. اضغط "توليد رمز QR" لإعادة الربط هنا.</span>'
+                            : '<span class="text-amber-800">⏸️ توقفت محاولات الربط لعدم مسح الرمز. اضغط "توليد رمز QR" عندما تكون جاهزاً للمسح.</span>';
+                        if (qrContainer) qrContainer.classList.add('hidden');
+                    } else if (data.state === 'service_down') {
+                        if (text) text.innerText = "واتساب: الخدمة لا تستجيب";
+                        if (modalStatusText) modalStatusText.innerHTML = '<span class="text-red-700">⚠️ خدمة الواتساب لا تستجيب على الخادم.</span>';
+                        if (qrContainer) qrContainer.classList.add('hidden');
+                    } else {
+                        if (text) text.innerText = "واتساب: بانتظار المسح";
+                        if (modalStatusText) modalStatusText.innerHTML = '<span class="text-amber-800">⚠️ الجلسة غير متصلة. يرجى مسح رمز الاستجابة السريعة (QR) أدناه:</span>';
+                        if (data.qr && qrImg) {
+                            qrImg.src = data.qr;
+                            if (qrContainer) qrContainer.classList.remove('hidden');
+                        }
                     }
                     if (disBtn) disBtn.classList.add('hidden');
                 }
             } catch(e) {}
+        };
+
+        window.requestNewWhatsAppQR = async function() {
+            const btn = document.getElementById('wa-request-qr-btn');
+            if (btn) btn.classList.add('hidden');
+            try {
+                await fetch('/api/whatsapp/request-qr', { method: 'POST' });
+            } catch (e) {}
+            setTimeout(checkWhatsAppLiveStatus, 3000);
         };
 
         window.forceDisconnectWhatsAppDirect = async function() {
