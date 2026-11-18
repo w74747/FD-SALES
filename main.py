@@ -31,8 +31,9 @@ from typing import Optional, List, Dict
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Response, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse
 from pydantic import BaseModel
+import security
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pyotp
@@ -333,6 +334,11 @@ def save_dispatched_order_items(customer_id: int, customer_name: str, branch_nam
             parsed_date = datetime.now().date()
 
         with conn.cursor() as cur:
+            # عند تعديل العميل لرسالة الطلب (أو إعادة إرسال الـ webhook) تُستبدل أصناف الطلبية السابقة بالكامل
+            # حتى تعكس الإحصائيات النسخة الأخيرة من الطلب فقط
+            if message_id:
+                cur.execute("DELETE FROM dispatched_orders WHERE message_id = %s;", (message_id,))
+
             for item in cleaned_items:
                 if not item or item == "Items specified in customer communication":
                     continue
@@ -366,10 +372,12 @@ def save_dispatched_order_items(customer_id: int, customer_name: str, branch_nam
                 cur.execute("""
                 INSERT INTO dispatched_orders (customer_id, customer_name, branch_name, order_date, item_name, quantity, unit, message_id)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (message_id) DO NOTHING;
-                """, (customer_id, customer_name, branch_name, parsed_date, item_name, qty, unit, message_id))
+                ON CONFLICT (message_id, item_name) WHERE message_id IS NOT NULL
+                DO UPDATE SET quantity = dispatched_orders.quantity + EXCLUDED.quantity;
+                """, (customer_id, customer_name, branch_name, parsed_date, item_name[:200], qty, unit, message_id))
             conn.commit()
     except Exception as e:
+        conn.rollback()
         logger.error(f"Error saving dispatched order items: {e}")
     finally:
         conn.close()
@@ -627,12 +635,6 @@ def init_database():
             """)
 
             cur.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatched_orders_msg_id 
-            ON dispatched_orders (message_id) 
-            WHERE message_id IS NOT NULL;
-            """)
-
-            cur.execute("""
             UPDATE dispatched_orders 
             SET item_name = 'Burger Buns (Standard)' 
             WHERE item_name ILIKE '%في مجال%' OR item_name ILIKE '%طلب اليوم%';
@@ -729,6 +731,21 @@ def init_database():
     run_isolated_ddl("ALTER TABLE whatsapp_logs ADD COLUMN IF NOT EXISTS sender_phone VARCHAR(50) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE dispatched_orders ADD COLUMN IF NOT EXISTS message_id VARCHAR(100);")
 
+    # الطلبية الواحدة (رسالة واتساب واحدة) قد تحتوي عدة أصناف، لذلك يكون التفرد على (رقم الرسالة + الصنف)
+    # بدلاً من رقم الرسالة وحده الذي كان يُسقط كل الأصناف بعد الأول ويُفشل الإدخال بالكامل.
+    run_isolated_ddl("DROP INDEX IF EXISTS idx_dispatched_orders_msg_id;")
+    run_isolated_ddl("ALTER TABLE dispatched_orders DROP CONSTRAINT IF EXISTS dispatched_orders_message_id_key;")
+    run_isolated_ddl("""
+        DELETE FROM dispatched_orders a USING dispatched_orders b
+        WHERE a.message_id IS NOT NULL AND a.message_id = b.message_id
+          AND a.item_name = b.item_name AND a.id > b.id;
+    """)
+    run_isolated_ddl("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatched_orders_msg_item
+        ON dispatched_orders (message_id, item_name) WHERE message_id IS NOT NULL;
+    """)
+    run_isolated_ddl("ALTER TABLE customer_accounts ALTER COLUMN contact_person SET DEFAULT '';")
+
 def start_whatsapp_service():
     global whatsapp_process
     if os.path.exists("whatsapp_service.js"):
@@ -750,15 +767,44 @@ async def lifespan(app: FastAPI):
     if whatsapp_process:
         whatsapp_process.terminate()
 
-app = FastAPI(title="FDC Sales CRM", version="23.3.0", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# توثيق الـ API التلقائي (/docs, /openapi.json) معطّل لعدم كشف خريطة المسارات للعموم
+app = FastAPI(
+    title="FDC Sales CRM", version="24.0.0", lifespan=lifespan,
+    docs_url=None, redoc_url=None, openapi_url=None
 )
+
+# اللوحة تُخدم من نفس النطاق، لذلك CORS مغلق افتراضياً.
+# لفتحه لنطاقات محددة: ALLOWED_ORIGINS=https://a.com,https://b.com
+_allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+if _allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["Content-Type"],
+    )
+
+
+@app.middleware("http")
+async def enforce_server_side_auth(request: Request, call_next):
+    """
+    بوابة الأمان المركزية:
+    - المسارات الداخلية (جلسة الواتساب/Webhook) تتطلب التوكن الداخلي فقط.
+    - بقية مسارات /api تتطلب جلسة دخول صالحة بعد التحقق الثنائي.
+    """
+    kind = security.classify_path(request.url.path)
+    if request.method == "OPTIONS" or kind in ("public", "static"):
+        return await call_next(request)
+
+    if kind == "internal":
+        if not security.is_valid_internal_token(request.headers.get(security.INTERNAL_TOKEN_HEADER)):
+            return JSONResponse({"detail": "Forbidden"}, status_code=403)
+        return await call_next(request)
+
+    if not security.verify_session_token(request.cookies.get(security.SESSION_COOKIE_NAME)):
+        return JSONResponse({"detail": "يجب تسجيل الدخول"}, status_code=401)
+    return await call_next(request)
 
 @app.get("/logo.png")
 def get_logo():
@@ -771,6 +817,12 @@ def get_logo():
 # ----------------- نماذج Pydantic -----------------
 class Verify2FAPayload(BaseModel):
     code: str
+
+class Setup2FAPayload(BaseModel):
+    setup_token: str
+
+class LogisticsGroupPayload(BaseModel):
+    group_id: str
 
 class InboundWelcomeConfigPayload(BaseModel):
     is_enabled: bool
@@ -796,6 +848,7 @@ class CreateCustomerPayload(BaseModel):
     sector: Optional[str] = "مطاعم"
     region: Optional[str] = "مسقط"
     phone: str
+    contact_person: Optional[str] = ""
     assigned_rep_id: Optional[int] = None
     assigned_rep_name: Optional[str] = ""
     whatsapp_group_id: Optional[str] = ""
@@ -896,31 +949,115 @@ class SessionSnapshotPayload(BaseModel):
     snapshot: Dict[str, str]
 
 # ----------------- مسار التحقق 2FA -----------------
-@app.post("/api/auth/2fa/verify")
-def verify_2fa(payload: Verify2FAPayload):
+def _set_session_cookie(response: Response, username: str):
+    response.set_cookie(
+        key=security.SESSION_COOKIE_NAME,
+        value=security.create_session_token(username),
+        max_age=security.SESSION_TTL_SECONDS,
+        httponly=True,
+        secure=security.COOKIE_SECURE,
+        samesite="strict",
+        path="/",
+    )
+
+
+@app.get("/api/auth/status")
+def auth_status(request: Request):
+    """حالة الدخول وحالة تفعيل 2FA لعرض الشاشة المناسبة في اللوحة"""
+    authenticated = bool(security.verify_session_token(request.cookies.get(security.SESSION_COOKIE_NAME)))
+    two_fa_enabled = False
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT is_2fa_enabled FROM system_auth WHERE username = 'admin';")
+                row = cur.fetchone()
+                two_fa_enabled = bool(row and row["is_2fa_enabled"])
+        finally:
+            conn.close()
+    return {
+        "authenticated": authenticated,
+        "two_fa_enabled": two_fa_enabled,
+        "setup_available": bool(security.ADMIN_SETUP_TOKEN),
+    }
+
+
+@app.post("/api/auth/2fa/setup")
+def setup_2fa(payload: Setup2FAPayload):
+    """
+    إعداد (أو إعادة ضبط) التحقق الثنائي للمدير.
+    يتطلب ADMIN_SETUP_TOKEN المعرّف في Railway؛ يولّد مفتاحاً جديداً ويعرض رمز QR مرة واحدة.
+    """
+    if not security.ADMIN_SETUP_TOKEN:
+        raise HTTPException(status_code=403, detail="إعداد 2FA معطّل: عرّف المتغير ADMIN_SETUP_TOKEN في Railway أولاً")
+    if not security.is_valid_setup_token(payload.setup_token):
+        security.otp_limiter.record_failure()
+        raise HTTPException(status_code=403, detail="توكن الإعداد غير صحيح")
+    if security.otp_limiter.is_blocked():
+        raise HTTPException(status_code=429, detail="محاولات كثيرة، حاول بعد 5 دقائق")
+
     conn = get_db_connection()
     if not conn:
-        return Response(content=json.dumps({"detail": "قاعدة البيانات غير متاحة"}), status_code=500, media_type="application/json")
+        raise HTTPException(status_code=500, detail="قاعدة البيانات غير متاحة")
     try:
-        clean_code = payload.code.strip()
+        new_secret = pyotp.random_base32()
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO system_auth (username, totp_secret, is_2fa_enabled) VALUES ('admin', %s, FALSE)
+                ON CONFLICT (username) DO UPDATE SET totp_secret = EXCLUDED.totp_secret, is_2fa_enabled = FALSE;
+            """, (new_secret,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    otp_uri = pyotp.TOTP(new_secret).provisioning_uri(name="admin", issuer_name="FDC Sales CRM")
+    from qrcode.image.pure import PyPNGImage
+    buf = io.BytesIO()
+    qrcode.make(otp_uri, image_factory=PyPNGImage).save(buf)
+    return {
+        "status": "PENDING_VERIFICATION",
+        "otpauth_uri": otp_uri,
+        "qr": "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii"),
+    }
+
+
+@app.post("/api/auth/2fa/verify")
+def verify_2fa(payload: Verify2FAPayload):
+    if security.otp_limiter.is_blocked():
+        return JSONResponse({"detail": "محاولات خاطئة كثيرة، حاول بعد 5 دقائق"}, status_code=429)
+    conn = get_db_connection()
+    if not conn:
+        return JSONResponse({"detail": "قاعدة البيانات غير متاحة"}, status_code=500)
+    try:
+        clean_code = re.sub(r"\D", "", payload.code or "")
         with conn.cursor() as cur:
             cur.execute("SELECT totp_secret FROM system_auth WHERE username = 'admin';")
             row = cur.fetchone()
             secret = row["totp_secret"] if row else None
 
         if not secret:
-            return Response(content=json.dumps({"detail": "لم يتم العثور على مفتاح التوثيق السري"}), status_code=400, media_type="application/json")
+            return JSONResponse({"detail": "لم يتم العثور على مفتاح التوثيق السري"}, status_code=400)
 
-        totp = pyotp.TOTP(secret)
-        if totp.verify(clean_code, valid_window=1):
+        if len(clean_code) == 6 and pyotp.TOTP(secret).verify(clean_code, valid_window=1):
             with conn.cursor() as cur:
                 cur.execute("UPDATE system_auth SET is_2fa_enabled = TRUE WHERE username = 'admin';")
             conn.commit()
-            return {"status": "SUCCESS", "message": "تم التحقق بنجاح"}
-        else:
-            return Response(content=json.dumps({"detail": "رمز التحقق غير صحيح أو انتهت صلاحيته"}), status_code=401, media_type="application/json")
+            security.otp_limiter.reset()
+            response = JSONResponse({"status": "SUCCESS", "message": "تم التحقق بنجاح"})
+            _set_session_cookie(response, "admin")
+            return response
+
+        security.otp_limiter.record_failure()
+        return JSONResponse({"detail": "رمز التحقق غير صحيح أو انتهت صلاحيته"}, status_code=401)
     finally:
         conn.close()
+
+
+@app.post("/api/auth/logout")
+def logout():
+    response = JSONResponse({"status": "LOGGED_OUT"})
+    response.delete_cookie(security.SESSION_COOKIE_NAME, path="/")
+    return response
 
 # ----------------- الكلمات المفتاحية الحية -----------------
 @app.get("/api/system/trigger-keywords")
@@ -1120,6 +1257,78 @@ async def reconcile_missed_orders():
         conn.close()
 
 # ----------------- رادار الواتساب ومعالجة التعديل والحذف واستبعاد المندوبين -----------------
+def resolve_logistics_target(cur, conf: dict) -> str:
+    """
+    تحديد مجموعة اللوجستيك التي تُوجَّه إليها أوامر التوريد:
+    1. القيمة المحفوظة من شاشة الإعدادات (logistics_group_id).
+    2. وإلا: قناة التوجيه لأول وكيل ذكي مفعّل لديه dispatch_channel.
+    """
+    target = (conf.get("logistics_group_id") or "").strip()
+    if target:
+        return target
+    try:
+        cur.execute("""
+            SELECT dispatch_channel FROM ai_agents
+            WHERE is_active = TRUE AND COALESCE(TRIM(dispatch_channel), '') <> ''
+            ORDER BY id ASC LIMIT 1;
+        """)
+        row = cur.fetchone()
+        return (row["dispatch_channel"] or "").strip() if row else ""
+    except Exception as e:
+        logger.warning(f"Could not resolve logistics target from agents: {e}")
+        return ""
+
+
+@app.get("/api/system/logistics-group")
+def get_logistics_group():
+    conn = get_db_connection()
+    if not conn:
+        return {"group_id": "", "effective_target": ""}
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT key_name, key_value FROM system_config;")
+            conf = {r["key_name"]: r["key_value"] for r in cur.fetchall()}
+            return {
+                "group_id": conf.get("logistics_group_id", ""),
+                "effective_target": resolve_logistics_target(cur, conf),
+            }
+    finally:
+        conn.close()
+
+
+@app.post("/api/system/logistics-group")
+def save_logistics_group(payload: LogisticsGroupPayload):
+    group_id = payload.group_id.strip()
+    if group_id and not re.fullmatch(r"[0-9]+(-[0-9]+)?(@g\.us|@s\.whatsapp\.net)?", group_id):
+        raise HTTPException(status_code=400, detail="صيغة معرّف المجموعة غير صحيحة (مثال: 120363000000000000@g.us)")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+            INSERT INTO system_config (key_name, key_value) VALUES ('logistics_group_id', %s)
+            ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;
+            """, (group_id,))
+            conn.commit()
+            return {"status": "SUCCESS", "group_id": group_id}
+    finally:
+        conn.close()
+
+
+@app.get("/api/whatsapp/groups")
+async def list_whatsapp_groups():
+    """قائمة مجموعات الواتساب المتصلة لاختيار مجموعة اللوجستيك من الواجهة"""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("http://127.0.0.1:3001/groups", timeout=8.0)
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception as e:
+        logger.warning(f"Could not fetch WhatsApp groups: {e}")
+    return []
+
+
 @app.post("/api/whatsapp/webhook")
 async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
@@ -1155,7 +1364,7 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
         with conn.cursor() as cur:
             cur.execute("SELECT key_name, key_value FROM system_config;")
             conf = {r["key_name"]: r["key_value"] for r in cur.fetchall()}
-            logistics_group = conf.get("logistics_group_id", "").strip()
+            logistics_group = resolve_logistics_target(cur, conf)
             auto_welcome_enabled = conf.get("exhibition_auto_reply_enabled") == "true"
             welcome_greeting = conf.get("exhibition_greeting_text", "")
 
@@ -1173,8 +1382,19 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 customer = cur.fetchone()
 
             if msg.event_type == 'MESSAGE_DELETED':
-                if msg.message_id and msg.message_id in dispatched_messages_cache:
-                    cached_order = dispatched_messages_cache[msg.message_id]
+                # الطلبية المحذوفة من الواتساب تُلغى من الإحصائيات ويُبلَّغ فريق اللوجستيك.
+                # يُقرأ الطلب من قاعدة البيانات (وليس من الذاكرة) حتى يعمل الإلغاء بعد إعادة تشغيل الخادم.
+                cached_order = dispatched_messages_cache.pop(msg.message_id, None) if msg.message_id else None
+                if msg.message_id:
+                    cur.execute("""
+                        DELETE FROM dispatched_orders WHERE message_id = %s
+                        RETURNING customer_name, branch_name;
+                    """, (msg.message_id,))
+                    deleted_rows = cur.fetchall()
+                    if deleted_rows:
+                        cached_order = {"company": deleted_rows[0]["customer_name"], "branch": deleted_rows[0]["branch_name"]}
+                    conn.commit()
+                if cached_order:
                     if logistics_group:
                         cancel_notice = (
                             f"🚫 *ORDER RETRACTED / CANCELLED BY SENDER*\n"
@@ -1186,7 +1406,6 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         )
                         forward_to_logistics = logistics_group
                         logistics_text = cancel_notice
-                    del dispatched_messages_cache[msg.message_id]
                 return {
                     "status": "PROCESSED_DELETE",
                     "forward_to_logistics": forward_to_logistics,
@@ -1358,7 +1577,7 @@ def create_customer(payload: CreateCustomerPayload):
             """, (
                 payload.company_name.strip(), payload.brand_name.strip() if payload.brand_name else "",
                 payload.sector or "مطاعم", payload.region or "مسقط",
-                payload.company_name.strip(), payload.phone.strip(),
+                (payload.contact_person or "").strip(), payload.phone.strip(),
                 payload.assigned_rep_id, payload.assigned_rep_name or "",
                 payload.whatsapp_group_id.strip() if payload.whatsapp_group_id else ""
             ))
