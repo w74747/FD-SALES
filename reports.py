@@ -652,8 +652,8 @@ body { margin: 0; background: var(--canvas); color: var(--ink);
 
 /* الغلاف: سطر التصنيف، عنوان هو جملة الحجة، المقدمة، شريط البيانات */
 .cover .eyebrow.class { color: var(--accent); margin-bottom: 4mm; }
-.cover h1 { font: 400 30pt/1.3 'DC Display', sans-serif; letter-spacing: -0.01em; margin: 0 0 6mm; max-width: 150mm; color: var(--ink); }
-.lede { font: 400 11.5pt/1.85 'DC Text', sans-serif; color: var(--graphite); max-width: 140mm; margin: 0 0 9mm; }
+.cover h1 { font: 400 20pt/1.45 'DC Display', sans-serif; letter-spacing: -0.01em; margin: 0 0 6mm; max-width: 150mm; color: var(--ink); }
+.lede { font: 400 10.5pt/1.85 'DC Text', sans-serif; color: var(--graphite); max-width: 140mm; margin: 0 0 9mm; }
 .rail { display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 5mm; border-top: var(--hair) solid var(--frost); border-bottom: var(--hair) solid var(--frost); padding: 4mm 0; margin-bottom: 9mm; }
 .rail .value { font: 500 8.5pt/1.6 'DC Mono', monospace; color: var(--ink); margin-top: 1mm; }
 .rail .value.text { font: 500 9pt/1.6 'DC Text', sans-serif; }
@@ -662,25 +662,25 @@ body { margin: 0; background: var(--canvas); color: var(--ink);
 .band { display: grid; grid-template-columns: repeat(3, 1fr); border: var(--hair) solid var(--frost-deep); margin: 0 0 8mm; }
 .band .cell { padding: 5mm 5mm 4mm; border-inline-start: var(--hair) solid var(--frost-deep); border-top: var(--hair) solid var(--frost-deep); }
 .band .cell:nth-child(3n+1) { border-inline-start: 0; } .band .cell:nth-child(-n+3) { border-top: 0; }
-.band .fig { font: 300 21pt/1.2 'DC Display', sans-serif; color: var(--ink); margin-bottom: 1.5mm; white-space: nowrap; }
+.band .fig { font: 300 16pt/1.25 'DC Display', sans-serif; color: var(--ink); margin-bottom: 1.5mm; white-space: nowrap; }
 .band .cmp { display: flex; justify-content: space-between; gap: 2mm; font-size: 7.5pt; line-height: 1.9; color: var(--mist); }
 .band.small { grid-template-columns: repeat(4, 1fr); } .band.small .cell:nth-child(3n+1) { border-inline-start: var(--hair) solid var(--frost-deep); }
-.band.small .cell:nth-child(4n+1) { border-inline-start: 0; } .band.small .cell { border-top: 0; } .band.small .fig { font-size: 16pt; }
+.band.small .cell:nth-child(4n+1) { border-inline-start: 0; } .band.small .cell { border-top: 0; } .band.small .fig { font-size: 13pt; }
 .chg { font: 500 7.5pt 'DC Mono', monospace; white-space: nowrap; }
 .chg.up { color: var(--ok); } .chg.down { color: var(--crit); } .chg.flat, .chg.na { color: var(--mist); }
 
 /* الأقسام: رقم القسم كتسمية صغيرة، عنوان Almarai، ثم جملة الخلاصة */
 section { margin-top: 12mm; }
 .secno { color: var(--accent); margin-bottom: 1mm; }
-h2 { font: 400 21pt/1.4 'DC Display', sans-serif; letter-spacing: -0.01em; color: var(--ink); margin: 0 0 3mm; }
-h3 { font: 600 11pt/1.5 'DC Text', sans-serif; color: var(--ink); margin: 7mm 0 2mm; }
+h2 { font: 400 14pt/1.5 'DC Display', sans-serif; letter-spacing: -0.01em; color: var(--ink); margin: 0 0 3mm; }
+h3 { font: 600 10.5pt/1.5 'DC Text', sans-serif; color: var(--ink); margin: 7mm 0 2mm; }
 p { margin: 0 0 3mm; max-width: 140mm; }
-.thesis { font-size: 11.5pt; line-height: 1.85; color: var(--graphite); margin-bottom: 6mm; }
+.thesis { font-size: 10.5pt; line-height: 1.85; color: var(--graphite); margin-bottom: 6mm; }
 
 /* كتلة التنبيه: واحدة لكل قسم كحد أقصى */
 .callout { background: var(--mesa); border-inline-start: var(--emph) solid var(--accent); padding: 5mm 6mm; margin: 6mm 0; break-inside: avoid; }
 .callout .eyebrow { color: var(--ink); margin-bottom: 1.5mm; }
-.callout p { margin: 0; max-width: none; font-size: 10.5pt; }
+.callout p { margin: 0; max-width: none; font-size: 10pt; }
 
 .twocol { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10mm; }
 ul { margin: 0; padding-inline-start: 5mm; } li { margin-bottom: 1mm; }
@@ -688,7 +688,7 @@ ul.good li::marker { content: "+  "; color: var(--ok); font-weight: 600; }
 ul.bad li::marker { content: "!  "; color: var(--crit); font-weight: 600; }
 ol.recs { margin: 0; padding: 0; list-style: none; counter-reset: rec; }
 ol.recs li { counter-increment: rec; display: grid; grid-template-columns: 10mm 1fr; padding: 3mm 0; border-bottom: var(--hair) solid var(--frost); margin: 0; }
-ol.recs li::before { content: counter(rec, arabic-indic); font: 300 15pt/1.4 'DC Display', sans-serif; color: var(--accent); }
+ol.recs li::before { content: counter(rec, arabic-indic); font: 300 12pt/1.5 'DC Display', sans-serif; color: var(--accent); }
 
 /* الجداول: بلا تعبئة ولا إطار خارجي */
 table { width: 100%; border-collapse: collapse; font: 400 8.5pt/1.65 'DC Text', sans-serif; margin: 2mm 0 7mm; }
@@ -725,7 +725,7 @@ section.closing { break-inside: avoid; }
 }
 @media screen and (max-width: 760px) {
   .sheet { padding: 10mm 6mm; } .band, .band.small { grid-template-columns: 1fr 1fr; } .twocol, .rail { grid-template-columns: 1fr 1fr; }
-  .cover h1 { font-size: 22pt; } table { display: block; overflow-x: auto; }
+  .cover h1 { font-size: 17pt; } table { display: block; overflow-x: auto; }
 }
 """
 
