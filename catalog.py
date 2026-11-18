@@ -248,6 +248,27 @@ def line_metrics(product: Optional[dict], quantity: float, unit: str) -> dict:
     return {"pieces": pieces, "weight_kg": weight}
 
 
+def line_value(product: Optional[dict], quantity: float, unit: str, price: Optional[float],
+               price_unit: Optional[str]) -> Optional[float]:
+    """
+    قيمة سطر الطلب بالريال حسب سعر العميل.
+    إذا كان السعر بنفس وحدة الطلب: الكمية × السعر.
+    وإلا (مثلاً السعر للكرتون والطلب بالكيس): التحويل عبر عدد الحبات من مواصفات المنتج.
+    """
+    if price is None:
+        return None
+    price = float(price)
+    pu = normalize_unit(price_unit or unit) or (price_unit or unit or "").strip().lower()
+    u = normalize_unit(unit) or (unit or "").strip().lower()
+    if pu == u:
+        return round(float(quantity) * price, 3)
+    pieces = line_metrics(product, quantity, unit)["pieces"] if product else None
+    per_price_unit = pieces_per_unit(product, price_unit) if product else None
+    if pieces is None or not per_price_unit:
+        return None
+    return round(pieces / per_price_unit * price, 3)
+
+
 def get_by_sku(cur, sku: Optional[str]) -> Optional[dict]:
     if not sku:
         return None

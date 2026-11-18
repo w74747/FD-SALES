@@ -802,8 +802,8 @@
                     <label class="font-bold text-[#3A056A]">المنتجات التي يطلبها العميل</label>
                     <button onclick="addProfileProductRow()" class="px-2 py-1 bg-purple-50 border border-purple-200 rounded text-[10px] font-bold text-[#3A056A]">+ منتج</button>
                 </div>
-                <p class="text-[10px] text-gray-500">الاسم الذي يستخدمه العميل في رسائله أو جدوله ← منتجنا ← الوحدة. يساعد البوت على فهم طلباته المختصرة وقراءة جداوله.</p>
-                <table class="w-full text-[11px] mt-1"><thead class="text-gray-500"><tr><th class="text-right p-1">اسم العميل</th><th class="text-right p-1">منتجنا</th><th class="text-right p-1">الوحدة</th><th class="text-right p-1">ملاحظة</th><th></th></tr></thead>
+                <p class="text-[10px] text-gray-500">الاسم الذي يستخدمه العميل في رسائله أو جدوله ← منتجنا من الكتالوج ← وحدة الطلب ← سعر هذا العميل. السعر يُحفظ مع كل طلب لحظة تسجيله، فتغييره لاحقاً لا يغيّر قيمة الطلبيات السابقة.</p>
+                <table class="w-full text-[11px] mt-1"><thead class="text-gray-500"><tr><th class="text-right p-1">اسم العميل</th><th class="text-right p-1">منتجنا</th><th class="text-right p-1">وحدة الطلب</th><th class="text-right p-1">السعر (ر.ع)</th><th class="text-right p-1">لكل</th><th class="text-right p-1">ملاحظة</th><th></th></tr></thead>
                     <tbody id="op-products"></tbody></table>
                 <datalist id="op-catalog"></datalist>
                 <input type="hidden" id="op-aliases">
@@ -831,6 +831,11 @@
                 <textarea id="op-reminder-text" rows="2" class="w-full p-2 border rounded-lg" placeholder="اتركه فارغاً للنص الافتراضي. متغيرات: {day} {day_en} {date}"></textarea>
             </div>
             <label class="flex items-center gap-2 font-bold"><input type="checkbox" id="op-auto-reply"> السماح بالرد الآلي في مجموعة هذا العميل (عند تفعيله عاماً)</label>
+            <label class="flex items-center gap-2 font-bold"><input type="checkbox" id="op-share-prices"> السماح للبوت بذكر أسعار هذا العميل عند سؤاله عنها (أسعاره فقط، داخل مجموعته)</label>
+            <div>
+                <button type="button" onclick="showPriceHistory()" class="text-[11px] text-purple-700 underline">سجل تغيّر أسعار هذا العميل</button>
+                <div id="op-price-history" class="hidden mt-1 max-h-40 overflow-y-auto text-[11px] border rounded-lg p-2 bg-gray-50"></div>
+            </div>
             <button onclick="saveOrderProfile()" class="w-full py-2.5 bg-[#3A056A] text-white font-bold rounded-xl">حفظ ملف الطلب</button>
         </div>
     </div>
@@ -1659,7 +1664,8 @@
                                 '<td class="p-2 font-bold">' + (i === 0 ? escHtml(b.company_name) : '') + '</td>' +
                                 '<td class="p-2">' + escHtml(l.branch) + '</td><td class="p-2">' + escHtml(l.product) + '</td>' +
                                 '<td class="p-2 font-bold">' + (l.quantity === '' ? '' : fmtQty(l.quantity) + ' ' + escHtml(l.unit)) + '</td>' +
-                                '<td class="p-2">' + (i === 0 ? status + (b.totals && b.totals.pieces ? '<div class="text-[10px] text-gray-500">≈ ' + Number(b.totals.pieces).toLocaleString() + ' حبة' + (b.totals.weight_kg ? ' · ' + b.totals.weight_kg + ' كجم' : '') + (b.totals.complete ? '' : ' (جزئي)') + '</div>' : '') : '') + '</td></tr>');
+                                '<td class="p-2">' + (i === 0 ? status + (b.totals && b.totals.pieces ? '<div class="text-[10px] text-gray-500">≈ ' + Number(b.totals.pieces).toLocaleString() + ' حبة' + (b.totals.weight_kg ? ' · ' + b.totals.weight_kg + ' كجم' : '') + (b.totals.complete ? '' : ' (جزئي)') + '</div>' : '') +
+                                    (b.totals && b.totals.value_omr !== null && b.totals.value_omr !== undefined ? '<div class="text-[10px] font-bold text-emerald-700">' + Number(b.totals.value_omr).toFixed(3) + ' ر.ع' + (b.totals.value_complete ? '' : ' (بعض الأصناف بلا سعر)') + '</div>' : '') : '') + '</td></tr>');
                         });
                     });
                     body.innerHTML = rows.join('') || '<tr><td colspan="6" class="p-4 text-center text-gray-400">لا توجد طلبيات</td></tr>';
@@ -1699,6 +1705,8 @@
             } catch (e) {}
             document.getElementById('op-reminder-frequency').value = p.reminder_frequency || 'daily';
             document.getElementById('op-auto-reply').checked = p.auto_reply_enabled !== false;
+            document.getElementById('op-share-prices').checked = !!p.share_prices_with_bot;
+            document.getElementById('op-price-history').classList.add('hidden');
             document.getElementById('op-default-branch').value = p.default_branch || '';
             document.getElementById('op-default-unit').value = p.default_unit || 'Cartons';
             document.getElementById('op-lead-days').value = p.lead_days == null ? 1 : p.lead_days;
@@ -1717,6 +1725,16 @@
             document.getElementById('order-profile-modal').classList.remove('hidden');
         };
 
+        window.showPriceHistory = async function() {
+            const box = document.getElementById('op-price-history');
+            const id = document.getElementById('op-customer-id').value;
+            const rows = await (await fetch('/api/customers/' + id + '/price-history')).json();
+            const f = (v) => (v === null || v === undefined) ? '—' : Number(v).toFixed(3);
+            box.innerHTML = rows.map(r => '<div class="border-b py-1">' + new Date(r.changed_at).toLocaleDateString('ar-OM') + ' · <b>' + escHtml(r.product) + '</b>' +
+                (r.product_sku ? ' [' + escHtml(r.product_sku) + ']' : '') + ': ' + f(r.old_price) + ' ← ' + f(r.new_price) + ' ر.ع / ' + escHtml(r.price_unit || '') + '</div>').join('') || 'لا توجد تغييرات مسجلة';
+            box.classList.toggle('hidden');
+        };
+
         window.addProfileProductRow = function(row) {
             row = row || {};
             const units = ['Cartons', 'Packets', 'Boxes', 'Pieces', 'Trays'];
@@ -1726,12 +1744,18 @@
                 '<td class="p-0.5"><input class="op-alias w-full p-1.5 border rounded" placeholder="5&quot; / بريوش"></td>' +
                 '<td class="p-0.5"><input class="op-product w-full p-1.5 border rounded" list="op-catalog" placeholder="اختر من الكتالوج"></td>' +
                 '<td class="p-0.5"><select class="op-unit w-full p-1.5 border rounded">' + units.map(u => '<option>' + u + '</option>').join('') + '</select></td>' +
+                '<td class="p-0.5"><input class="op-price w-20 p-1.5 border rounded" type="number" step="0.001" min="0" placeholder="0.000"></td>' +
+                '<td class="p-0.5"><select class="op-price-unit w-full p-1.5 border rounded">' + units.map(u => '<option>' + u + '</option>').join('') + '</select></td>' +
                 '<td class="p-0.5"><input class="op-notes w-full p-1.5 border rounded" placeholder="3pc/pkt"></td>' +
                 '<td class="p-0.5"><button type="button" class="text-red-500 font-bold px-1" onclick="this.closest(\'tr\').remove()">✕</button></td>';
             tr.querySelector('.op-alias').value = row.alias || '';
             tr.querySelector('.op-product').value = (row.product || '') + (row.sku ? ' [' + row.sku + ']' : '');
             tr.querySelector('.op-unit').value = units.includes(row.unit) ? row.unit : 'Cartons';
             tr.querySelector('.op-notes').value = row.notes || '';
+            tr.querySelector('.op-price').value = (row.price === null || row.price === undefined) ? '' : Number(row.price).toFixed(3);
+            tr.querySelector('.op-price-unit').value = units.includes(row.price_unit) ? row.price_unit : tr.querySelector('.op-unit').value;
+            // وحدة السعر تتبع وحدة الطلب افتراضياً
+            tr.querySelector('.op-unit').addEventListener('change', e => { if (!tr.querySelector('.op-price').value) tr.querySelector('.op-price-unit').value = e.target.value; });
             document.getElementById('op-products').appendChild(tr);
         };
 
@@ -1743,10 +1767,13 @@
                     alias: tr.querySelector('.op-alias').value.trim(),
                     product: tr.querySelector('.op-product').value.trim(),
                     unit: tr.querySelector('.op-unit').value,
+                    price: tr.querySelector('.op-price').value === '' ? null : parseFloat(tr.querySelector('.op-price').value),
+                    price_unit: tr.querySelector('.op-price-unit').value,
                     notes: tr.querySelector('.op-notes').value.trim()
                 })).filter(x => x.product),
                 reminder_frequency: document.getElementById('op-reminder-frequency').value,
                 auto_reply_enabled: document.getElementById('op-auto-reply').checked,
+                share_prices_with_bot: document.getElementById('op-share-prices').checked,
                 default_branch: document.getElementById('op-default-branch').value.trim(),
                 default_unit: document.getElementById('op-default-unit').value,
                 lead_days: parseInt(document.getElementById('op-lead-days').value || '1', 10),

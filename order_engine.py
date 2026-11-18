@@ -150,6 +150,21 @@ SCHEMA = [
         resolved_at TIMESTAMP WITH TIME ZONE
     );""",
     "CREATE INDEX IF NOT EXISTS idx_issues_status ON customer_issues (status, created_at DESC);",
+    # أسعار العملاء: السعر يُحفظ في سطر الطلب لحظة تسجيله، فلا تتغير قيمة الطلبيات السابقة إذا تغيّر السعر لاحقاً
+    "ALTER TABLE order_lines ADD COLUMN IF NOT EXISTS unit_price NUMERIC(12, 3);",
+    "ALTER TABLE order_lines ADD COLUMN IF NOT EXISTS price_unit VARCHAR(30);",
+    "ALTER TABLE order_lines ADD COLUMN IF NOT EXISTS line_value NUMERIC(14, 3);",
+    "ALTER TABLE customer_order_profiles ADD COLUMN IF NOT EXISTS share_prices_with_bot BOOLEAN DEFAULT FALSE;",
+    """CREATE TABLE IF NOT EXISTS customer_price_history (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+        product_sku VARCHAR(100),
+        product VARCHAR(200) NOT NULL,
+        old_price NUMERIC(12, 3),
+        new_price NUMERIC(12, 3),
+        price_unit VARCHAR(30),
+        changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );""",
 ]
 
 
@@ -173,6 +188,7 @@ PROFILE_DEFAULTS = {
     "lead_days": 1, "reminder_enabled": False, "reminder_days": "0,1,2,3,4,5,6",
     "reminder_time": "09:00", "reminder_text": "", "last_reminder_date": None,
     "products": [], "auto_reply_enabled": True, "reminder_frequency": "daily",
+    "share_prices_with_bot": False,
 }
 
 
@@ -210,8 +226,11 @@ def product_map(profile: dict) -> list:
         product = (p.get("product") or "").strip()
         if not product:
             continue
+        price = p.get("price")
         out.append({"alias": (p.get("alias") or product).strip(), "product": product, "sku": (p.get("sku") or "").strip(),
-                    "unit": (p.get("unit") or "").strip(), "notes": (p.get("notes") or "").strip()})
+                    "unit": (p.get("unit") or "").strip(), "notes": (p.get("notes") or "").strip(),
+                    "price": float(price) if price not in (None, "") else None,
+                    "price_unit": (p.get("price_unit") or p.get("unit") or "").strip()})
     out += parse_aliases(profile.get("product_aliases", ""))
     return out
 
@@ -375,11 +394,46 @@ def get_or_create_batch(cur, customer_id: int, delivery: date) -> dict:
 
 def batch_lines(cur, batch_id: int) -> list:
     cur.execute("""
-        SELECT branch_name, product, quantity, unit, product_sku FROM order_lines
+        SELECT branch_name, product, quantity, unit, product_sku, line_value FROM order_lines
         WHERE batch_id = %s ORDER BY branch_name, product;
     """, (batch_id,))
     return [{"branch": r["branch_name"], "product": r["product"], "quantity": float(r["quantity"]), "unit": r["unit"],
-             "sku": r["product_sku"]} for r in cur.fetchall()]
+             "sku": r["product_sku"], "value": float(r["line_value"]) if r["line_value"] is not None else None}
+            for r in cur.fetchall()]
+
+
+def customer_price(aliases: list, sku: Optional[str], product: str) -> Optional[dict]:
+    """سعر العميل للمنتج من ملفه (بالكود أولاً ثم بالاسم)"""
+    for a in aliases:
+        if a.get("price") is None:
+            continue
+        if (sku and a.get("sku") == sku) or _norm(a["product"]) == _norm(product):
+            return a
+    return None
+
+
+def price_batch_lines(cur, batch_id: int, aliases: list):
+    """
+    تسعير أسطر الطلبية:
+    - السطر المسعَّر سابقاً يحتفظ بسعره (لقطة وقت الطلب) وتُعاد حساب قيمته فقط إذا تغيرت الكمية.
+    - السطر الجديد يأخذ سعر العميل الحالي من ملفه.
+    """
+    cur.execute("""SELECT id, product, product_sku, quantity, unit, unit_price, price_unit
+                   FROM order_lines WHERE batch_id = %s;""", (batch_id,))
+    cache = {}
+    for ln in cur.fetchall():
+        unit_price, price_unit = ln["unit_price"], ln["price_unit"]
+        if unit_price is None:
+            entry = customer_price(aliases, ln["product_sku"], ln["product"])
+            if not entry:
+                continue
+            unit_price, price_unit = entry["price"], entry["price_unit"] or ln["unit"]
+        sku = ln["product_sku"]
+        if sku not in cache:
+            cache[sku] = catalog.get_by_sku(cur, sku)
+        value = catalog.line_value(cache[sku], float(ln["quantity"]), ln["unit"], float(unit_price), price_unit)
+        cur.execute("UPDATE order_lines SET unit_price = %s, price_unit = %s, line_value = %s WHERE id = %s;",
+                    (unit_price, price_unit, value, ln["id"]))
 
 
 def lines_totals(cur, lines: list) -> dict:
@@ -399,9 +453,14 @@ def lines_totals(cur, lines: list) -> dict:
             continue
         pieces += m["pieces"]
         weight += m["weight_kg"] or 0
+    values = [ln.get("value") for ln in lines]
+    priced = [v for v in values if v is not None]
     return {"pieces": round(pieces) if lines and not unconverted else (round(pieces) if pieces else None),
             "weight_kg": round(weight, 1) if weight else None,
-            "complete": bool(lines) and not unconverted, "unconverted": sorted(set(unconverted))}
+            "complete": bool(lines) and not unconverted, "unconverted": sorted(set(unconverted)),
+            "value_omr": round(sum(priced), 3) if priced else None,
+            "value_complete": bool(lines) and len(priced) == len(lines),
+            "unpriced": sorted({ln["product"] for ln in lines if ln.get("value") is None})}
 
 
 def resolve_delivery_date(value: Optional[str], profile: dict) -> date:
@@ -469,6 +528,7 @@ def apply_proposal(cur, customer: dict, profile: dict, proposal: dict, source_me
                 source_message_id = EXCLUDED.source_message_id, updated_at = NOW();
         """, (batch["id"], ln["branch"], ln["product"], ln["quantity"], ln["unit"], source_message_id, ln.get("sku") or None))
 
+    price_batch_lines(cur, batch["id"], aliases)
     after = batch_lines(cur, batch["id"])
     if after == before:
         return None
@@ -920,6 +980,13 @@ async def handle_issue(conn, customer: dict, profile: dict, msg, kind: str, resu
                 and profile.get("auto_reply_enabled", True) and not staff_active_recently(cur, chat_id))
         target = alert_target(cur, customer)
         kb_text = knowledge.build_context(cur) if (auto and kind == "inquiry") else ""
+        # أسعار هذا العميل فقط (إن سمح المسؤول بذلك في ملفه) - لا تُكشف أسعار العملاء الآخرين أبداً
+        if kb_text is not None and auto and kind == "inquiry" and profile.get("share_prices_with_bot"):
+            prices = [a for a in product_map(profile) if a.get("price") is not None]
+            if prices:
+                kb_text += "\n\n=== AGREED PRICES FOR THIS CUSTOMER ONLY (OMR) ===\n" + "\n".join(
+                    f"{a['product']}" + (f" (code {a['sku']})" if a.get("sku") else "") +
+                    f": {a['price']:.3f} OMR per {a['price_unit'] or a['unit'] or 'unit'}" for a in prices)
     conn.commit()
 
     category = CATEGORY_AR.get(result.get("issue_category") or "other", "أخرى")
