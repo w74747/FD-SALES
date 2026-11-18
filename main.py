@@ -39,6 +39,7 @@ import ai_client
 import order_engine
 import knowledge
 import catalog
+import reports
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pyotp
@@ -772,6 +773,7 @@ def init_database():
     order_engine.init_schema(run_isolated_ddl)
     knowledge.init_schema(run_isolated_ddl)
     catalog.init_schema(run_isolated_ddl)
+    reports.init_schema(run_isolated_ddl)
     run_isolated_ddl("""
         CREATE TABLE IF NOT EXISTS stored_files (
             file_key VARCHAR(100) PRIMARY KEY,
@@ -1417,6 +1419,7 @@ class OrderProfilePayload(BaseModel):
 class AssistantSettingsPayload(BaseModel):
     admin_alert_phone: Optional[str] = ""
     auto_reply_enabled: Optional[bool] = False
+    auto_reports_enabled: Optional[bool] = True
 
 
 class KnowledgeTextPayload(BaseModel):
@@ -1706,6 +1709,7 @@ def get_assistant_settings():
             return {
                 "admin_alert_phone": order_engine.get_setting(cur, "admin_alert_phone"),
                 "auto_reply_enabled": order_engine.get_setting(cur, "auto_reply_enabled", "false").lower() == "true",
+                "auto_reports_enabled": order_engine.get_setting(cur, "auto_reports_enabled", "true").lower() == "true",
                 "ai_enabled": ai_client.is_enabled(),
                 "voice_enabled": bool(os.getenv("TOGETHER_API_KEY", "").strip()),
             }
@@ -1723,7 +1727,8 @@ def save_assistant_settings(payload: AssistantSettingsPayload):
         raise HTTPException(status_code=500, detail="Database unreachable")
     try:
         with conn.cursor() as cur:
-            for k, v in (("admin_alert_phone", phone), ("auto_reply_enabled", "true" if payload.auto_reply_enabled else "false")):
+            for k, v in (("admin_alert_phone", phone), ("auto_reply_enabled", "true" if payload.auto_reply_enabled else "false"),
+                         ("auto_reports_enabled", "true" if payload.auto_reports_enabled else "false")):
                 cur.execute("""INSERT INTO system_config (key_name, key_value) VALUES (%s, %s)
                                ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;""", (k, v))
         conn.commit()
@@ -1887,6 +1892,143 @@ def issues_summary(days: int = 90):
         conn.close()
 
 
+# ======================= التقارير الدورية للإدارة =======================
+
+class ReportRequestPayload(BaseModel):
+    kind: str
+    year: int
+    index: Optional[int] = 1
+
+
+def _report_logo() -> str:
+    try:
+        from logo_data import LOGO_BASE64
+        return LOGO_BASE64
+    except Exception:
+        return ""
+
+
+@app.get("/api/reports")
+def list_reports():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT id, period_kind, period_start, period_end, title, source, created_at,
+                                  metrics->'narrative'->>'headline' AS headline
+                           FROM management_reports ORDER BY period_start DESC, id DESC LIMIT 100;""")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+@app.post("/api/reports/generate")
+async def generate_report(payload: ReportRequestPayload):
+    if payload.kind not in ("month", "quarter", "year"):
+        raise HTTPException(status_code=400, detail="نوع التقرير غير صحيح")
+    try:
+        start, end, label = reports.period_bounds(payload.kind, payload.year, payload.index or 1)
+    except Exception:
+        raise HTTPException(status_code=400, detail="الفترة غير صحيحة")
+    if start > order_engine.today_local():
+        raise HTTPException(status_code=400, detail="لا يمكن إعداد تقرير لفترة لم تبدأ بعد")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        rep_ = await reports.generate(conn, payload.kind, start, end, label, "manual", _report_logo())
+        return {"status": "SUCCESS", "id": rep_["id"], "title": rep_["title"]}
+    finally:
+        conn.close()
+
+
+@app.get("/api/reports/{report_id}/view", response_class=HTMLResponse)
+def view_report(report_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT html FROM management_reports WHERE id = %s;", (report_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="التقرير غير موجود")
+            return HTMLResponse(row["html"])
+    finally:
+        conn.close()
+
+
+@app.get("/api/reports/{report_id}/excel")
+def report_excel(report_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT title, metrics, period_start FROM management_reports WHERE id = %s;", (report_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="التقرير غير موجود")
+    finally:
+        conn.close()
+    data = reports.metrics_to_xlsx(row["metrics"], row["title"])
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="FDC_Report_{row["period_start"]}_{report_id}.xlsx"'})
+
+
+@app.delete("/api/reports/{report_id}")
+def delete_report(report_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM management_reports WHERE id = %s;", (report_id,))
+        conn.commit()
+        return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+
+async def run_scheduled_reports():
+    """
+    التقارير التلقائية (بتوقيت مسقط، بعد الساعة 7 صباحاً):
+    أول يوم من كل شهر ← تقرير الشهر السابق؛ أول يوم من كل ربع ← تقرير الربع السابق؛ 1 يناير ← التقرير السنوي.
+    يُرسل ملخص ورابط التقرير لمسؤول النظام على الواتساب.
+    """
+    now = order_engine.now_local()
+    if now.day != 1 or now.hour < 7:
+        return
+    due = [("month",)] + ([("quarter",)] if now.month in (1, 4, 7, 10) else []) + ([("year",)] if now.month == 1 else [])
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            if order_engine.get_setting(cur, "auto_reports_enabled", "true").lower() != "true":
+                return
+            admin = re.sub(r"[^0-9]", "", order_engine.get_setting(cur, "admin_alert_phone"))
+        for (kind,) in due:
+            start, end, label = reports.last_completed_period(kind, now.date())
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM management_reports WHERE period_kind = %s AND period_start = %s AND source = 'auto';",
+                            (kind, start))
+                exists = cur.fetchone()
+            conn.commit()
+            if exists:
+                continue
+            rep_ = await reports.generate(conn, kind, start, end, label, "auto", _report_logo())
+            logger.info(f"[Reports] Auto-generated {rep_['title']} (#{rep_['id']})")
+            if admin:
+                base = order_engine.public_base_url()
+                await send_whatsapp_direct(admin, reports.whatsapp_summary(rep_, f"{base}/api/reports/{rep_['id']}/view" if base else ""))
+    except Exception as e:
+        logger.error(f"Scheduled report failed: {e}")
+    finally:
+        conn.close()
+
+
 async def order_scheduler_loop():
     """كل دقيقة: إرسال تذكيرات الطلب المستحقة وإنهاء طلبات التأكيد القديمة"""
     await asyncio.sleep(20)
@@ -1902,6 +2044,7 @@ async def order_scheduler_loop():
                 finally:
                     conn.close()
                 await dispatch_actions(actions)
+            await run_scheduled_reports()
         except asyncio.CancelledError:
             raise
         except Exception as e:
