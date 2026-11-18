@@ -26,7 +26,7 @@ import re
 import math
 import asyncio
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Response, Request, UploadFile, File
@@ -35,6 +35,8 @@ from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSO
 from pydantic import BaseModel
 import security
 import db_pool
+import ai_client
+import order_engine
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pyotp
@@ -765,6 +767,7 @@ def init_database():
         ON dispatched_orders (message_id, item_name) WHERE message_id IS NOT NULL;
     """)
     run_isolated_ddl("ALTER TABLE customer_accounts ALTER COLUMN contact_person SET DEFAULT '';")
+    order_engine.init_schema(run_isolated_ddl)
     run_isolated_ddl("""
         CREATE TABLE IF NOT EXISTS stored_files (
             file_key VARCHAR(100) PRIMARY KEY,
@@ -792,7 +795,9 @@ async def lifespan(app: FastAPI):
     init_database()
     restore_catalog_from_db()
     start_whatsapp_service()
+    scheduler_task = asyncio.create_task(order_scheduler_loop())
     yield
+    scheduler_task.cancel()
     global whatsapp_process
     if whatsapp_process:
         whatsapp_process.terminate()
@@ -974,6 +979,14 @@ class IncomingWhatsAppMessage(BaseModel):
     message_id: Optional[str] = None
     event_type: Optional[str] = "NORMAL"
     shared_location_url: Optional[str] = None
+    # حقول المحرك الذكي: رسائل الفريق، الرد المقتبس، والصور/الملفات
+    is_from_me: bool = False
+    sender_is_staff_hint: bool = False
+    quoted_message_id: Optional[str] = None
+    quoted_text: Optional[str] = None
+    media_base64: Optional[str] = None
+    media_mimetype: Optional[str] = None
+    media_filename: Optional[str] = None
 
 class SessionSnapshotPayload(BaseModel):
     session_name: str
@@ -1379,6 +1392,247 @@ async def list_whatsapp_groups():
     return []
 
 
+# ======================= الطلبيات الذكية =======================
+
+class OrderProfilePayload(BaseModel):
+    product_aliases: Optional[str] = ""
+    default_branch: Optional[str] = ""
+    default_unit: Optional[str] = "Cartons"
+    ai_notes: Optional[str] = ""
+    lead_days: Optional[int] = 1
+    reminder_enabled: Optional[bool] = False
+    reminder_days: Optional[str] = "0,1,2,3,4,5,6"
+    reminder_time: Optional[str] = "09:00"
+    reminder_text: Optional[str] = ""
+
+
+async def dispatch_actions(actions: list):
+    """إرسال رسائل المحرك (للمجموعة أو للوجستيك أو للمندوب) عبر خدمة الواتساب"""
+    for a in actions or []:
+        if a.get("to") and a.get("text"):
+            await send_whatsapp_direct(a["to"], a["text"])
+
+
+def _load_customer(cur, customer_id: int) -> Optional[dict]:
+    cur.execute("SELECT id, company_name, brand_name, phone, assigned_rep_id, whatsapp_group_id FROM customer_accounts WHERE id = %s;",
+                (customer_id,))
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def _current_logistics_target(cur) -> str:
+    cur.execute("SELECT key_name, key_value FROM system_config;")
+    return resolve_logistics_target(cur, {r["key_name"]: r["key_value"] for r in cur.fetchall()})
+
+
+async def _resolve_pending_by_id(pending_id: int, approve: bool, resolved_by: str) -> dict:
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM pending_order_confirmations WHERE id = %s;", (pending_id,))
+            pending = cur.fetchone()
+            if not pending:
+                raise HTTPException(status_code=404, detail="الطلب غير موجود")
+            pending = dict(pending)
+            if pending["status"] != "pending":
+                return {"status": pending["status"], "already_resolved": True, "resolved_by": pending.get("resolved_by")}
+            customer = _load_customer(cur, pending["customer_id"])
+            profile = order_engine.load_profile(cur, pending["customer_id"])
+            actions = order_engine.resolve_pending(
+                cur, pending, approve, resolved_by, customer, profile, _current_logistics_target(cur),
+                # العميل سُئل في المجموعة (أو طلب تأكيد التوفر): نغلق السؤال برسالة قصيرة عند الاعتماد
+                announce_in_group=True)
+        conn.commit()
+    finally:
+        conn.close()
+    await dispatch_actions(actions)
+    return {"status": "approved" if approve else "rejected"}
+
+
+@app.get("/api/orders/pending")
+def list_pending_orders():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            order_engine.expire_old_pending(cur)
+            conn.commit()
+            cur.execute("""
+                SELECT p.id, p.customer_id, c.company_name, p.proposal, p.question_text, p.status, p.created_at
+                FROM pending_order_confirmations p JOIN customer_accounts c ON c.id = p.customer_id
+                WHERE p.status = 'pending' ORDER BY p.created_at DESC LIMIT 50;
+            """)
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+@app.post("/api/orders/pending/{pending_id}/approve")
+async def approve_pending_order(pending_id: int):
+    return await _resolve_pending_by_id(pending_id, True, "dashboard:admin")
+
+
+@app.post("/api/orders/pending/{pending_id}/reject")
+async def reject_pending_order(pending_id: int):
+    return await _resolve_pending_by_id(pending_id, False, "dashboard:admin")
+
+
+@app.get("/api/orders/batches")
+def list_order_batches(days_back: int = 1):
+    """الطلبيات المجمّعة من اليوم فصاعداً (طلبية واحدة لكل عميل وتاريخ تسليم)"""
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT b.id, b.delivery_date, b.status, c.company_name, c.brand_name,
+                       COALESCE(json_agg(json_build_object('branch', l.branch_name, 'product', l.product,
+                                'quantity', l.quantity, 'unit', l.unit) ORDER BY l.branch_name, l.product)
+                                FILTER (WHERE l.id IS NOT NULL), '[]') AS lines
+                FROM order_batches b JOIN customer_accounts c ON c.id = b.customer_id
+                LEFT JOIN order_lines l ON l.batch_id = b.id
+                WHERE b.delivery_date >= %s
+                GROUP BY b.id, c.company_name, c.brand_name
+                ORDER BY b.delivery_date ASC, c.company_name ASC LIMIT 200;
+            """, (order_engine.today_local() - timedelta(days=max(0, min(days_back, 60))),))
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+@app.get("/api/customers/{customer_id}/order-profile")
+def get_order_profile(customer_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            profile = order_engine.load_profile(cur, customer_id)
+            cur.execute("SELECT branch_name FROM customer_branches WHERE customer_id = %s ORDER BY id;", (customer_id,))
+            profile["branches"] = [r["branch_name"] for r in cur.fetchall()]
+            return profile
+    finally:
+        conn.close()
+
+
+@app.post("/api/customers/{customer_id}/order-profile")
+def save_order_profile(customer_id: int, payload: OrderProfilePayload):
+    data = payload.dict()
+    if data.get("reminder_time") and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", data["reminder_time"]):
+        raise HTTPException(status_code=400, detail="وقت التذكير يجب أن يكون بصيغة HH:MM")
+    data["reminder_days"] = ",".join(sorted(set(re.findall(r"[0-6]", data.get("reminder_days") or ""))))
+    data["lead_days"] = max(0, min(int(data.get("lead_days") or 1), 14))
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            order_engine.save_profile(cur, customer_id, data)
+        conn.commit()
+        return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+
+_APPROVAL_PAGE = """<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>اعتماد طلب</title><style>
+body{{font-family:system-ui,Tahoma,sans-serif;background:#f5f0fa;margin:0;padding:16px;color:#222}}
+.card{{max-width:440px;margin:24px auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 18px #3a056a22}}
+h1{{font-size:18px;color:#3A056A;margin:0 0 12px}} .muted{{color:#666;font-size:13px}}
+table{{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}} td{{border-bottom:1px solid #eee;padding:6px 4px}}
+button{{width:100%;padding:14px;border:0;border-radius:12px;font-size:16px;font-weight:700;margin-top:8px;cursor:pointer}}
+.ok{{background:#3A056A;color:#fff}} .no{{background:#fde8e8;color:#b00020}} .done{{padding:12px;border-radius:12px;background:#e8f7ee;color:#106b34;font-weight:700}}
+</style></head><body><div class="card">{body}</div></body></html>"""
+
+
+def _render_approval(pending: dict, company: str, token: str, notice: str = "") -> str:
+    from html import escape
+    p = pending["proposal"]
+    rows = "".join(
+        f"<tr><td>{escape(str(l.get('branch','')))}</td><td>{escape(str(l.get('product','')))}</td>"
+        f"<td><b>{escape(order_engine._qty(float(l.get('quantity') or 0)))}</b> {escape(str(l.get('unit','')))}</td></tr>"
+        for l in (p.get("lines") or []))
+    reason = "العميل طلب تأكيد التوفر" if p.get("ambiguity") == "availability" else "البوت غير متأكد وسأل العميل"
+    body = (f"<h1>اعتماد طلب — {escape(company)}</h1>"
+            f"<div class='muted'>{escape(reason)} · التسليم: {escape(str(p.get('delivery_date') or '-'))} · نوع العملية: {escape(str(p.get('kind')))}</div>"
+            f"<table>{rows or '<tr><td>بدون أصناف</td></tr>'}</table>")
+    if pending.get("question_text"):
+        body += f"<div class='muted'>السؤال للعميل: {escape(pending['question_text'])}</div>"
+    if notice or pending["status"] != "pending":
+        status_ar = {"approved": "تم اعتماد الطلب ✅", "rejected": "تم رفض الطلب", "expired": "انتهت صلاحية الطلب",
+                     "superseded": "استُبدل بطلب أحدث من العميل"}.get(pending["status"], pending["status"])
+        who = f" ({escape(pending.get('resolved_by') or '')})" if pending.get("resolved_by") else ""
+        body += f"<p class='done'>{escape(notice or status_ar)}{who}</p>"
+    else:
+        body += (f"<form method='post' action='/approve/{escape(token)}'>"
+                 f"<button class='ok' name='action' value='approve'>✅ اعتماد وإرسال للوجستيك</button>"
+                 f"<button class='no' name='action' value='reject'>✖ رفض</button></form>")
+    return _APPROVAL_PAGE.format(body=body)
+
+
+def _pending_for_token(token: str) -> tuple:
+    pid = order_engine.verify_approval_token(token)
+    if not pid:
+        raise HTTPException(status_code=404, detail="الرابط غير صالح أو منتهي")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT p.*, c.company_name FROM pending_order_confirmations p
+                           JOIN customer_accounts c ON c.id = p.customer_id WHERE p.id = %s;""", (pid,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="الطلب غير موجود")
+            return dict(row), row["company_name"]
+    finally:
+        conn.close()
+
+
+@app.get("/approve/{token}", response_class=HTMLResponse)
+def approval_page(token: str):
+    """صفحة اعتماد المندوب بضغطة (الرابط موقّع ومؤقت، لا يحتاج تسجيل دخول)"""
+    pending, company = _pending_for_token(token)
+    return HTMLResponse(_render_approval(pending, company, token))
+
+
+@app.post("/approve/{token}", response_class=HTMLResponse)
+async def approval_submit(token: str, request: Request):
+    pending, company = _pending_for_token(token)
+    form = await request.form()
+    approve = form.get("action") == "approve"
+    await _resolve_pending_by_id(pending["id"], approve, "rep-link")
+    pending, company = _pending_for_token(token)
+    return HTMLResponse(_render_approval(pending, company, token))
+
+
+async def order_scheduler_loop():
+    """كل دقيقة: إرسال تذكيرات الطلب المستحقة وإنهاء طلبات التأكيد القديمة"""
+    await asyncio.sleep(20)
+    while True:
+        try:
+            conn = get_db_connection()
+            if conn:
+                try:
+                    with conn.cursor() as cur:
+                        order_engine.expire_old_pending(cur)
+                        actions = order_engine.due_reminders(cur)
+                    conn.commit()
+                finally:
+                    conn.close()
+                await dispatch_actions(actions)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"Order scheduler error: {e}")
+        await asyncio.sleep(60)
+
+
 @app.post("/api/whatsapp/webhook")
 async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
     chat_id = msg.chat_id.strip()
@@ -1407,9 +1661,9 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                 LIMIT 1;
             """, (f"%{clean_phone[-8:]}%", clean_phone))
             is_staff = cur.fetchone()
-            if is_staff or "FDC" in (msg.sender_name or "").upper():
-                logger.info(f"Ignored message from internal sales representative: {msg.sender_name} ({clean_phone})")
-                return {"status": "IGNORED_INTERNAL_STAFF"}
+            # رسائل الفريق لا تُعامل كطلبات، لكنها تُحفظ كسياق للمحرك الذكي (مثل سؤال المندوب "بدنا اوردر صلالة")
+            sender_is_staff = bool(is_staff) or "FDC" in (msg.sender_name or "").upper() \
+                or msg.is_from_me or msg.sender_is_staff_hint
 
         with conn.cursor() as cur:
             cur.execute("SELECT key_name, key_value FROM system_config;")
@@ -1423,13 +1677,39 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
 
             if pure_group_num:
                 cur.execute("""
-                SELECT id, company_name, brand_name, phone 
+                SELECT id, company_name, brand_name, phone, assigned_rep_id
                 FROM customer_accounts 
                 WHERE regexp_replace(whatsapp_group_id, '[^0-9]', '', 'g') = %s 
                    OR whatsapp_group_id ILIKE %s 
                 LIMIT 1;
                 """, (pure_group_num, f"%{pure_group_num}%"))
                 customer = cur.fetchone()
+
+            # ---------- المحرك الذكي لفهم الطلبات (Claude) ----------
+            if customer and ai_client.is_enabled() and chat_id.endswith("@g.us"):
+                conn.commit()
+                if sender_is_staff:
+                    return order_engine.handle_staff_message(conn, dict(customer), msg, logistics_group)
+                result = await order_engine.handle_customer_message(conn, dict(customer), msg, logistics_group)
+                if not result.get("fallback"):
+                    try:
+                        with conn.cursor() as log_cur:
+                            log_cur.execute("""
+                            INSERT INTO whatsapp_logs (created_at, sender_name, sender_phone, channel_name, is_external_call, message_body)
+                            VALUES (NOW(), %s, %s, %s, FALSE, %s);
+                            """, (msg.sender_name, clean_phone, f"مجموعة: {customer['company_name']}",
+                                  text or ("[صورة/ملف]" if msg.media_base64 else "")))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                    return result
+                logger.warning("Smart order engine unavailable, falling back to legacy parser.")
+
+            if sender_is_staff:
+                logger.info(f"Ignored message from internal sales representative: {msg.sender_name} ({clean_phone})")
+                return {"status": "IGNORED_INTERNAL_STAFF"}
+            if not text and not msg.shared_location_url and msg.event_type != 'MESSAGE_DELETED':
+                return {"status": "IGNORED_EMPTY"}
 
             if msg.event_type == 'MESSAGE_DELETED':
                 # الطلبية المحذوفة من الواتساب تُلغى من الإحصائيات ويُبلَّغ فريق اللوجستيك.

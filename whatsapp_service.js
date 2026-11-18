@@ -10,7 +10,8 @@ const {
   default: makeWASocket, 
   DisconnectReason, 
   fetchLatestBaileysVersion,
-  useMultiFileAuthState
+  useMultiFileAuthState,
+  downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const axios = require('axios');
@@ -101,6 +102,71 @@ function isInternalStaffName(pushName) {
   if (!pushName) return false;
   const upper = pushName.toUpperCase();
   return upper.includes('FDC') || upper.includes('SALES TEAM') || upper.includes('تنمية الغذاء');
+}
+
+// معرّفات الرسائل التي أرسلها البوت نفسه، حتى لا تُعامل كرسائل من فريق العمل
+const botSentIds = new Set();
+function rememberBotMessage(sent) {
+  if (sent && sent.key && sent.key.id) {
+    botSentIds.add(sent.key.id);
+    if (botSentIds.size > 2000) botSentIds.delete(botSentIds.values().next().value);
+    if (sent.message) messageStore.set(sent.key.id, sent.message);
+  }
+}
+
+// تحويل الرقم/المعرف إلى JID: معرفات المجموعات أطول من أرقام الهواتف (أكثر من 15 رقماً) أو تحتوي "-"
+function toJid(target) {
+  const clean = String(target || '').trim().replace(/[^0-9@a-z._-]/gi, '');
+  if (clean.includes('@')) return clean;
+  const digits = clean.replace(/^\+/, '');
+  return (digits.includes('-') || digits.replace(/\D/g, '').length > 15) ? `${digits}@g.us` : `${digits}@s.whatsapp.net`;
+}
+
+const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
+const ORDER_DOC_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                         'application/vnd.ms-excel', 'image/jpeg', 'image/png', 'image/webp'];
+
+// تنزيل صورة أو ملف الطلب (جدول الفروع والأصناف) لقراءته بالذكاء الاصطناعي
+async function extractOrderMedia(sock, msg, mMsg) {
+  const image = mMsg?.imageMessage;
+  const doc = mMsg?.documentMessage || mMsg?.documentWithCaptionMessage?.message?.documentMessage;
+  const media = image || doc;
+  if (!media) return null;
+  const mimetype = (media.mimetype || (image ? 'image/jpeg' : '')).split(';')[0];
+  if (doc && !ORDER_DOC_TYPES.includes(mimetype)) return null;
+  if (Number(media.fileLength || 0) > MAX_MEDIA_BYTES) return null;
+  try {
+    const buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: sock.updateMediaMessage });
+    if (!buffer || buffer.length > MAX_MEDIA_BYTES) return null;
+    return { media_base64: buffer.toString('base64'), media_mimetype: mimetype, media_filename: doc?.fileName || null };
+  } catch (e) {
+    console.error('[Operations WA] Media download failed:', e.message);
+    return null;
+  }
+}
+
+function extractQuoted(mMsg) {
+  const ctx = mMsg?.extendedTextMessage?.contextInfo || mMsg?.imageMessage?.contextInfo ||
+              mMsg?.documentMessage?.contextInfo || mMsg?.videoMessage?.contextInfo;
+  if (!ctx || !ctx.stanzaId) return { quoted_message_id: null, quoted_text: null };
+  const q = ctx.quotedMessage;
+  let qText = extractMessageText(q);
+  if (!qText && q?.imageMessage) qText = '[image]';
+  if (!qText && q?.documentMessage) qText = `[file] ${q.documentMessage.fileName || ''}`.trim();
+  return { quoted_message_id: ctx.stanzaId, quoted_text: qText || null };
+}
+
+// تنفيذ الرسائل التي يطلبها المحرك (سؤال العميل، تنبيه المندوب، أمر التوريد للوجستيك)
+async function runActions(sock, actions) {
+  for (const a of actions || []) {
+    if (!a || !a.to || !a.text) continue;
+    try {
+      const sent = await sock.sendMessage(toJid(a.to), { text: a.text });
+      rememberBotMessage(sent);
+    } catch (e) {
+      console.error('[Operations WA] Action send failed:', e.message);
+    }
+  }
 }
 
 function extractMessageText(mMsg) {
@@ -252,11 +318,14 @@ async function processIncomingMessage(sock, msg) {
           }
         }
 
-        if (!msg.message || msg.key.fromMe) return;
+        if (!msg.message) return;
 
         const chatId = msg.key.remoteJid;
+        const isFromMe = Boolean(msg.key.fromMe);
+        // رسائلنا من رقم الشركة: نهتم فقط بالمكتوبة يدوياً في المجموعات (سياق)، لا برسائل البوت نفسه
+        if (isFromMe && (!chatId.endsWith('@g.us') || botSentIds.has(msg.key.id))) return;
 
-        let rawSender = msg.key.participant || chatId;
+        let rawSender = isFromMe ? ((sock.user && sock.user.id) || '').split(':')[0] : (msg.key.participant || chatId);
         rawSender = rawSender.split('@')[0];
         let senderPhone = rawSender.replace(/[^0-9]/g, '');
 
@@ -269,11 +338,11 @@ async function processIncomingMessage(sock, msg) {
 
         const senderName = msg.pushName || senderPhone;
 
-        if (isInternalStaffName(senderName)) {
-          return;
-        }
+        // رسائل فريق العمل تُرسل كسياق للمحرك (مثل سؤال المندوب عن الطلب) ولا تُعامل كطلبات
+        const isStaff = isFromMe || isInternalStaffName(senderName);
 
         const isRevoked = msg.message?.protocolMessage?.type === 0;
+        if (isRevoked && isStaff) return;
         if (isRevoked) {
           const targetMsgId = msg.message.protocolMessage.key?.id;
           const delResp = await coreApi.post('/api/whatsapp/webhook', {
@@ -288,8 +357,9 @@ async function processIncomingMessage(sock, msg) {
           if (delResp.data && delResp.data.forward_to_logistics && delResp.data.logistics_text) {
             let logJid = delResp.data.forward_to_logistics.trim();
             if (!logJid.endsWith('@g.us') && !logJid.endsWith('@s.whatsapp.net')) logJid = `${logJid}@g.us`;
-            await sock.sendMessage(logJid, { text: delResp.data.logistics_text });
+            rememberBotMessage(await sock.sendMessage(logJid, { text: delResp.data.logistics_text }));
           }
+          await runActions(sock, delResp.data && delResp.data.actions);
           return;
         }
 
@@ -318,7 +388,13 @@ async function processIncomingMessage(sock, msg) {
           }
         }
 
-        if (!text.trim() && !locationUrl) return;
+        if (mMsg?.stickerMessage || mMsg?.reactionMessage) return;
+
+        // الصور والملفات (جداول الطلبات) تُقرأ فقط من العملاء داخل المجموعات
+        const media = (!isStaff && chatId.endsWith('@g.us') && !isEdited) ? await extractOrderMedia(sock, msg, mMsg) : null;
+        const quoted = extractQuoted(mMsg);
+
+        if (!text.trim() && !locationUrl && !media) return;
 
         const originalMsgId = isEdited ? msg.message.protocolMessage.key?.id : msg.key.id;
 
@@ -329,12 +405,19 @@ async function processIncomingMessage(sock, msg) {
           message_text: text,
           message_id: originalMsgId,
           event_type: isEdited ? 'MESSAGE_EDITED' : 'NORMAL',
-          shared_location_url: locationUrl
-        }, { timeout: 8000 });
+          shared_location_url: locationUrl,
+          is_from_me: isFromMe,
+          sender_is_staff_hint: isStaff,
+          quoted_message_id: quoted.quoted_message_id,
+          quoted_text: quoted.quoted_text,
+          ...(media || {})
+        }, { timeout: media ? 90000 : 40000 });
+
+        await runActions(sock, resp.data && resp.data.actions);
 
         if (resp.data && resp.data.reply_text) {
           const sent = await sock.sendMessage(chatId, { text: resp.data.reply_text });
-          if (sent && sent.key && sent.message) messageStore.set(sent.key.id, sent.message);
+          rememberBotMessage(sent);
         }
 
         if (resp.data && resp.data.send_catalog && resp.data.catalog_path && fs.existsSync(resp.data.catalog_path)) {
@@ -353,7 +436,7 @@ async function processIncomingMessage(sock, msg) {
           if (!logJid.endsWith('@g.us') && !logJid.endsWith('@s.whatsapp.net')) {
             logJid = `${logJid}@g.us`;
           }
-          await sock.sendMessage(logJid, { text: resp.data.logistics_text });
+          rememberBotMessage(await sock.sendMessage(logJid, { text: resp.data.logistics_text }));
         }
       }
 }
@@ -427,15 +510,12 @@ app.post('/send-message', async (req, res) => {
   }
 
   try {
-    let cleanTarget = phone_or_group.replace(/[^0-9@a-z._-]/gi, '');
-    let jid = cleanTarget.endsWith('@g.us') ? cleanTarget : `${cleanTarget.replace(/^\+/, '')}@s.whatsapp.net`;
+    const jid = toJid(phone_or_group);
 
     try { await sessions.operations.sock.presenceSubscribe(jid); } catch (e) {}
 
     const sent = await sessions.operations.sock.sendMessage(jid, { text: message });
-    if (sent && sent.key && sent.message) {
-      messageStore.set(sent.key.id, sent.message);
-    }
+    rememberBotMessage(sent);
     return res.json({ status: 'SENT', to: jid });
   } catch (e) {
     return res.status(500).json({ error: e.message });
@@ -449,8 +529,7 @@ app.post('/send-document', async (req, res) => {
   }
 
   try {
-    let cleanTarget = phone_or_group.replace(/[^0-9@a-z._-]/gi, '');
-    let jid = cleanTarget.endsWith('@g.us') ? cleanTarget : `${cleanTarget.replace(/^\+/, '')}@s.whatsapp.net`;
+    const jid = toJid(phone_or_group);
     const docBuffer = Buffer.from(file_base64, 'base64');
     const fname = (file_name || 'attachment.pdf').toLowerCase();
 
