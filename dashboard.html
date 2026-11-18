@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+    <link rel="icon" type="image/png" href="/favicon.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>شركة تنمية الغذاء | نظام إدارة المبيعات الميدانية والتنفيذية</title>
@@ -232,6 +233,9 @@
                 <button onclick="switchTab('issues'); loadIssues();" id="nav-issues" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>الشكاوى والاستفسارات</span>
                     <span id="open-issues-badge" class="hidden mr-auto bg-red-400 text-white text-[10px] font-bold rounded-full px-2">0</span>
+                </button>
+                <button onclick="switchTab('reports'); loadReports();" id="nav-reports" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
+                    <span>تقارير الإدارة</span>
                 </button>
                 <button onclick="switchTab('knowledge'); loadKnowledge();" id="nav-knowledge" class="w-full flex items-center gap-3 px-3 py-2.5 text-xs rounded-lg font-medium text-purple-200 hover:bg-[#480d80] text-right">
                     <span>قاعدة معرفة البوت</span>
@@ -493,6 +497,21 @@
                 </div>
             </div>
 
+            <!-- تقارير الإدارة الدورية -->
+            <div id="tab-reports" class="tab-content hidden space-y-4">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-purple-100 space-y-3">
+                    <h3 class="font-bold text-sm text-[#3A056A]">📊 تقارير الإدارة</h3>
+                    <p class="text-[11px] text-gray-600">تقرير احترافي يشمل المبيعات والطلبيات، صحة قاعدة العملاء، أداء الفريق وسرعة الرد، الجودة والشكاوى حسب المنتج، والعمليات — مع مقارنة بالفترة السابقة ونفس الفترة من العام الماضي. الأرقام محسوبة من سجلات النظام، والنص التحليلي والتوصيات يكتبها الذكاء الاصطناعي من هذه الأرقام. يُولَّد تلقائياً أول كل شهر/ربع/سنة ويصلك ملخصه على الواتساب.</p>
+                    <div class="flex flex-wrap gap-2 items-end text-xs">
+                        <div><label class="block font-bold mb-1">النوع</label>
+                            <select id="report-kind" onchange="fillReportPeriods()" class="p-2 border rounded-lg"><option value="month">شهري</option><option value="quarter">ربع سنوي</option><option value="year">سنوي</option></select></div>
+                        <div><label class="block font-bold mb-1">الفترة</label><select id="report-period" class="p-2 border rounded-lg w-44"></select></div>
+                        <button onclick="generateReport()" id="report-generate-btn" class="px-4 py-2 bg-[#3A056A] text-white rounded-lg font-bold">إعداد التقرير</button>
+                    </div>
+                    <div id="reports-list" class="space-y-2 text-xs"></div>
+                </div>
+            </div>
+
             <!-- قاعدة معرفة البوت: ملفات ومعلومات يجيب منها على استفسارات العملاء -->
             <div id="tab-knowledge" class="tab-content hidden space-y-4">
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-purple-100 space-y-3">
@@ -640,6 +659,7 @@
                             <input id="admin-alert-phone" dir="ltr" placeholder="96890000000" class="p-2 border rounded-lg text-xs font-mono">
                             <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="auto-reply-enabled"> الرد الآلي على الاستفسارات والشكاوى</label>
                         </div>
+                        <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="auto-reports-enabled"> إعداد تقارير الإدارة تلقائياً (أول كل شهر/ربع/سنة) وإرسال ملخصها لهذا الرقم</label>
                         <div id="assistant-capabilities" class="text-[10px] text-gray-500"></div>
                         <button onclick="saveAssistantSettings()" class="px-3.5 py-1.5 bg-[#3A056A] text-white font-bold rounded-lg text-xs">حفظ</button>
                     </div>
@@ -1868,12 +1888,58 @@
             loadProductsCatalog();
         };
 
+        // ---------------- تقارير الإدارة ----------------
+        const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+        window.fillReportPeriods = function() {
+            const kind = document.getElementById('report-kind').value;
+            const sel = document.getElementById('report-period');
+            const now = new Date(); const opts = [];
+            if (kind === 'month') {
+                for (let i = 0; i < 24; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    opts.push([d.getFullYear() + '-' + (d.getMonth() + 1), MONTHS_AR[d.getMonth()] + ' ' + d.getFullYear() + (i === 0 ? ' (حتى اليوم)' : '')]); }
+            } else if (kind === 'quarter') {
+                let y = now.getFullYear(), q = Math.floor(now.getMonth() / 3) + 1;
+                for (let i = 0; i < 8; i++) { opts.push([y + '-' + q, 'الربع ' + q + ' ' + y + (i === 0 ? ' (حتى اليوم)' : '')]); q--; if (!q) { q = 4; y--; } }
+            } else { for (let i = 0; i < 4; i++) opts.push([(now.getFullYear() - i) + '-1', 'عام ' + (now.getFullYear() - i) + (i === 0 ? ' (حتى اليوم)' : '')]); }
+            sel.innerHTML = opts.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('');
+            if (opts.length > 1) sel.selectedIndex = 1;
+        };
+        window.loadReports = async function() {
+            if (!document.getElementById('report-period').options.length) fillReportPeriods();
+            const list = await (await fetch('/api/reports')).json();
+            const KIND = { month: 'شهري', quarter: 'ربع سنوي', year: 'سنوي' };
+            document.getElementById('reports-list').innerHTML = list.map(r =>
+                '<div class="p-3 rounded-xl border border-purple-100 flex justify-between gap-3 items-center">' +
+                '<div><div class="font-bold text-[#3A056A]">' + escHtml(r.title) + '</div>' +
+                '<div class="text-[11px] text-gray-600">' + escHtml(r.headline || '') + '</div>' +
+                '<div class="text-[10px] text-gray-400">' + KIND[r.period_kind] + ' · ' + (r.source === 'auto' ? 'تلقائي' : 'يدوي') + ' · ' + new Date(r.created_at).toLocaleString('ar-OM') + '</div></div>' +
+                '<div class="flex gap-1 flex-shrink-0">' +
+                '<a href="/api/reports/' + r.id + '/view" target="_blank" class="px-2 py-1 bg-[#3A056A] text-white rounded font-bold">عرض / PDF</a>' +
+                '<a href="/api/reports/' + r.id + '/excel" class="px-2 py-1 border rounded">Excel</a>' +
+                '<button onclick="deleteReport(' + r.id + ')" class="px-2 py-1 border border-red-200 text-red-600 rounded">حذف</button></div></div>'
+            ).join('') || '<div class="text-gray-400">لا توجد تقارير بعد.</div>';
+        };
+        window.generateReport = async function() {
+            const kind = document.getElementById('report-kind').value;
+            const [year, index] = document.getElementById('report-period').value.split('-').map(Number);
+            const btn = document.getElementById('report-generate-btn');
+            btn.disabled = true; btn.textContent = 'جاري الإعداد (قد يستغرق دقيقة)...';
+            try {
+                const res = await fetch('/api/reports/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, year, index }) });
+                const d = await res.json().catch(() => ({}));
+                if (!res.ok) return alert(d.detail || 'تعذر إعداد التقرير');
+                window.open('/api/reports/' + d.id + '/view', '_blank');
+            } finally { btn.disabled = false; btn.textContent = 'إعداد التقرير'; loadReports(); }
+        };
+        window.deleteReport = async function(id) { if (!confirm('حذف هذا التقرير؟')) return; await fetch('/api/reports/' + id, { method: 'DELETE' }); loadReports(); };
+
         // ---------------- مسؤول النظام والرد الآلي ----------------
         window.loadAssistantSettings = async function() {
             try {
                 const d = await (await fetch('/api/system/assistant-settings')).json();
                 document.getElementById('admin-alert-phone').value = d.admin_alert_phone || '';
                 document.getElementById('auto-reply-enabled').checked = !!d.auto_reply_enabled;
+                document.getElementById('auto-reports-enabled').checked = d.auto_reports_enabled !== false;
                 document.getElementById('assistant-capabilities').textContent =
                     'فهم الطلبات والصور (Claude): ' + (d.ai_enabled ? '✓ مفعّل' : '✗ يحتاج ANTHROPIC_API_KEY') +
                     ' · الرسائل الصوتية (Together): ' + (d.voice_enabled ? '✓ مفعّل' : '✗ يحتاج TOGETHER_API_KEY');
@@ -1882,7 +1948,8 @@
         window.saveAssistantSettings = async function() {
             const res = await fetch('/api/system/assistant-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ admin_alert_phone: document.getElementById('admin-alert-phone').value.trim(),
-                                       auto_reply_enabled: document.getElementById('auto-reply-enabled').checked }) });
+                                       auto_reply_enabled: document.getElementById('auto-reply-enabled').checked,
+                                       auto_reports_enabled: document.getElementById('auto-reports-enabled').checked }) });
             const d = await res.json().catch(() => ({}));
             alert(res.ok ? 'تم الحفظ ✓' : (d.detail || 'تعذر الحفظ'));
         };

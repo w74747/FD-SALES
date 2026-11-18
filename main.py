@@ -39,6 +39,7 @@ import ai_client
 import order_engine
 import knowledge
 import catalog
+import reports
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pyotp
@@ -58,18 +59,6 @@ CATALOG_FILE_PATH = os.path.join(UPLOADS_FOLDER, "fdc_catalog.pdf")
 whatsapp_process = None
 
 dispatched_messages_cache: Dict[str, dict] = {}
-
-LOGO_SVG_RAW = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 90" width="420" height="90">
-  <rect width="100%" fill="transparent"/>
-  <g transform="translate(10, 10)">
-    <circle cx="35" cy="35" r="32" fill="#F5F0FC" stroke="#E4D9F5" stroke-width="2"/>
-    <path d="M 35 15 C 23.95 15 15 23.95 15 35 C 15 46.05 23.95 55 35 55 C 43.5 55 50.8 49.7 53.6 42 L 44.5 42 C 42.4 46.3 38.9 48.5 35 48.5 C 27.5 48.5 21.5 42.5 21.5 35 C 21.5 27.5 27.5 21.5 35 21.5 C 40.2 21.5 44.6 25.2 46.5 29.5 L 54.2 29.5 C 51.5 20.9 44 15 35 15 Z" fill="#3A056A"/>
-    <circle cx="35" cy="35" r="5.5" fill="#7E22CE"/>
-    <path d="M 48 20 C 49 23 48.5 27 46 29 C 44 26 44.5 22 48 20 Z" fill="#C194FB"/>
-    <text x="85" y="34" font-family="'Cairo', sans-serif" font-size="21" font-weight="900" fill="#3A056A">شركة تنمية الغذاء</text>
-    <text x="86" y="54" font-family="'Cairo', sans-serif" font-size="11" font-weight="700" fill="#7E22CE" letter-spacing="1.5">FOOD DEVELOPMENT CO.</text>
-  </g>
-</svg>"""
 
 def get_db_connection():
     """اتصال من المجمّع (Connection Pool) - close() يعيده للمجمّع بدل إغلاقه"""
@@ -772,6 +761,7 @@ def init_database():
     order_engine.init_schema(run_isolated_ddl)
     knowledge.init_schema(run_isolated_ddl)
     catalog.init_schema(run_isolated_ddl)
+    reports.init_schema(run_isolated_ddl)
     run_isolated_ddl("""
         CREATE TABLE IF NOT EXISTS stored_files (
             file_key VARCHAR(100) PRIMARY KEY,
@@ -846,13 +836,20 @@ async def enforce_server_side_auth(request: Request, call_next):
         return JSONResponse({"detail": "يجب تسجيل الدخول"}, status_code=401)
     return await call_next(request)
 
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+
+
 @app.get("/logo.png")
 def get_logo():
-    return Response(
-        content=LOGO_SVG_RAW.strip().encode("utf-8"),
-        media_type="image/svg+xml",
-        headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"}
-    )
+    """الشعار الرسمي لشركة تنمية الغذاء (PNG بخلفية شفافة)"""
+    return FileResponse(os.path.join(ASSETS_DIR, "fdc-logo.png"), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/favicon.png")
+def get_favicon():
+    return FileResponse(os.path.join(ASSETS_DIR, "fdc-mark.png"), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 # ----------------- نماذج Pydantic -----------------
 class Verify2FAPayload(BaseModel):
@@ -1417,6 +1414,7 @@ class OrderProfilePayload(BaseModel):
 class AssistantSettingsPayload(BaseModel):
     admin_alert_phone: Optional[str] = ""
     auto_reply_enabled: Optional[bool] = False
+    auto_reports_enabled: Optional[bool] = True
 
 
 class KnowledgeTextPayload(BaseModel):
@@ -1706,6 +1704,7 @@ def get_assistant_settings():
             return {
                 "admin_alert_phone": order_engine.get_setting(cur, "admin_alert_phone"),
                 "auto_reply_enabled": order_engine.get_setting(cur, "auto_reply_enabled", "false").lower() == "true",
+                "auto_reports_enabled": order_engine.get_setting(cur, "auto_reports_enabled", "true").lower() == "true",
                 "ai_enabled": ai_client.is_enabled(),
                 "voice_enabled": bool(os.getenv("TOGETHER_API_KEY", "").strip()),
             }
@@ -1723,7 +1722,8 @@ def save_assistant_settings(payload: AssistantSettingsPayload):
         raise HTTPException(status_code=500, detail="Database unreachable")
     try:
         with conn.cursor() as cur:
-            for k, v in (("admin_alert_phone", phone), ("auto_reply_enabled", "true" if payload.auto_reply_enabled else "false")):
+            for k, v in (("admin_alert_phone", phone), ("auto_reply_enabled", "true" if payload.auto_reply_enabled else "false"),
+                         ("auto_reports_enabled", "true" if payload.auto_reports_enabled else "false")):
                 cur.execute("""INSERT INTO system_config (key_name, key_value) VALUES (%s, %s)
                                ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;""", (k, v))
         conn.commit()
@@ -1887,6 +1887,152 @@ def issues_summary(days: int = 90):
         conn.close()
 
 
+# ======================= التقارير الدورية للإدارة =======================
+
+class ReportRequestPayload(BaseModel):
+    kind: str
+    year: int
+    index: Optional[int] = 1
+
+
+def _report_logo() -> str:
+    # الشعار يُحمَّل من الخادم (لا يُضمَّن في كل تقرير محفوظ)
+    return "/logo.png"
+
+
+REPORT_FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+
+
+@app.get("/report-fonts/{name}")
+def report_font(name: str):
+    """خطوط التقارير حسب الهوية (IBM Plex Sans Arabic، Plus Jakarta Sans، Almarai، Spectral، IBM Plex Mono - رخصة OFL)"""
+    if not re.fullmatch(r"(text-(ar|la)-(400|500|600)|disp-ar-(300|400|700|800)|disp-la-(300|400|600)|mono-(400|500))\.woff2", name):
+        raise HTTPException(status_code=404)
+    return FileResponse(os.path.join(REPORT_FONTS_DIR, name), media_type="font/woff2",
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+@app.get("/api/reports")
+def list_reports():
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT id, period_kind, period_start, period_end, title, source, created_at,
+                                  metrics->'narrative'->>'headline' AS headline
+                           FROM management_reports ORDER BY period_start DESC, id DESC LIMIT 100;""")
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+@app.post("/api/reports/generate")
+async def generate_report(payload: ReportRequestPayload):
+    if payload.kind not in ("month", "quarter", "year"):
+        raise HTTPException(status_code=400, detail="نوع التقرير غير صحيح")
+    try:
+        start, end, label = reports.period_bounds(payload.kind, payload.year, payload.index or 1)
+    except Exception:
+        raise HTTPException(status_code=400, detail="الفترة غير صحيحة")
+    if start > order_engine.today_local():
+        raise HTTPException(status_code=400, detail="لا يمكن إعداد تقرير لفترة لم تبدأ بعد")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        rep_ = await reports.generate(conn, payload.kind, start, end, label, "manual", _report_logo())
+        return {"status": "SUCCESS", "id": rep_["id"], "title": rep_["title"]}
+    finally:
+        conn.close()
+
+
+@app.get("/api/reports/{report_id}/view", response_class=HTMLResponse)
+def view_report(report_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT html FROM management_reports WHERE id = %s;", (report_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="التقرير غير موجود")
+            return HTMLResponse(row["html"])
+    finally:
+        conn.close()
+
+
+@app.get("/api/reports/{report_id}/excel")
+def report_excel(report_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT title, metrics, period_start FROM management_reports WHERE id = %s;", (report_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="التقرير غير موجود")
+    finally:
+        conn.close()
+    data = reports.metrics_to_xlsx(row["metrics"], row["title"])
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="FDC_Report_{row["period_start"]}_{report_id}.xlsx"'})
+
+
+@app.delete("/api/reports/{report_id}")
+def delete_report(report_id: int):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM management_reports WHERE id = %s;", (report_id,))
+        conn.commit()
+        return {"status": "SUCCESS"}
+    finally:
+        conn.close()
+
+
+async def run_scheduled_reports():
+    """
+    التقارير التلقائية (بتوقيت مسقط، بعد الساعة 7 صباحاً):
+    أول يوم من كل شهر ← تقرير الشهر السابق؛ أول يوم من كل ربع ← تقرير الربع السابق؛ 1 يناير ← التقرير السنوي.
+    يُرسل ملخص ورابط التقرير لمسؤول النظام على الواتساب.
+    """
+    now = order_engine.now_local()
+    if now.day != 1 or now.hour < 7:
+        return
+    due = [("month",)] + ([("quarter",)] if now.month in (1, 4, 7, 10) else []) + ([("year",)] if now.month == 1 else [])
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            if order_engine.get_setting(cur, "auto_reports_enabled", "true").lower() != "true":
+                return
+            admin = re.sub(r"[^0-9]", "", order_engine.get_setting(cur, "admin_alert_phone"))
+        for (kind,) in due:
+            start, end, label = reports.last_completed_period(kind, now.date())
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM management_reports WHERE period_kind = %s AND period_start = %s AND source = 'auto';",
+                            (kind, start))
+                exists = cur.fetchone()
+            conn.commit()
+            if exists:
+                continue
+            rep_ = await reports.generate(conn, kind, start, end, label, "auto", _report_logo())
+            logger.info(f"[Reports] Auto-generated {rep_['title']} (#{rep_['id']})")
+            if admin:
+                base = order_engine.public_base_url()
+                await send_whatsapp_direct(admin, reports.whatsapp_summary(rep_, f"{base}/api/reports/{rep_['id']}/view" if base else ""))
+    except Exception as e:
+        logger.error(f"Scheduled report failed: {e}")
+    finally:
+        conn.close()
+
+
 async def order_scheduler_loop():
     """كل دقيقة: إرسال تذكيرات الطلب المستحقة وإنهاء طلبات التأكيد القديمة"""
     await asyncio.sleep(20)
@@ -1902,6 +2048,7 @@ async def order_scheduler_loop():
                 finally:
                     conn.close()
                 await dispatch_actions(actions)
+            await run_scheduled_reports()
         except asyncio.CancelledError:
             raise
         except Exception as e:
