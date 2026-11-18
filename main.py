@@ -60,18 +60,6 @@ whatsapp_process = None
 
 dispatched_messages_cache: Dict[str, dict] = {}
 
-LOGO_SVG_RAW = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 90" width="420" height="90">
-  <rect width="100%" fill="transparent"/>
-  <g transform="translate(10, 10)">
-    <circle cx="35" cy="35" r="32" fill="#F5F0FC" stroke="#E4D9F5" stroke-width="2"/>
-    <path d="M 35 15 C 23.95 15 15 23.95 15 35 C 15 46.05 23.95 55 35 55 C 43.5 55 50.8 49.7 53.6 42 L 44.5 42 C 42.4 46.3 38.9 48.5 35 48.5 C 27.5 48.5 21.5 42.5 21.5 35 C 21.5 27.5 27.5 21.5 35 21.5 C 40.2 21.5 44.6 25.2 46.5 29.5 L 54.2 29.5 C 51.5 20.9 44 15 35 15 Z" fill="#3A056A"/>
-    <circle cx="35" cy="35" r="5.5" fill="#7E22CE"/>
-    <path d="M 48 20 C 49 23 48.5 27 46 29 C 44 26 44.5 22 48 20 Z" fill="#C194FB"/>
-    <text x="85" y="34" font-family="'Cairo', sans-serif" font-size="21" font-weight="900" fill="#3A056A">شركة تنمية الغذاء</text>
-    <text x="86" y="54" font-family="'Cairo', sans-serif" font-size="11" font-weight="700" fill="#7E22CE" letter-spacing="1.5">FOOD DEVELOPMENT CO.</text>
-  </g>
-</svg>"""
-
 def get_db_connection():
     """اتصال من المجمّع (Connection Pool) - close() يعيده للمجمّع بدل إغلاقه"""
     return db_pool.get_pooled_connection(DATABASE_URL)
@@ -848,13 +836,20 @@ async def enforce_server_side_auth(request: Request, call_next):
         return JSONResponse({"detail": "يجب تسجيل الدخول"}, status_code=401)
     return await call_next(request)
 
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+
+
 @app.get("/logo.png")
 def get_logo():
-    return Response(
-        content=LOGO_SVG_RAW.strip().encode("utf-8"),
-        media_type="image/svg+xml",
-        headers={"Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*"}
-    )
+    """الشعار الرسمي لشركة تنمية الغذاء (PNG بخلفية شفافة)"""
+    return FileResponse(os.path.join(ASSETS_DIR, "fdc-logo.png"), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/favicon.png")
+def get_favicon():
+    return FileResponse(os.path.join(ASSETS_DIR, "fdc-mark.png"), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 # ----------------- نماذج Pydantic -----------------
 class Verify2FAPayload(BaseModel):
@@ -1901,11 +1896,8 @@ class ReportRequestPayload(BaseModel):
 
 
 def _report_logo() -> str:
-    try:
-        from logo_data import LOGO_BASE64
-        return LOGO_BASE64
-    except Exception:
-        return ""
+    # الشعار يُحمَّل من الخادم (لا يُضمَّن في كل تقرير محفوظ)
+    return "/logo.png"
 
 
 REPORT_FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")

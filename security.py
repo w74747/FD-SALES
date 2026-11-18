@@ -48,6 +48,7 @@ COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").strip().lower() != "false"
 PUBLIC_PATHS = {
     "/",
     "/logo.png",
+    "/favicon.png",
     "/healthz",
     "/api/auth/status",
     "/api/auth/2fa/verify",
