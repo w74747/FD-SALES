@@ -1908,6 +1908,18 @@ def _report_logo() -> str:
         return ""
 
 
+REPORT_FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+
+
+@app.get("/report-fonts/{name}")
+def report_font(name: str):
+    """خط التقارير (IBM Plex Sans Arabic، رخصة OFL) - ملفات محددة فقط"""
+    if not re.fullmatch(r"plex-arabic-(arabic|latin)-(400|500|700)\.woff2", name):
+        raise HTTPException(status_code=404)
+    return FileResponse(os.path.join(REPORT_FONTS_DIR, name), media_type="font/woff2",
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
 @app.get("/api/reports")
 def list_reports():
     conn = get_db_connection()
