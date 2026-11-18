@@ -71,13 +71,17 @@ def build_context(cur) -> str:
     for r in cur.fetchall():
         parts.append(f"=== {r['title']} ===\n{r['content_text']}")
     try:
-        cur.execute("""SELECT sku, name_ar, name_en, weight_spec, primary_packaging, carton_pack_spec, notes
-                       FROM products_catalog ORDER BY id LIMIT 300;""")
+        cur.execute("""SELECT * FROM products_catalog ORDER BY category NULLS LAST, sku LIMIT 500;""")
         rows = cur.fetchall()
         if rows:
-            parts.append("=== Product catalog (system) ===\n" + "\n".join(
-                f"{r['sku'] or '-'} | {r['name_en'] or ''} | {r['name_ar'] or ''} | weight: {r['weight_spec'] or '-'} | "
-                f"pack: {r['primary_packaging'] or '-'} | carton: {r['carton_pack_spec'] or '-'} | {r['notes'] or ''}"
+            g = lambda r, k: r.get(k) if r.get(k) not in (None, "") else None
+            fmt = lambda v: f"{float(v):g}" if isinstance(v, (int, float)) or hasattr(v, "as_tuple") else str(v)
+            parts.append("=== Product catalog (code | name | category | weight/piece g | pcs/pack | packs/box | pcs/box | "
+                         "shelf life frozen days | shelf life after thawing +4C | preparation) ===\n" + "\n".join(
+                " | ".join(fmt(x) if x is not None else "-" for x in (
+                    g(r, "sku"), g(r, "name_en") or g(r, "name_ar"), g(r, "category"), g(r, "piece_weight_g"),
+                    g(r, "pieces_per_pack"), g(r, "packs_per_box"), g(r, "pieces_per_box"),
+                    g(r, "shelf_life_frozen"), g(r, "shelf_life_secondary"), g(r, "preparation")))
                 for r in rows))
     except Exception:
         pass
@@ -102,7 +106,7 @@ ANSWER_TOOL = {
 ANSWER_SYSTEM = """You reply on behalf of Food Development Co. (FDC), a B2B bakery in Oman, inside a customer's WhatsApp group.
 Use ONLY the COMPANY KNOWLEDGE below. Never guess or invent prices, stock, delivery dates, discounts, ingredients or policies.
 If the knowledge does not explicitly contain the answer, set can_answer=false (a team member will reply).
-If prices in the knowledge are general list prices, say they are list prices and that the sales team can confirm the customer's agreed price.
+Prices: if an "AGREED PRICES FOR THIS CUSTOMER ONLY" section is present you may quote those exact prices (OMR, with the unit). Otherwise do not quote any price: say the sales team will confirm the price. Never quote prices that belong to another customer.
 Never discuss the customer's account balance, invoices, payments or complaints compensation: escalate.
 Keep replies short (1-4 lines), friendly and professional, in the same language as the customer (Arabic or English)."""
 
