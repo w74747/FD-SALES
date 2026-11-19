@@ -28,7 +28,8 @@ APPROVE_RE = re.compile(r"معتمد|اعتمد|تم\s*الاعتماد|مواف
 # تأكيد تنفيذ الإلغاء في النظام
 DONE_RE = re.compile(r"\bتم\b|ملغي|ملغى|الغي|ألغي|الغاء|إلغاء|\bdone\b|\bok(ay)?\b|\bcancel(l?ed)?\b", re.IGNORECASE)
 # رقم الطلب في نظام الشركة: أرقام (3 فأكثر) مع بادئة حروف اختيارية، مثل 10234 أو SO-2026-00123
-ERP_RE = re.compile(r"(?<![\w/.:-])((?:[A-Za-z]{1,6}[-/#]?)?\d{3,}(?:[-/]\d+)*)(?![\w/.:])")
+# يقبل صيغة نظام الشركة كما تظهر على الشاشة «BKLSO - 202602343» (بمسافات حول الشرطة) ويوحّدها إلى BKLSO-202602343
+ERP_RE = re.compile(r"(?<![\w/.:-])((?:[A-Za-z]{2,8}\s*[-/#]?\s*)?\d{3,}(?:[-/]\d+)*)(?![\w/.:])")
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "0123456789" * 2)
 
 OPEN_STATUSES = ("awaiting", "entered")
@@ -120,8 +121,14 @@ def _parse(text: str) -> dict:
     t = REF_RE.sub(" ", (text or "").translate(_DIGITS))
     erp = ERP_RE.search(t)
     rejected = bool(REJECT_RE.search(t))
-    return {"erp": erp.group(1) if erp else "", "rejected": rejected,
+    return {"erp": _normalize_erp(erp.group(1)) if erp else "", "rejected": rejected,
             "approved": (not rejected) and bool(APPROVE_RE.search(t)), "done": bool(DONE_RE.search(t)), "text": t.strip()}
+
+
+def _normalize_erp(raw: str) -> str:
+    """BKLSO - 202602343 / bklso202602343 / BKLSO 202602343 ← BKLSO-202602343"""
+    m = re.fullmatch(r"([A-Za-z]{2,8})\s*[-/#]?\s*(\d.*)", raw.strip())
+    return f"{m.group(1).upper()}-{m.group(2)}" if m else raw.strip()
 
 
 def _open_submissions(cur) -> list:
