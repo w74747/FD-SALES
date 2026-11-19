@@ -965,6 +965,28 @@
                 </div>
             </div>
 
+            <!-- استيراد الفروع دفعة واحدة: تنزيل القالب ← تعبئته ← رفعه ← معاينة ← حفظ -->
+            <div class="p-3 bg-white border border-purple-200 rounded-xl space-y-2.5">
+                <div class="font-bold text-[#3A056A]">⇪ استيراد فروع دفعة واحدة (Excel):</div>
+                <div class="text-[10px] text-gray-500">نزّل القالب (فيه الفروع الحالية)، عدّل أو أضف فروعاً، ثم ارفعه. ستظهر معاينة قبل الحفظ، ولا يُحذف أي فرع غير موجود في الملف.</div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="downloadBranchesTemplate()" class="px-3 py-1.5 bg-white border border-purple-300 text-[#3A056A] rounded-lg font-bold">⬇ تنزيل القالب</button>
+                    <label class="px-3 py-1.5 brand-primary-bg text-white rounded-lg font-bold cursor-pointer">
+                        ⬆ رفع ملف
+                        <input type="file" id="branches-import-file" accept=".xlsx" class="hidden" onchange="previewBranchesImport(this)">
+                    </label>
+                    <span id="branches-import-filename" class="text-[10px] text-gray-500"></span>
+                </div>
+                <div id="branches-import-preview" class="hidden space-y-2">
+                    <div id="branches-import-summary" class="flex flex-wrap gap-2 text-[10px] font-bold"></div>
+                    <div id="branches-import-rows" class="max-h-48 overflow-y-auto border rounded-lg divide-y divide-gray-100"></div>
+                    <div class="flex justify-end gap-2">
+                        <button onclick="resetBranchesImport()" class="px-3 py-1.5 border rounded-lg">إلغاء</button>
+                        <button id="branches-import-apply" onclick="applyBranchesImport()" class="px-4 py-1.5 brand-primary-bg text-white font-bold rounded-lg disabled:opacity-50">حفظ الفروع</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="flex justify-end pt-2 border-t">
                 <button onclick="closeModal('branches-modal')" class="px-4 py-2 border rounded-lg">إغلاق</button>
             </div>
@@ -987,6 +1009,10 @@
             <div>
                 <label class="block font-bold mb-1">رابط موقع الخريطة (Google Maps URL):</label>
                 <input type="text" id="edit-branch-location" class="w-full p-2 border rounded-lg font-mono text-[11px]">
+            </div>
+            <div>
+                <label class="block font-bold mb-1">الأسماء البديلة (مفصولة بفواصل، مثل: صلالة, Salalah, SLL):</label>
+                <input type="text" id="edit-branch-aliases" class="w-full p-2 border rounded-lg">
             </div>
             <div class="flex justify-end gap-2 pt-2 border-t">
                 <button onclick="closeModal('branch-edit-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
@@ -1547,6 +1573,7 @@
             document.getElementById('new-branch-name').value = '';
             document.getElementById('new-branch-phone').value = '';
             document.getElementById('new-branch-location').value = '';
+            resetBranchesImport();
 
             openModal('branches-modal');
             await loadCustomerBranches(customerId);
@@ -1568,6 +1595,8 @@
                             <div class="space-y-0.5">
                                 <div class="font-bold text-purple-900">${b.branch_name}</div>
                                 <div class="text-gray-600 font-mono">الهاتف: ${b.branch_phone || 'غير مسجل'}</div>
+                                ${b.city ? `<div class="text-gray-600 text-[10px]">المنطقة: ${escHtml(b.city)}</div>` : ''}
+                                ${b.aliases ? `<div class="text-gray-500 text-[10px]">أسماء بديلة: ${escHtml(b.aliases)}</div>` : ''}
                                 ${b.location_url ? `<a href="${b.location_url}" target="_blank" class="text-blue-600 hover:underline flex items-center gap-1 font-mono text-[10px]">📍 فتح الموقع بالخريطة</a>` : '<div class="text-gray-400 text-[10px]">لا يوجد رابط موقع</div>'}
                             </div>
                             <div class="flex items-center gap-1.5 whitespace-nowrap">
@@ -1627,6 +1656,7 @@
             document.getElementById('edit-branch-name').value = b.branch_name || '';
             document.getElementById('edit-branch-phone').value = b.branch_phone || '';
             document.getElementById('edit-branch-location').value = b.location_url || '';
+            document.getElementById('edit-branch-aliases').value = b.aliases || '';
 
             openModal('branch-edit-modal');
         };
@@ -1636,6 +1666,8 @@
             const branch_name = document.getElementById('edit-branch-name').value.trim();
             const branch_phone = document.getElementById('edit-branch-phone').value.trim();
             const location_url = document.getElementById('edit-branch-location').value.trim();
+            const aliases = document.getElementById('edit-branch-aliases').value.trim();
+            const current = window.appState.loadedBranches.find(x => String(x.id) === String(branch_id));
 
             if (!branch_name) return alert("يرجى إدخال اسم الفرع");
 
@@ -1646,7 +1678,8 @@
                     branch_name,
                     branch_phone,
                     location_url,
-                    city: 'مسقط'
+                    aliases,
+                    city: (current && current.city) || 'مسقط'  // الإبقاء على المنطقة الحالية (قد تأتي من الاستيراد)
                 })
             });
 
@@ -1656,6 +1689,86 @@
                 alert("تم تحديث بيانات الفرع بنجاح ✓");
             } else {
                 alert("فشل تحديث بيانات الفرع");
+            }
+        };
+
+        // ---------------- استيراد الفروع دفعة واحدة (Excel) ----------------
+        window.downloadBranchesTemplate = function() {
+            const id = window.appState.activeBranchCustomerId;
+            if (id) window.location.href = `/api/customers/${id}/branches/template`;
+        };
+
+        window.resetBranchesImport = function() {
+            window.appState.branchImportFile = null;
+            const input = document.getElementById('branches-import-file');
+            if (input) input.value = '';
+            document.getElementById('branches-import-filename').innerText = '';
+            document.getElementById('branches-import-preview').classList.add('hidden');
+        };
+
+        window.previewBranchesImport = async function(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            const id = window.appState.activeBranchCustomerId;
+            window.appState.branchImportFile = file;
+            document.getElementById('branches-import-filename').innerText = `${file.name} — جاري الفحص...`;
+            const fd = new FormData();
+            fd.append('file', file);
+            let data;
+            try {
+                const res = await fetch(`/api/customers/${id}/branches/import/preview`, { method: 'POST', body: fd });
+                data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'تعذر قراءة الملف');
+            } catch (e) {
+                resetBranchesImport();
+                return alert(e.message || 'تعذر قراءة الملف');
+            }
+            document.getElementById('branches-import-filename').innerText = file.name;
+
+            const s = data.summary;
+            const pill = (cls, txt) => `<span class="px-2 py-0.5 rounded-full ${cls}">${txt}</span>`;
+            document.getElementById('branches-import-summary').innerHTML =
+                pill('bg-green-100 text-green-800', `🟢 جديد: ${s.new}`) +
+                pill('bg-yellow-100 text-yellow-800', `🟡 محدّث: ${s.updated}`) +
+                pill('bg-gray-100 text-gray-600', `بدون تغيير: ${s.unchanged}`) +
+                pill('bg-red-100 text-red-800', `🔴 أخطاء: ${s.error}`) +
+                (s.error ? '<span class="text-red-700 font-normal">صفوف الأخطاء لن تُحفظ — صحّحها وأعد الرفع، أو احفظ الباقي.</span>' : '');
+
+            const fieldNames = { branch_name: 'الاسم', city: 'المنطقة', branch_phone: 'الهاتف', location_url: 'الموقع', aliases: 'الأسماء البديلة' };
+            const order = { error: 0, new: 1, updated: 2, unchanged: 3 };
+            const items = [...data.items].sort((a, b) => order[a.status] - order[b.status] || a.row - b.row);
+            document.getElementById('branches-import-rows').innerHTML = items.map(it => {
+                const icon = { new: '🟢', updated: '🟡', unchanged: '⚪', error: '🔴' }[it.status];
+                let detail = '';
+                if (it.status === 'error') detail = `<div class="text-red-700">${it.errors.map(escHtml).join(' · ')}</div>`;
+                else if (it.status === 'updated') detail = Object.entries(it.changes).map(([f, c]) =>
+                    `<div class="text-gray-600">${fieldNames[f] || f}: <span class="line-through text-gray-400">${escHtml(c.old || '—')}</span> ← ${escHtml(c.new)}</div>`).join('');
+                return `<div class="p-2 text-[11px] ${it.status === 'unchanged' ? 'text-gray-400' : ''}">
+                    <div><span class="text-gray-400 font-mono">صف ${it.row}</span> ${icon} <b>${escHtml(it.branch_name || '(بدون اسم)')}</b></div>${detail}</div>`;
+            }).join('') || '<div class="p-2 text-gray-400">لا توجد صفوف في الملف</div>';
+
+            document.getElementById('branches-import-apply').disabled = (s.new + s.updated) === 0;
+            document.getElementById('branches-import-preview').classList.remove('hidden');
+        };
+
+        window.applyBranchesImport = async function() {
+            const id = window.appState.activeBranchCustomerId;
+            const file = window.appState.branchImportFile;
+            if (!file) return;
+            const btn = document.getElementById('branches-import-apply');
+            btn.disabled = true;
+            const fd = new FormData();
+            fd.append('file', file);
+            try {
+                const res = await fetch(`/api/customers/${id}/branches/import/apply`, { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'فشل الحفظ');
+                resetBranchesImport();
+                await loadCustomerBranches(id);
+                alert(`تم الحفظ ✓\nفروع جديدة: ${data.added}\nفروع محدّثة: ${data.updated}` + (data.skipped ? `\nصفوف لم تُحفظ بسبب أخطاء: ${data.skipped}` : ''));
+            } catch (e) {
+                btn.disabled = false;
+                alert(e.message || 'فشل الحفظ');
             }
         };
 
