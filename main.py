@@ -38,6 +38,7 @@ import db_pool
 import ai_client
 import order_engine
 import order_approval
+import i18n
 import knowledge
 import catalog
 import reports
@@ -860,6 +861,7 @@ class Setup2FAPayload(BaseModel):
     setup_token: str
 
 class LogisticsGroupPayload(BaseModel):
+    language: Optional[str] = None
     group_id: str
 
 class InboundWelcomeConfigPayload(BaseModel):
@@ -881,6 +883,7 @@ class BulkCampaignPayload(BaseModel):
     custom_attachment_name: Optional[str] = None
 
 class CreateCustomerPayload(BaseModel):
+    language: Optional[str] = "auto"
     company_name: str
     brand_name: Optional[str] = ""
     sector: Optional[str] = "مطاعم"
@@ -892,6 +895,7 @@ class CreateCustomerPayload(BaseModel):
     whatsapp_group_id: Optional[str] = ""
 
 class UpdateCustomerPayload(BaseModel):
+    language: Optional[str] = "auto"
     company_name: str
     brand_name: Optional[str] = ""
     region: Optional[str] = "مسقط"
@@ -935,6 +939,7 @@ class UpdateRepPayload(BaseModel):
     phone_number: str
     monthly_target: Optional[float] = 0.0
     status: Optional[str] = "نشط"
+    language: Optional[str] = "en"
 
 class UpdateAgentPayload(BaseModel):
     name: str
@@ -1356,6 +1361,7 @@ def get_logistics_group():
             return {
                 "group_id": conf.get("logistics_group_id", ""),
                 "effective_target": resolve_logistics_target(cur, conf),
+                "language": i18n.norm(conf.get("logistics_language")),
             }
     finally:
         conn.close()
@@ -1375,6 +1381,10 @@ def save_logistics_group(payload: LogisticsGroupPayload):
             INSERT INTO system_config (key_name, key_value) VALUES ('logistics_group_id', %s)
             ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;
             """, (group_id,))
+            if payload.language:
+                cur.execute("""INSERT INTO system_config (key_name, key_value) VALUES ('logistics_language', %s)
+                               ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;""",
+                            (i18n.norm(payload.language),))
             conn.commit()
             return {"status": "SUCCESS", "group_id": group_id}
     finally:
@@ -1414,6 +1424,7 @@ class OrderProfilePayload(BaseModel):
 
 class AssistantSettingsPayload(BaseModel):
     admin_alert_phone: Optional[str] = ""
+    admin_language: Optional[str] = None
     auto_reply_enabled: Optional[bool] = False
     auto_reports_enabled: Optional[bool] = True
 
@@ -1435,7 +1446,7 @@ async def dispatch_actions(actions: list):
 
 
 def _load_customer(cur, customer_id: int) -> Optional[dict]:
-    cur.execute("SELECT id, company_name, brand_name, phone, assigned_rep_id, whatsapp_group_id FROM customer_accounts WHERE id = %s;",
+    cur.execute("SELECT id, company_name, brand_name, phone, assigned_rep_id, whatsapp_group_id, language FROM customer_accounts WHERE id = %s;",
                 (customer_id,))
     row = cur.fetchone()
     return dict(row) if row else None
@@ -1504,6 +1515,7 @@ async def reject_pending_order(pending_id: int):
 # ----------------- مسار الاعتماد: إدخال البيانات ← المالية ← اللوجستيك -----------------
 class OrderRoutingPayload(BaseModel):
     data_entry_target: str = ""
+    data_entry_language: Optional[str] = None
 
 
 class SubmissionDecisionPayload(BaseModel):
@@ -1536,6 +1548,7 @@ def get_order_routing():
     try:
         with conn.cursor() as cur:
             return {"data_entry_target": order_engine.data_entry_target(cur),
+                    "data_entry_language": order_engine.data_entry_language(cur),
                     "logistics_target": _current_logistics_target(cur)}
     finally:
         conn.close()
@@ -1553,6 +1566,10 @@ def save_order_routing(payload: OrderRoutingPayload):
                 INSERT INTO system_config (key_name, key_value) VALUES ('data_entry_target', %s)
                 ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;
             """, (target,))
+            if payload.data_entry_language:
+                cur.execute("""INSERT INTO system_config (key_name, key_value) VALUES ('data_entry_language', %s)
+                               ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;""",
+                            (i18n.norm(payload.data_entry_language),))
         conn.commit()
         return {"status": "SUCCESS", "data_entry_target": target}
     finally:
@@ -1815,6 +1832,7 @@ def get_assistant_settings():
         with conn.cursor() as cur:
             return {
                 "admin_alert_phone": order_engine.get_setting(cur, "admin_alert_phone"),
+                "admin_language": order_engine.admin_language(cur),
                 "auto_reply_enabled": order_engine.get_setting(cur, "auto_reply_enabled", "false").lower() == "true",
                 "auto_reports_enabled": order_engine.get_setting(cur, "auto_reports_enabled", "true").lower() == "true",
                 "ai_enabled": ai_client.is_enabled(),
@@ -1834,8 +1852,11 @@ def save_assistant_settings(payload: AssistantSettingsPayload):
         raise HTTPException(status_code=500, detail="Database unreachable")
     try:
         with conn.cursor() as cur:
-            for k, v in (("admin_alert_phone", phone), ("auto_reply_enabled", "true" if payload.auto_reply_enabled else "false"),
-                         ("auto_reports_enabled", "true" if payload.auto_reports_enabled else "false")):
+            pairs = [("admin_alert_phone", phone), ("auto_reply_enabled", "true" if payload.auto_reply_enabled else "false"),
+                     ("auto_reports_enabled", "true" if payload.auto_reports_enabled else "false")]
+            if payload.admin_language:
+                pairs.append(("admin_language", i18n.norm(payload.admin_language)))
+            for k, v in pairs:
                 cur.execute("""INSERT INTO system_config (key_name, key_value) VALUES (%s, %s)
                                ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;""", (k, v))
         conn.commit()
@@ -2125,6 +2146,7 @@ async def run_scheduled_reports():
             if order_engine.get_setting(cur, "auto_reports_enabled", "true").lower() != "true":
                 return
             admin = re.sub(r"[^0-9]", "", order_engine.get_setting(cur, "admin_alert_phone"))
+            admin_lang = order_engine.admin_language(cur)
         for (kind,) in due:
             start, end, label = reports.last_completed_period(kind, now.date())
             with conn.cursor() as cur:
@@ -2138,7 +2160,7 @@ async def run_scheduled_reports():
             logger.info(f"[Reports] Auto-generated {rep_['title']} (#{rep_['id']})")
             if admin:
                 base = order_engine.public_base_url()
-                await send_whatsapp_direct(admin, reports.whatsapp_summary(rep_, f"{base}/api/reports/{rep_['id']}/view" if base else ""))
+                await send_whatsapp_direct(admin, reports.whatsapp_summary(rep_, f"{base}/api/reports/{rep_['id']}/view" if base else "", admin_lang))
     except Exception as e:
         logger.error(f"Scheduled report failed: {e}")
     finally:
@@ -2219,7 +2241,7 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
 
             if pure_group_num:
                 cur.execute("""
-                SELECT id, company_name, brand_name, phone, assigned_rep_id
+                SELECT id, company_name, brand_name, phone, assigned_rep_id, language
                 FROM customer_accounts 
                 WHERE regexp_replace(whatsapp_group_id, '[^0-9]', '', 'g') = %s 
                    OR whatsapp_group_id ILIKE %s 
@@ -2436,6 +2458,11 @@ def get_customers():
     finally:
         conn.close()
 
+def _customer_lang(value: Optional[str]) -> str:
+    """auto = البوت يرد بنفس لغة رسالة العميل"""
+    return value if value in i18n.LANGS else "auto"
+
+
 @app.post("/api/customers")
 def create_customer(payload: CreateCustomerPayload):
     conn = get_db_connection()
@@ -2454,6 +2481,7 @@ def create_customer(payload: CreateCustomerPayload):
                 payload.whatsapp_group_id.strip() if payload.whatsapp_group_id else ""
             ))
             new_id = cur.fetchone()["id"]
+            cur.execute("UPDATE customer_accounts SET language = %s WHERE id = %s;", (_customer_lang(payload.language), new_id))
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
     finally:
@@ -2478,6 +2506,7 @@ def update_customer(cust_id: int, payload: UpdateCustomerPayload):
                 payload.whatsapp_group_id.strip() if payload.whatsapp_group_id else "",
                 cust_id
             ))
+            cur.execute("UPDATE customer_accounts SET language = %s WHERE id = %s;", (_customer_lang(payload.language), cust_id))
             conn.commit()
             return {"status": "SUCCESS"}
     finally:
@@ -2754,11 +2783,40 @@ def get_reps():
                     "monthly_target": float(r.get("monthly_target") or 0),
                     "achieved_sales": float(r.get("achieved_sales") or 0),
                     "total_expenses": float(r.get("total_expenses") or 0),
-                    "status": r["status"] or "نشط"
+                    "status": r["status"] or "نشط",
+                    "language": i18n.norm(r.get("language")),
                 })
             return enriched
     finally:
         conn.close()
+
+@app.post("/api/reps")
+def create_sales_rep(payload: UpdateRepPayload):
+    """إضافة عضو لفريق المبيعات (رقمه يستقبل تنبيهات عملائه بلغته المختارة)"""
+    name, phone = payload.name.strip(), re.sub(r"[^0-9]", "", payload.phone_number or "")
+    if not name or not (8 <= len(phone) <= 15):
+        raise HTTPException(status_code=400, detail="أدخل الاسم ورقم هاتف صحيحاً (مثال: 96890000000)")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database error")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM sales_executives WHERE regexp_replace(phone_number, '[^0-9]', '', 'g') = %s;", (phone,))
+            if cur.fetchone():
+                raise HTTPException(status_code=400, detail="هذا الرقم مسجل لعضو آخر")
+            cur.execute("SELECT COALESCE(MAX(id), 0) + 1 AS n FROM sales_executives;")
+            code = f"REP-{cur.fetchone()['n']:03d}"
+            cur.execute("""
+                INSERT INTO sales_executives (name, employee_code, phone_number, region, monthly_target, status, language)
+                VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id;
+            """, (name, code, phone, (payload.region or "").strip() or "-", payload.monthly_target or 0.0,
+                  payload.status or "نشط", i18n.norm(payload.language)))
+            new_id = cur.fetchone()["id"]
+        conn.commit()
+        return {"status": "SUCCESS", "id": new_id, "employee_code": code}
+    finally:
+        conn.close()
+
 
 @app.post("/api/reps/{rep_id}/update")
 def update_sales_rep(rep_id: int, payload: UpdateRepPayload):
@@ -2769,12 +2827,12 @@ def update_sales_rep(rep_id: int, payload: UpdateRepPayload):
         with conn.cursor() as cur:
             cur.execute("""
             UPDATE sales_executives 
-            SET name = %s, region = %s, phone_number = %s, monthly_target = %s, status = %s
+            SET name = %s, region = %s, phone_number = %s, monthly_target = %s, status = %s, language = %s
             WHERE id = %s;
             """, (
                 payload.name.strip(), payload.region.strip(), 
                 payload.phone_number.strip(), payload.monthly_target or 0.0, 
-                payload.status or "نشط", rep_id
+                payload.status or "نشط", i18n.norm(payload.language), rep_id
             ))
             conn.commit()
             return {"status": "SUCCESS"}

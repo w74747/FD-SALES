@@ -17,6 +17,7 @@ import logging
 import re
 from typing import Optional
 
+import i18n
 import order_engine as oe
 
 logger = logging.getLogger("fd-sales.order-approval")
@@ -33,9 +34,12 @@ ERP_RE = re.compile(r"(?<![\w/.:-])((?:[A-Za-z]{2,8}\s*[-/#]?\s*)?\d{3,}(?:[-/]\
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "0123456789" * 2)
 
 OPEN_STATUSES = ("awaiting", "entered")
-KIND_AR = {"new": "طلب جديد", "update": "تحديث طلب", "cancel": "إلغاء طلب"}
-STATUS_AR = {"awaiting": "بانتظار الإدخال", "entered": "مُدخل — بانتظار المالية", "approved": "معتمد ومرسل للوجستيك",
-             "rejected": "مرفوض", "superseded": "استُبدل بتحديث أحدث"}
+def _kind(kind: str, lang: str) -> str:
+    return i18n.t(f"kind_{kind}", lang)
+
+
+def _state(status: str, lang: str) -> str:
+    return i18n.t(f"st_{status}", lang)
 
 
 def _digits(v: str) -> str:
@@ -62,17 +66,12 @@ def is_data_entry_chat(target: str, chat_id: str, sender_phone: str) -> bool:
 
 
 def _customer(cur, customer_id: int) -> dict:
-    cur.execute("SELECT id, company_name, brand_name, assigned_rep_id FROM customer_accounts WHERE id = %s;", (customer_id,))
+    cur.execute("SELECT id, company_name, brand_name, assigned_rep_id, language FROM customer_accounts WHERE id = %s;", (customer_id,))
     return dict(cur.fetchone())
 
 
-def _instructions(kind: str) -> str:
-    if kind == "cancel":
-        return "↩️ ألغِ الطلب في النظام ثم *ردّ على هذه الرسالة* بكلمة «تم»."
-    if kind == "update":
-        return "↩️ عدّل الطلب في النظام، وبعد اعتماد المالية *ردّ على هذه الرسالة* بكلمة «معتمد»."
-    return ("↩️ بعد إدخال الطلب *ردّ على هذه الرسالة* برقم الطلب، وبعد اعتماد المالية ردّ بكلمة «معتمد»"
-            " (أو الاثنين معاً: 12345 معتمد).")
+def _instructions(kind: str, lang: str) -> str:
+    return i18n.t({"cancel": "instr_cancel", "update": "instr_update"}.get(kind, "instr_new"), lang)
 
 
 # ======================= 1) إرسال الطلب لإدخال البيانات =======================
@@ -94,11 +93,12 @@ def submit_change(cur, customer: dict, change: dict, entry_target: str, logistic
     """, (change["batch_id"], customer["id"], kind, json.dumps(after), json.dumps(entry), batch["erp_order_no"]))
     sid = cur.fetchone()["id"]
 
-    extra = ["📝 *للإدخال في النظام* — " + KIND_AR[kind]]
+    elang, llang = oe.data_entry_language(cur), oe.logistics_language(cur)
+    extra = [i18n.t("for_entry", elang, kind=_kind(kind, elang))]
     if batch["erp_order_no"]:
-        extra.append(f"🧾 *Order No:* {batch['erp_order_no']}")
-    text = oe.format_logistics_message(customer, dict(change, snapshot=entry), ref=f"FD-{sid}",
-                                       extra_lines=extra, footer=_instructions(kind))
+        extra.append(i18n.t("order_no", elang, no=batch["erp_order_no"]))
+    text = oe.format_logistics_message(customer, dict(change, snapshot=entry), ref=f"FD-{sid}", extra_lines=extra,
+                                       footer=_instructions(kind, elang), lang=elang, cancel_note="cancel_note_entry")
     cur.execute("UPDATE order_submissions SET entry_message = %s WHERE id = %s;", (text, sid))
     cur.execute("UPDATE order_batches SET entry_snapshot = %s::jsonb, updated_at = NOW() WHERE id = %s;",
                 (json.dumps(after), change["batch_id"]))
@@ -109,7 +109,7 @@ def submit_change(cur, customer: dict, change: dict, entry_target: str, logistic
     if kind == "cancel" and dispatched and logistics_target:
         hold = oe.format_logistics_message(
             customer, dict(change, snapshot=dispatched), ref=f"FD-{sid}",
-            extra_lines=[f"🧾 *Order No:* {batch['erp_order_no']}"] if batch["erp_order_no"] else None)
+            extra_lines=[i18n.t("order_no", llang, no=batch["erp_order_no"])] if batch["erp_order_no"] else None, lang=llang)
         actions.append(oe._action(logistics_target, hold))
         cur.execute("UPDATE order_batches SET dispatched_snapshot = '[]'::jsonb WHERE id = %s;", (change["batch_id"],))
     return actions
@@ -156,6 +156,7 @@ def handle_data_entry_message(conn, msg, logistics_target: str) -> dict:
     by = f"data-entry:{msg.sender_name or msg.sender_phone}"[:150]
     actions = []
     with conn.cursor() as cur:
+        lang = oe.data_entry_language(cur)
         ref = REF_RE.search((msg.quoted_text or "").translate(_DIGITS)) or REF_RE.search((msg.message_text or "").translate(_DIGITS))
         sub = _get_submission(cur, int(ref.group(1))) if ref else None
         if not sub:
@@ -165,9 +166,8 @@ def handle_data_entry_message(conn, msg, logistics_target: str) -> dict:
             if len(open_subs) == 1 and not msg.quoted_text:
                 sub = open_subs[0]
             elif open_subs:
-                lst = "\n".join(f"• FD-{s['id']} | {s['company_name']} — {KIND_AR[s['kind']]}" for s in open_subs[:10])
-                actions.append(oe._action(chat_id, "⚠️ لم أعرف أي طلب تقصد. يرجى *الرد على رسالة الطلب نفسها*.\n"
-                                                    f"الطلبات المفتوحة:\n{lst}"))
+                lst = "\n".join(f"• FD-{s['id']} | {s['company_name']} — {_kind(s['kind'], lang)}" for s in open_subs[:10])
+                actions.append(oe._action(chat_id, i18n.t("de_which", lang, lst=lst)))
                 return {"status": "DATA_ENTRY_AMBIGUOUS", "actions": actions}
             else:
                 return {"status": "DATA_ENTRY_IGNORED", "actions": []}
@@ -178,12 +178,13 @@ def handle_data_entry_message(conn, msg, logistics_target: str) -> dict:
 
 def process_reply(cur, sub: dict, p: dict, by: str, logistics_target: str, ack_to: str) -> list:
     tag = f"FD-{sub['id']} | {sub['company_name']}"
-    ack = lambda text: [oe._action(ack_to, text)] if ack_to else []
+    lang = oe.data_entry_language(cur)
+    ack = lambda key, **kw: [oe._action(ack_to, i18n.t(key, lang, tag=tag, **kw))] if ack_to else []
 
     if sub["status"] == "approved":
-        return ack(f"ℹ️ {tag}: هذا الطلب معتمد ومرسل للوجستيك مسبقاً (رقم {sub['erp_order_no'] or '—'}).")
+        return ack("de_already", no=sub["erp_order_no"] or "—")
     if sub["status"] in ("rejected", "superseded"):
-        return ack(f"ℹ️ {tag}: حالة هذا الطلب «{STATUS_AR[sub['status']]}»، لا حاجة لإجراء.")
+        return ack("de_state", state=_state(sub["status"], lang))
 
     if sub["kind"] == "cancel" and (p["approved"] or p["done"] or p["rejected"] or p["erp"]):
         return approve_submission(cur, sub["id"], p["erp"], by, logistics_target, ack_to)
@@ -195,14 +196,13 @@ def process_reply(cur, sub: dict, p: dict, by: str, logistics_target: str, ack_t
     if p["approved"]:
         number = p["erp"] or sub["erp_order_no"] or _batch_erp(cur, sub["batch_id"])
         if not number:
-            return ack(f"⚠️ {tag}: يرجى إرسال *رقم الطلب* في النظام مع الاعتماد (مثال: 12345 معتمد) بالرد على رسالة الطلب.")
+            return ack("de_need_number")
         return approve_submission(cur, sub["id"], number, by, logistics_target, ack_to)
     if p["erp"]:
         cur.execute("""UPDATE order_submissions SET status = 'entered', entered_at = COALESCE(entered_at, NOW())
                        WHERE id = %s AND status IN ('awaiting', 'entered');""", (sub["id"],))
-        return ack(f"📝 {tag}: سُجّل رقم الطلب *{p['erp']}* — بانتظار اعتماد المالية.\n"
-                   "عند الاعتماد ردّ على رسالة الطلب بكلمة «معتمد».")
-    return ack(f"ℹ️ {tag}: لم أفهم الرد. أرسل رقم الطلب، أو «معتمد» بعد اعتماد المالية، أو «مرفوض».")
+        return ack("de_entered", no=p["erp"])
+    return ack("de_unclear")
 
 
 def _batch_erp(cur, batch_id: int) -> str:
@@ -224,9 +224,10 @@ def approve_submission(cur, sid: int, number: str, by: str, logistics_target: st
     if not sub:
         return []
     tag = f"FD-{sid} | {sub['company_name']}"
-    ack = lambda text: [oe._action(ack_to, text)] if ack_to else []
+    lang, llang = oe.data_entry_language(cur), oe.logistics_language(cur)
+    ack = lambda key, **kw: [oe._action(ack_to, i18n.t(key, lang, tag=tag, **kw))] if ack_to else []
     if sub["status"] not in OPEN_STATUSES:
-        return ack(f"ℹ️ {tag}: حالة هذا الطلب «{STATUS_AR[sub['status']]}».")
+        return ack("de_state", state=_state(sub["status"], lang))
     number = (number or sub["erp_order_no"] or _batch_erp(cur, sub["batch_id"]) or "").strip()[:60]
 
     # اعتماد متأخر لنسخة أقدم بعد اعتماد تحديث أحدث لنفس الطلب: لا نُرجع اللوجستيك لنسخة قديمة
@@ -236,7 +237,7 @@ def approve_submission(cur, sid: int, number: str, by: str, logistics_target: st
     if newer:
         cur.execute("UPDATE order_submissions SET status = 'superseded', resolved_by = %s, resolved_at = NOW() WHERE id = %s;",
                     (by, sid))
-        return ack(f"ℹ️ {tag}: تم اعتماد تحديث أحدث لهذا الطلب (FD-{newer['id']}) وأُرسل للوجستيك، فلا حاجة لإرسال هذه النسخة.")
+        return ack("de_newer", newer=newer["id"])
 
     cur.execute("""
         UPDATE order_submissions SET status = 'approved', erp_order_no = NULLIF(%s, ''), resolved_by = %s, resolved_at = NOW(),
@@ -261,9 +262,9 @@ def approve_submission(cur, sid: int, number: str, by: str, logistics_target: st
         if logistics_target:
             change = {"after": lines, "snapshot": dispatched, "delivery_date": batch["delivery_date"],
                       "batch_id": batch["id"], "totals": oe.lines_totals(cur, lines)}
-            status = "✅ *CANCELLATION CONFIRMED*" if not lines else "✅ *APPROVED*"
-            text = oe.format_logistics_message(customer, change, ref=f"FD-{sid}",
-                                               extra_lines=[f"🧾 *Order No:* {number or '—'}  |  {status}"])
+            status = i18n.t("cancel_confirmed_tag" if not lines else "approved_tag", llang)
+            text = oe.format_logistics_message(customer, change, ref=f"FD-{sid}", lang=llang,
+                                               extra_lines=[i18n.t("order_no", llang, no=number or "—") + f"  |  {status}"])
             actions.append(oe._action(logistics_target, text))
             sent = True
         cur.execute("UPDATE order_batches SET dispatched_snapshot = %s::jsonb, updated_at = NOW() WHERE id = %s;",
@@ -272,13 +273,13 @@ def approve_submission(cur, sid: int, number: str, by: str, logistics_target: st
         cur.execute("UPDATE order_submissions SET logistics_sent_at = NOW() WHERE id = %s;", (sid,))
 
     if sub["kind"] == "cancel":
-        actions += ack(f"✅ {tag}: تم تأكيد الإلغاء" + (" وإبلاغ اللوجستيك." if sent or dispatched == [] else "."))
+        actions += ack("de_cancel_ok_log" if (sent or dispatched == []) and logistics_target else "de_cancel_ok")
     elif sent:
-        actions += ack(f"✅ {tag}: الطلب رقم *{number}* معتمد وأُرسل للوجستيك.")
+        actions += ack("de_sent", no=number)
     elif not logistics_target:
-        actions += ack(f"⚠️ {tag}: اعتُمد الطلب رقم *{number}* لكن وجهة اللوجستيك غير محددة في الإعدادات.")
+        actions += ack("de_no_logistics", no=number)
     else:
-        actions += ack(f"✅ {tag}: الطلب رقم *{number}* معتمد (لا تغيير جديد على ما لدى اللوجستيك).")
+        actions += ack("de_nochange", no=number)
     return actions
 
 
@@ -292,14 +293,15 @@ def reject_submission(cur, sid: int, by: str, reason: str = "", ack_to: str = ""
     if not cur.fetchone():
         return []
     tag = f"FD-{sid} | {sub['company_name']}"
-    actions = [oe._action(ack_to, f"❌ {tag}: سُجّل أن الطلب غير معتمد ولن يُرسل للوجستيك.")] if ack_to else []
+    lang = oe.data_entry_language(cur)
+    actions = [oe._action(ack_to, i18n.t("de_rejected", lang, tag=tag))] if ack_to else []
     customer = _customer(cur, sub["customer_id"])
-    alert = oe.alert_target(cur, customer)
+    alert, alang = oe.alert_target_lang(cur, customer)
     if alert:
-        actions.append(oe._action(alert, f"❌ *طلب لم تعتمده المالية* — {sub['company_name']}\n"
-                                         f"المرجع: FD-{sid}" + (f" | رقم الطلب: {sub['erp_order_no']}" if sub["erp_order_no"] else "") +
-                                         (f"\nالملاحظة: {reason}" if reason else "") +
-                                         "\nيرجى التواصل مع العميل أو المالية."))
+        actions.append(oe._action(alert, i18n.t(
+            "al_rejected", alang, company=sub["company_name"], sid=sid,
+            no=i18n.t("al_rejected_no", alang, no=sub["erp_order_no"]) if sub["erp_order_no"] else "",
+            note=i18n.t("al_note", alang, text=reason) if reason else "")))
     return actions
 
 
