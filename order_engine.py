@@ -130,6 +130,31 @@ SCHEMA = [
     );""",
     "CREATE INDEX IF NOT EXISTS idx_pending_chat ON pending_order_confirmations (chat_id, status, created_at DESC);",
     "ALTER TABLE customer_order_profiles ADD COLUMN IF NOT EXISTS products JSONB DEFAULT '[]'::jsonb;",
+    # مسار الاعتماد: العميل ← إدخال البيانات (رقم الطلب في النظام) ← اعتماد المالية ← اللوجستيك
+    "ALTER TABLE order_batches ADD COLUMN IF NOT EXISTS erp_order_no VARCHAR(60);",
+    "ALTER TABLE order_batches ADD COLUMN IF NOT EXISTS entry_snapshot JSONB;",
+    # الطلبيات التي وصلت اللوجستيك قبل تفعيل المسار تُعتبر مُدخلة (لا تُرسل لإدخال البيانات كطلب جديد)
+    "UPDATE order_batches SET entry_snapshot = COALESCE(dispatched_snapshot, '[]'::jsonb) WHERE entry_snapshot IS NULL;",
+    "ALTER TABLE order_batches ALTER COLUMN entry_snapshot SET DEFAULT '[]'::jsonb;",
+    """CREATE TABLE IF NOT EXISTS order_submissions (
+        id SERIAL PRIMARY KEY,
+        batch_id INTEGER NOT NULL REFERENCES order_batches(id) ON DELETE CASCADE,
+        customer_id INTEGER NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+        kind VARCHAR(10) NOT NULL,
+        lines JSONB NOT NULL DEFAULT '[]'::jsonb,
+        prev_lines JSONB NOT NULL DEFAULT '[]'::jsonb,
+        status VARCHAR(12) NOT NULL DEFAULT 'awaiting',
+        erp_order_no VARCHAR(60),
+        entry_message TEXT DEFAULT '',
+        resolved_by VARCHAR(150),
+        note TEXT DEFAULT '',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        entered_at TIMESTAMP WITH TIME ZONE,
+        resolved_at TIMESTAMP WITH TIME ZONE,
+        logistics_sent_at TIMESTAMP WITH TIME ZONE
+    );""",
+    "CREATE INDEX IF NOT EXISTS idx_order_submissions_open ON order_submissions (status, created_at);",
+    "CREATE INDEX IF NOT EXISTS idx_order_submissions_batch ON order_submissions (batch_id, id);",
     "ALTER TABLE customer_order_profiles ADD COLUMN IF NOT EXISTS auto_reply_enabled BOOLEAN DEFAULT TRUE;",
     "ALTER TABLE customer_order_profiles ADD COLUMN IF NOT EXISTS reminder_frequency VARCHAR(10) DEFAULT 'daily';",
     # الشكاوى والاستفسارات: تُصنَّف حسب المنتج والنوع لتقارير الجودة والبحث والتطوير
@@ -598,17 +623,24 @@ def _totals(lines: list, metrics: Optional[dict] = None) -> str:
     return text
 
 
-def format_logistics_message(customer: dict, change: dict) -> str:
+def format_logistics_message(customer: dict, change: dict, ref: Optional[str] = None,
+                             extra_lines: Optional[list] = None, footer: str = "") -> str:
+    """
+    رسالة الطلب (جديد/تحديث/إلغاء). تُستخدم للوجستيك ولموظف إدخال البيانات:
+    ref = مرجع الرسالة (افتراضياً B-رقم الطلبية)، extra_lines = أسطر بعد التاريخ (رقم الطلب والحالة)،
+    footer = تعليمات في آخر الرسالة.
+    """
     after, snapshot = change["after"], change["snapshot"] or []
     d: date = change["delivery_date"]
     header_name = customer["company_name"] + (f" ({customer['brand_name']})" if customer.get("brand_name") else "")
-    date_line = f"🗓 *Delivery:* {d.strftime('%a %d/%m/%Y')}"
+    date_line = f"🗓 *Delivery:* {d.strftime('%a %d/%m/%Y')}" + "".join("\n" + x for x in (extra_lines or []))
+    ref_line = f"Ref: {ref or 'B-' + str(change['batch_id'])}" + (f"\n{footer}" if footer else "")
 
     if not after:
         return (f"🚫 *ORDER CANCELLED* | {header_name}\n{date_line}\n"
                 f"----------------------------------------\n"
                 f"⚠️ The customer cancelled/removed this order. Please hold and do not dispatch.\n"
-                f"Ref: B-{change['batch_id']}")
+                f"{ref_line}")
 
     body = []
     for branch, items in _group_by_branch(after).items():
@@ -620,7 +652,7 @@ def format_logistics_message(customer: dict, change: dict) -> str:
         return (f"📦 *NEW ORDER* | {header_name}\n{date_line}\n"
                 f"----------------------------------------\n{current}\n"
                 f"----------------------------------------\n"
-                f"*Total:* {_totals(after, change.get('totals'))}\nRef: B-{change['batch_id']}")
+                f"*Total:* {_totals(after, change.get('totals'))}\n{ref_line}")
 
     prev = {(l["branch"], l["product"]): l for l in snapshot}
     now = {(l["branch"], l["product"]): l for l in after}
@@ -636,7 +668,7 @@ def format_logistics_message(customer: dict, change: dict) -> str:
     return (f"🔄 *ORDER UPDATE* | {header_name}\n{date_line}\n"
             f"----------------------------------------\n*Changes:*\n" + "\n".join(changes) +
             f"\n----------------------------------------\n*Full order now:*\n{current}\n"
-            f"*Total:* {_totals(after, change.get('totals'))}\nRef: B-{change['batch_id']}")
+            f"*Total:* {_totals(after, change.get('totals'))}\n{ref_line}")
 
 
 def mark_dispatched(cur, change: dict):
@@ -845,6 +877,11 @@ def _dispatch_change(cur, customer: dict, change: dict, logistics_target: str) -
         return []
     actions = []
     change["totals"] = lines_totals(cur, change["after"])
+    entry_target = data_entry_target(cur)
+    if entry_target:
+        # المسار الجديد: الطلب يذهب أولاً لموظف إدخال البيانات، ولا يصل اللوجستيك إلا بعد اعتماد المالية
+        import order_approval
+        return order_approval.submit_change(cur, customer, change, entry_target, logistics_target)
     if logistics_target:
         actions.append(_action(logistics_target, format_logistics_message(customer, change)))
     mark_dispatched(cur, change)
@@ -855,6 +892,11 @@ def get_setting(cur, key: str, default: str = "") -> str:
     cur.execute("SELECT key_value FROM system_config WHERE key_name = %s;", (key,))
     row = cur.fetchone()
     return (row["key_value"] if row and row["key_value"] is not None else default).strip()
+
+
+def data_entry_target(cur) -> str:
+    """مجموعة أو رقم موظف إدخال البيانات؛ فارغ = الطلبات تذهب مباشرة للوجستيك (السلوك السابق)"""
+    return get_setting(cur, "data_entry_target")
 
 
 def alert_target(cur, customer: dict) -> str:
