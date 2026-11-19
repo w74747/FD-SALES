@@ -41,6 +41,7 @@ import order_approval
 import i18n
 import knowledge
 import catalog
+import branch_import
 import reports
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -745,6 +746,8 @@ def init_database():
 
     run_isolated_ddl("ALTER TABLE whatsapp_logs ADD COLUMN IF NOT EXISTS sender_phone VARCHAR(50) DEFAULT '';")
     run_isolated_ddl("ALTER TABLE dispatched_orders ADD COLUMN IF NOT EXISTS message_id VARCHAR(100);")
+    # الأسماء البديلة للفرع (مثل صلالة / Salalah / SLL) يستخدمها البوت لمطابقة الفرع دون سؤال العميل
+    run_isolated_ddl("ALTER TABLE customer_branches ADD COLUMN IF NOT EXISTS aliases TEXT DEFAULT '';")
 
     # الطلبية الواحدة (رسالة واتساب واحدة) قد تحتوي عدة أصناف، لذلك يكون التفرد على (رقم الرسالة + الصنف)
     # بدلاً من رقم الرسالة وحده الذي كان يُسقط كل الأصناف بعد الأول ويُفشل الإدخال بالكامل.
@@ -910,12 +913,14 @@ class CustomerBranchPayload(BaseModel):
     branch_phone: Optional[str] = ""
     location_url: Optional[str] = ""
     city: Optional[str] = "مسقط"
+    aliases: Optional[str] = ""
 
 class UpdateCustomerBranchPayload(BaseModel):
     branch_name: str
     branch_phone: Optional[str] = ""
     location_url: Optional[str] = ""
     city: Optional[str] = "مسقط"
+    aliases: Optional[str] = None  # None = لا تغيير على الأسماء البديلة
 
 class CreateTargetPayload(BaseModel):
     title: str
@@ -2545,9 +2550,10 @@ def add_customer_branch(payload: CustomerBranchPayload):
     try:
         with conn.cursor() as cur:
             cur.execute("""
-            INSERT INTO customer_branches (customer_id, branch_name, branch_phone, location_url, city)
-            VALUES (%s, %s, %s, %s, %s) RETURNING id;
-            """, (payload.customer_id, payload.branch_name.strip(), payload.branch_phone or "", payload.location_url or "", payload.city or "مسقط"))
+            INSERT INTO customer_branches (customer_id, branch_name, branch_phone, location_url, city, aliases)
+            VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;
+            """, (payload.customer_id, payload.branch_name.strip(), payload.branch_phone or "", payload.location_url or "",
+                  payload.city or "مسقط", branch_import.join_aliases(branch_import.split_aliases(payload.aliases))))
             new_id = cur.fetchone()["id"]
             conn.commit()
             return {"status": "SUCCESS", "id": new_id}
@@ -2566,6 +2572,9 @@ def update_customer_branch(branch_id: int, payload: UpdateCustomerBranchPayload)
             SET branch_name = %s, branch_phone = %s, location_url = %s, city = %s
             WHERE id = %s;
             """, (payload.branch_name.strip(), payload.branch_phone or "", payload.location_url or "", payload.city or "مسقط", branch_id))
+            if payload.aliases is not None:
+                cur.execute("UPDATE customer_branches SET aliases = %s WHERE id = %s;",
+                            (branch_import.join_aliases(branch_import.split_aliases(payload.aliases)), branch_id))
             conn.commit()
             return {"status": "SUCCESS"}
     finally:
@@ -2583,6 +2592,82 @@ def delete_customer_branch(branch_id: int):
             return {"status": "SUCCESS"}
     finally:
         conn.close()
+
+# ----------------- استيراد الفروع دفعة واحدة (Excel) -----------------
+def _customer_and_branches(cur, customer_id: int):
+    cur.execute("SELECT id, company_name FROM customer_accounts WHERE id = %s;", (customer_id,))
+    customer = cur.fetchone()
+    if not customer:
+        raise HTTPException(status_code=404, detail="العميل غير موجود")
+    cur.execute("SELECT * FROM customer_branches WHERE customer_id = %s ORDER BY id ASC;", (customer_id,))
+    return customer, [dict(r) for r in cur.fetchall()]
+
+
+async def _read_branch_file(file: UploadFile) -> list:
+    raw = await file.read()
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="الحد الأقصى لحجم الملف 5 ميجابايت")
+    try:
+        return branch_import.read_rows(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/customers/{customer_id}/branches/template")
+def download_branches_template(customer_id: int):
+    """قالب Excel معبأ مسبقاً بفروع العميل الحالية"""
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            customer, branches = _customer_and_branches(cur, customer_id)
+    finally:
+        conn.close()
+    data = branch_import.build_template(customer["company_name"] or "", branches)
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "_", customer["company_name"] or "").strip("_") or f"customer_{customer_id}"
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="FDC_Branches_{safe}.xlsx"'})
+
+
+@app.post("/api/customers/{customer_id}/branches/import/preview")
+async def preview_branches_import(customer_id: int, file: UploadFile = File(...)):
+    """معاينة الملف قبل الحفظ: جديد / محدّث / بدون تغيير / أخطاء (لا يُحفظ شيء هنا)"""
+    rows = await _read_branch_file(file)
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            _, branches = _customer_and_branches(cur, customer_id)
+    finally:
+        conn.close()
+    return branch_import.build_preview(rows, branches)
+
+
+@app.post("/api/customers/{customer_id}/branches/import/apply")
+async def apply_branches_import(customer_id: int, file: UploadFile = File(...)):
+    """حفظ الفروع الجديدة والمحدّثة من الملف نفسه؛ صفوف الأخطاء تُتجاهل ولا يُحذف أي فرع"""
+    rows = await _read_branch_file(file)
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            _, branches = _customer_and_branches(cur, customer_id)
+            # المعاينة تُعاد على البيانات الحالية لحظة الحفظ حتى لا نعتمد على معاينة قديمة
+            preview = branch_import.build_preview(rows, branches)
+            result = branch_import.apply_preview(cur, customer_id, preview)
+        conn.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Branch import failed for customer {customer_id}: {e}")
+        raise HTTPException(status_code=500, detail="تعذر حفظ الفروع، لم يُحفظ أي تغيير")
+    finally:
+        conn.close()
+    return {"status": "SUCCESS", **result, "summary": preview["summary"]}
 
 # ----------------- مسارات الأهداف والفرص -----------------
 @app.get("/api/targets")

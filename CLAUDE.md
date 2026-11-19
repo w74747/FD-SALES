@@ -12,6 +12,8 @@ Plus product catalogue, customer pricing, and management reports.
   - `ai_client.py` — Claude (Anthropic Messages API), forced tool output
   - `media_tools.py` — Word/Excel/CSV/PDF text extraction; voice via Whisper on Together
   - `catalog.py` — Assortment Excel import, packing specs, unit conversion (pieces / kg)
+  - `branch_import.py` — bulk branch import: Excel template, preview, apply (no auto-delete),
+    branch alternate names used by the bot's branch matching (DB-free, unit-tested)
   - `knowledge.py` — knowledge base for bot auto-replies
   - `reports.py`, `sales_reports_engine.py` — management reports (PDF/Excel + WhatsApp summary)
   - `i18n.py` — all bot-facing text
@@ -45,10 +47,14 @@ Plus product catalogue, customer pricing, and management reports.
 - Git-ignored runtime dirs: `auth_info/`, `uploads/`.
 
 ## Tests
-- There are currently NO test files in this repository (no `test_*.py` on any branch).
-  The "199/199 tests" reported in the claude.ai sessions were not committed.
-- When adding tests, put them in `test_*.py` and run with `python -m pytest -q`
-  (pytest is not in requirements.txt yet).
+- Tests live in `test_*.py` at the repo root; run with `python -m pytest -q`.
+  Currently: `test_branch_import.py` only. The "199/199 tests" reported in the
+  claude.ai sessions were never committed.
+- pytest is not in requirements.txt (dev-only); install it in the venv.
+- Local dev on this Windows ARM64 machine: `.venv` (git-ignored via .git/info/exclude).
+  `psycopg2-binary` has no win-arm64 wheel, so modules importing psycopg2 (`main.py`,
+  `order_engine.py`, `db_pool.py`) can't be imported locally — keep business logic in
+  DB-free modules so it can be tested.
 
 ## Workflow
 - Branch from main → PR → merge → Railway auto-deploys → check deploy logs.
@@ -77,15 +83,13 @@ Plus product catalogue, customer pricing, and management reports.
   current code is FastAPI + HTML. Ask before switching stacks.
 
 ## Known open issues
-- No automated tests in the repo (see Tests).
+- Test coverage is minimal (see Tests).
 - Real Claude/Whisper calls untested in production.
 - Products file: 29 items missing packing specs; conflict on SKU 0911;
   duplicate "Potato Bun 4pcs" (0122 / 0142).
 - Historical orders still to be imported.
 
 ## Backlog
-- Bulk branch import via Excel template (alt-names column; preview new/updated/errors;
-  no auto-delete)
 - Role permissions + device binding
 - WhatsApp Cloud API for campaigns
 - Rep visit logging with location

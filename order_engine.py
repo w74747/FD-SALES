@@ -25,6 +25,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import ai_client
+import branch_import
 import catalog
 import i18n
 import knowledge
@@ -367,14 +368,20 @@ def _norm(s: str) -> str:
     return re.sub(r"[^\w؀-ۿ]+", "", s)
 
 
-def match_branch(name: str, registered: list) -> Optional[str]:
-    """مطابقة اسم الفرع مع الفروع المسجلة (بدون إنشاء فرع جديد)"""
+def match_branch(name: str, registered: list, aliases: Optional[dict] = None) -> Optional[str]:
+    """
+    مطابقة اسم الفرع مع الفروع المسجلة (بدون إنشاء فرع جديد).
+    الترتيب: الاسم الرسمي مطابقة تامة ← الأسماء البديلة مطابقة تامة ← احتواء جزئي للاسم الرسمي.
+    """
     key = _norm(name)
     if not key:
         return None
     for b in registered:
         if _norm(b) == key:
             return b
+    by_alias = branch_import.match_alias(_norm, name, aliases)
+    if by_alias:
+        return by_alias
     for b in registered:
         nb = _norm(b)
         if nb and (key in nb or nb in key):
@@ -382,11 +389,12 @@ def match_branch(name: str, registered: list) -> Optional[str]:
     return None
 
 
-def canonical_branch(cur, customer_id: int, name: str, registered: list, default_branch: str) -> str:
+def canonical_branch(cur, customer_id: int, name: str, registered: list, default_branch: str,
+                     aliases: Optional[dict] = None) -> str:
     name = (name or "").strip()
     if not name:
         name = default_branch or (registered[0] if len(registered) == 1 else "Main Branch")
-    found = match_branch(name, registered)
+    found = match_branch(name, registered, aliases)
     if found:
         return found
     # فرع جديد يُسجَّل تلقائياً للعميل
@@ -516,8 +524,10 @@ def apply_proposal(cur, customer: dict, profile: dict, proposal: dict, source_me
     kind = proposal.get("kind")
     delivery = resolve_delivery_date(proposal.get("delivery_date"), profile)
     aliases = product_map(profile)
-    cur.execute("SELECT branch_name FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
-    registered = [r["branch_name"] for r in cur.fetchall()]
+    cur.execute("SELECT branch_name, aliases FROM customer_branches WHERE customer_id = %s;", (customer["id"],))
+    branch_rows = cur.fetchall()
+    registered = [r["branch_name"] for r in branch_rows]
+    branch_aliases = {r["branch_name"]: r.get("aliases") or "" for r in branch_rows}
 
     batch = get_or_create_batch(cur, customer["id"], delivery)
     before = batch_lines(cur, batch["id"])
@@ -532,7 +542,8 @@ def apply_proposal(cur, customer: dict, profile: dict, proposal: dict, source_me
         if not product:
             continue
         sku = sku or catalog.find_sku(cur, product)
-        branch = canonical_branch(cur, customer["id"], ln.get("branch", ""), registered, profile.get("default_branch", ""))
+        branch = canonical_branch(cur, customer["id"], ln.get("branch", ""), registered, profile.get("default_branch", ""),
+                                  branch_aliases)
         unit = (ln.get("unit") or alias_unit or profile.get("default_unit") or "Cartons").strip()[:30]
         norm_lines.append({"branch": branch, "product": product[:200], "quantity": qty, "unit": unit, "sku": sku})
 
@@ -761,8 +772,14 @@ Rules:
 
 
 def build_interpretation_request(customer: dict, profile: dict, branches: list, habitual: list, upcoming: list,
-                                 context_rows: list, pending: Optional[dict], msg) -> tuple:
+                                 context_rows: list, pending: Optional[dict], msg,
+                                 branch_aliases: Optional[dict] = None) -> tuple:
     now = now_local()
+    # الأسماء البديلة تُعرض بجانب اسم الفرع حتى يعيد Claude الاسم الرسمي مباشرة
+    branch_txt = ", ".join(
+        b + (f" (also written: {', '.join(branch_import.split_aliases((branch_aliases or {}).get(b)))})"
+             if (branch_aliases or {}).get(b) else "")
+        for b in branches)
     forced = (customer.get("language") or "auto")
     forced_lang_note = (f"\nLANGUAGE: always write clarification_question for this customer in "
                         f"{'Arabic' if forced == 'ar' else 'English'}." if forced in i18n.LANGS else "")
@@ -783,7 +800,7 @@ def build_interpretation_request(customer: dict, profile: dict, branches: list, 
 
     info = f"""TODAY: {now.strftime('%A %Y-%m-%d %H:%M')} (Muscat time). Default delivery if not stated: {(now.date() + timedelta(days=int(profile.get('lead_days') or 1))).isoformat()}.
 CUSTOMER: {customer['company_name']} (brand: {customer.get('brand_name') or '-'})
-REGISTERED BRANCHES: {', '.join(branches) or '(none)'}
+REGISTERED BRANCHES: {branch_txt or '(none)'}
 DEFAULT BRANCH: {profile.get('default_branch') or '(none)'}   DEFAULT UNIT: {profile.get('default_unit') or 'Cartons'}
 PRODUCTS THIS CUSTOMER ORDERS (customer's name => our product [unit]):
 {alias_txt}
@@ -1126,15 +1143,17 @@ async def handle_customer_message(conn, customer: dict, msg, logistics_target: s
             conn.commit()
             return {"status": "SMART_STORED", "actions": []}
 
-        cur.execute("SELECT branch_name FROM customer_branches WHERE customer_id = %s ORDER BY id;", (customer["id"],))
-        branches = [r["branch_name"] for r in cur.fetchall()]
+        cur.execute("SELECT branch_name, aliases FROM customer_branches WHERE customer_id = %s ORDER BY id;", (customer["id"],))
+        branch_rows = cur.fetchall()
+        branches = [r["branch_name"] for r in branch_rows]
+        branch_aliases = {r["branch_name"]: r.get("aliases") or "" for r in branch_rows}
         habitual = get_habitual_products(cur, customer["id"])
         upcoming = get_upcoming_batches(cur, customer["id"])
         context_rows = get_context(cur, chat_id, message_id)
     conn.commit()  # لا نُبقي معاملة مفتوحة أثناء انتظار النموذج
 
     content, use_vision = build_interpretation_request(customer, profile, branches, habitual, upcoming,
-                                                       context_rows, pending, msg)
+                                                       context_rows, pending, msg, branch_aliases)
     result = await ai_client.call_tool(SYSTEM_PROMPT, content, INTERPRET_TOOL, use_vision=use_vision)
     if result is not None and customer.get("language") in i18n.LANGS:
         result["customer_language"] = customer["language"]  # لغة العميل المحددة في ملفه تتقدّم على المكتشفة
@@ -1175,7 +1194,7 @@ async def handle_customer_message(conn, customer: dict, msg, logistics_target: s
             if confident and branches and kind != "cancellation":
                 fallback = profile.get("default_branch") or (branches[0] if len(branches) == 1 else "")
                 unknown = [l for l in proposal["lines"]
-                           if not match_branch(l.get("branch") or fallback, branches)]
+                           if not match_branch(l.get("branch") or fallback, branches, branch_aliases)]
                 if unknown:
                     confident = False
                     logger.info(f"[Orders] Unregistered branch(es) {[l.get('branch') for l in unknown]} -> confirmation")
