@@ -37,6 +37,7 @@ import security
 import db_pool
 import ai_client
 import order_engine
+import order_approval
 import knowledge
 import catalog
 import reports
@@ -1500,6 +1501,116 @@ async def reject_pending_order(pending_id: int):
     return await _resolve_pending_by_id(pending_id, False, "dashboard:admin")
 
 
+# ----------------- مسار الاعتماد: إدخال البيانات ← المالية ← اللوجستيك -----------------
+class OrderRoutingPayload(BaseModel):
+    data_entry_target: str = ""
+
+
+class SubmissionDecisionPayload(BaseModel):
+    erp_order_no: str = ""
+    reason: str = ""
+
+
+def _normalize_target(value: str, label: str) -> str:
+    """مجموعة (120363...@g.us) أو رقم هاتف (968...)؛ فارغ = تعطيل"""
+    v = (value or "").strip().replace(" ", "")
+    if not v:
+        return ""
+    if v.endswith("@g.us") or "-" in v.split("@")[0]:
+        if not re.fullmatch(r"[0-9]+(-[0-9]+)?@g\.us", v if v.endswith("@g.us") else v + "@g.us"):
+            raise HTTPException(status_code=400, detail=f"صيغة معرّف مجموعة {label} غير صحيحة")
+        return v if v.endswith("@g.us") else v + "@g.us"
+    digits = re.sub(r"[^0-9]", "", v.split("@")[0])
+    if len(digits) > 15:
+        return digits + "@g.us"
+    if len(digits) < 8:
+        raise HTTPException(status_code=400, detail=f"رقم {label} غير صحيح (مثال: 96890000000)")
+    return digits
+
+
+@app.get("/api/system/order-routing")
+def get_order_routing():
+    conn = get_db_connection()
+    if not conn:
+        return {"data_entry_target": "", "logistics_target": ""}
+    try:
+        with conn.cursor() as cur:
+            return {"data_entry_target": order_engine.data_entry_target(cur),
+                    "logistics_target": _current_logistics_target(cur)}
+    finally:
+        conn.close()
+
+
+@app.post("/api/system/order-routing")
+def save_order_routing(payload: OrderRoutingPayload):
+    target = _normalize_target(payload.data_entry_target, "إدخال البيانات")
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO system_config (key_name, key_value) VALUES ('data_entry_target', %s)
+                ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;
+            """, (target,))
+        conn.commit()
+        return {"status": "SUCCESS", "data_entry_target": target}
+    finally:
+        conn.close()
+
+
+@app.get("/api/orders/submissions")
+def list_order_submissions(scope: str = "open"):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            return order_approval.list_submissions(cur, "open" if scope == "open" else "all")
+    finally:
+        conn.close()
+
+
+async def _decide_submission(sid: int, approve: bool, payload: SubmissionDecisionPayload) -> dict:
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT status, erp_order_no, batch_id, kind FROM order_submissions WHERE id = %s;", (sid,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="الطلب غير موجود")
+            if row["status"] not in order_approval.OPEN_STATUSES:
+                return {"status": row["status"], "already_resolved": True}
+            number = payload.erp_order_no.strip()
+            if approve and row["kind"] != "cancel" and not (number or row["erp_order_no"]):
+                cur.execute("SELECT erp_order_no FROM order_batches WHERE id = %s;", (row["batch_id"],))
+                if not (cur.fetchone() or {}).get("erp_order_no"):
+                    raise HTTPException(status_code=400, detail="أدخل رقم الطلب في النظام قبل الاعتماد")
+            if approve:
+                actions = order_approval.approve_submission(cur, sid, number, "dashboard:admin", _current_logistics_target(cur),
+                                                            order_engine.data_entry_target(cur))
+            else:
+                actions = order_approval.reject_submission(cur, sid, "dashboard:admin", payload.reason.strip(),
+                                                           order_engine.data_entry_target(cur))
+        conn.commit()
+    finally:
+        conn.close()
+    await dispatch_actions(actions)
+    return {"status": "approved" if approve else "rejected"}
+
+
+@app.post("/api/orders/submissions/{sid}/approve")
+async def approve_order_submission(sid: int, payload: SubmissionDecisionPayload):
+    return await _decide_submission(sid, True, payload)
+
+
+@app.post("/api/orders/submissions/{sid}/reject")
+async def reject_order_submission(sid: int, payload: SubmissionDecisionPayload):
+    return await _decide_submission(sid, False, payload)
+
+
 @app.get("/api/orders/batches")
 def list_order_batches(days_back: int = 1):
     """الطلبيات المجمّعة من اليوم فصاعداً (طلبية واحدة لكل عميل وتاريخ تسليم)"""
@@ -1509,7 +1620,8 @@ def list_order_batches(days_back: int = 1):
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT b.id, b.delivery_date, b.status, c.company_name, c.brand_name,
+                SELECT b.id, b.delivery_date, b.status, c.company_name, c.brand_name, b.erp_order_no,
+                       (SELECT s.status FROM order_submissions s WHERE s.batch_id = b.id ORDER BY s.id DESC LIMIT 1) AS approval_status,
                        COALESCE(json_agg(json_build_object('branch', l.branch_name, 'product', l.product, 'sku', l.product_sku,
                                 'quantity', l.quantity, 'unit', l.unit, 'value', l.line_value, 'unit_price', l.unit_price,
                                 'price_unit', l.price_unit) ORDER BY l.branch_name, l.product)
@@ -2094,6 +2206,13 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
             logistics_group = resolve_logistics_target(cur, conf)
             auto_welcome_enabled = conf.get("exhibition_auto_reply_enabled") == "true"
             welcome_greeting = conf.get("exhibition_greeting_text", "")
+
+            # ---------- ردود موظف إدخال البيانات (رقم الطلب / اعتماد المالية) ----------
+            entry_target = (conf.get("data_entry_target") or "").strip()
+            if entry_target and msg.event_type == "NORMAL" and not msg.is_from_me \
+                    and order_approval.is_data_entry_chat(entry_target, chat_id, clean_phone):
+                conn.commit()
+                return order_approval.handle_data_entry_message(conn, msg, logistics_group)
 
             pure_group_num = re.sub(r'[^0-9]', '', chat_id)
             customer = None

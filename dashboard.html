@@ -70,6 +70,7 @@
             if (cleanId === 'agents') {
                 if (typeof window.loadOrderKeywords === 'function') window.loadOrderKeywords();
                 if (typeof window.loadLogisticsGroup === 'function') window.loadLogisticsGroup();
+                if (typeof window.loadOrderRouting === 'function') window.loadOrderRouting();
                 if (typeof window.loadSmartOrders === 'function') window.loadSmartOrders();
                 if (typeof window.loadAssistantSettings === 'function') window.loadAssistantSettings();
                 if (typeof window.loadIssues === 'function') window.loadIssues();
@@ -466,6 +467,11 @@
                     <p class="text-[11px] text-gray-500 mb-3">طلبات لم يتأكد منها البوت أو طلب العميل تأكيد توفرها. أول من يعتمد (العميل في المجموعة، المندوب برابط الاعتماد، أو من هنا) يُرسل الطلب للوجستيك.</p>
                     <div id="pending-orders-list" class="space-y-2 text-xs"><div class="text-gray-400">لا توجد طلبات معلّقة</div></div>
                 </div>
+                <div id="submissions-card" class="bg-white rounded-2xl p-5 shadow-sm border border-purple-200 hidden">
+                    <h3 class="font-bold text-sm text-[#3A056A] mb-1">🧾 بانتظار الإدخال واعتماد المالية</h3>
+                    <p class="text-[11px] text-gray-500 mb-3">أُرسلت لموظف إدخال البيانات ولم تصل اللوجستيك بعد. يعتمدها الموظف بالرد على رسالة الطلب في الواتساب، أو من هنا.</p>
+                    <div id="submissions-list" class="space-y-2 text-xs"></div>
+                </div>
                 <div class="bg-white rounded-2xl p-5 shadow-sm border border-purple-100">
                     <h3 class="font-bold text-sm text-[#3A056A] mb-3">📦 الطلبيات حسب تاريخ التسليم</h3>
                     <div class="overflow-x-auto">
@@ -626,11 +632,32 @@
                         <textarea id="order-keywords-input" rows="2" class="w-full p-2 border rounded-lg text-xs leading-relaxed font-mono" placeholder="box, boxes, كرتون, كراتين, طلب, طلبية, potato, buns..."></textarea>
                     </div>
 
+                    <!-- موظف إدخال البيانات: يستلم الطلب أولاً، يردّ برقم الطلب وبعد اعتماد المالية يُرسل للوجستيك -->
+                    <div class="p-3.5 bg-gray-50 border border-purple-200 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center gap-2">
+                            <div>
+                                <div class="font-bold text-xs text-[#3A056A]">إدخال البيانات واعتماد المالية:</div>
+                                <div class="text-[10px] text-gray-500">عند التحديد: الطلب يُرسل أولاً لموظف إدخال البيانات، فيردّ على رسالة الطلب برقمه في النظام ثم بكلمة «معتمد» بعد اعتماد المالية، وعندها فقط يُرسل للوجستيك. اتركه فارغاً لإرسال الطلبات للوجستيك مباشرة.</div>
+                                <div id="data-entry-effective" class="text-[10px] font-mono text-gray-500 mt-1">غير مفعّل — الطلبات تذهب للوجستيك مباشرة</div>
+                            </div>
+                            <div class="flex gap-1.5 flex-shrink-0">
+                                <button onclick="loadWhatsAppGroupsInto('data-entry-select')" class="px-3 py-1.5 bg-purple-100 text-[#3A056A] font-bold rounded-lg text-xs hover:bg-purple-200 transition">تحميل المجموعات</button>
+                                <button onclick="saveOrderRouting()" class="px-3.5 py-1.5 bg-[#3A056A] text-white font-bold rounded-lg text-xs hover:bg-purple-900 transition shadow-xs">حفظ</button>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <select id="data-entry-select" onchange="if (this.value) document.getElementById('data-entry-input').value = this.value" class="w-1/2 p-2 border rounded-lg text-xs">
+                                <option value="">— اختر مجموعة، أو اكتب رقم الموظف —</option>
+                            </select>
+                            <input id="data-entry-input" type="text" dir="ltr" placeholder="96890000000 أو 120363...@g.us" class="w-1/2 p-2 border rounded-lg text-xs font-mono">
+                        </div>
+                    </div>
+
                     <!-- مجموعة اللوجستيك: الوجهة التي تُرسل إليها أوامر التوريد المعتمدة وتنبيهات الإلغاء -->
                     <div class="p-3.5 bg-gray-50 border border-purple-200 rounded-xl space-y-2">
                         <div class="flex justify-between items-center gap-2">
                             <div>
-                                <div class="font-bold text-xs text-[#3A056A]">مجموعة اللوجستيك (Logistics Group):</div>
+                                <div class="font-bold text-xs text-[#3A056A]">مسؤول اللوجستيك (مجموعة أو رقم):</div>
                                 <div class="text-[10px] text-gray-500">تُرسل إليها أوامر التوريد المستخرجة من مجموعات العملاء وتنبيهات إلغاء الطلبيات.</div>
                                 <div id="logistics-group-effective" class="text-[10px] font-mono text-red-600 mt-1">غير محددة — لن تُوجَّه الطلبيات</div>
                             </div>
@@ -647,7 +674,7 @@
                             <select id="logistics-group-select" onchange="if (this.value) document.getElementById('logistics-group-input').value = this.value" class="w-1/2 p-2 border rounded-lg text-xs">
                                 <option value="">— اختر من مجموعات الواتساب —</option>
                             </select>
-                            <input id="logistics-group-input" type="text" dir="ltr" placeholder="120363000000000000@g.us" class="w-1/2 p-2 border rounded-lg text-xs font-mono">
+                            <input id="logistics-group-input" type="text" dir="ltr" placeholder="120363...@g.us أو 96890000000" class="w-1/2 p-2 border rounded-lg text-xs font-mono">
                         </div>
                     </div>
 
@@ -1651,6 +1678,7 @@
         window.loadSmartOrders = async function() {
             try {
                 const [pRes, bRes] = await Promise.all([fetch('/api/orders/pending'), fetch('/api/orders/batches')]);
+                loadSubmissions();
                 const pending = pRes.ok ? await pRes.json() : [];
                 const batches = bRes.ok ? await bRes.json() : [];
                 const badge = document.getElementById('pending-orders-badge');
@@ -1678,13 +1706,16 @@
                     const rows = [];
                     batches.forEach(b => {
                         const status = b.status === 'cancelled' ? '<span class="text-red-600">ملغاة</span>' : '<span class="text-emerald-700">نشطة</span>';
+                        const APPROVAL = {awaiting: ['بانتظار الإدخال','text-amber-700'], entered: ['بانتظار المالية','text-amber-700'], approved: ['معتمد ✓','text-emerald-700'], rejected: ['لم تعتمده المالية','text-red-600'], superseded: ['محدّث','text-gray-500']};
+                        const ap = APPROVAL[b.approval_status];
+                        const approvalHtml = (b.erp_order_no ? '<div class="text-[10px] font-mono">#' + escHtml(b.erp_order_no) + '</div>' : '') + (ap ? '<div class="text-[10px] font-bold ' + ap[1] + '">' + ap[0] + '</div>' : '');
                         (b.lines.length ? b.lines : [{branch: '—', product: '—', quantity: '', unit: ''}]).forEach((l, i) => {
                             rows.push('<tr class="border-b">' +
                                 '<td class="p-2 font-mono">' + (i === 0 ? escHtml(b.delivery_date) : '') + '</td>' +
                                 '<td class="p-2 font-bold">' + (i === 0 ? escHtml(b.company_name) : '') + '</td>' +
                                 '<td class="p-2">' + escHtml(l.branch) + '</td><td class="p-2">' + escHtml(l.product) + '</td>' +
                                 '<td class="p-2 font-bold">' + (l.quantity === '' ? '' : fmtQty(l.quantity) + ' ' + escHtml(l.unit)) + '</td>' +
-                                '<td class="p-2">' + (i === 0 ? status + (b.totals && b.totals.pieces ? '<div class="text-[10px] text-gray-500">≈ ' + Number(b.totals.pieces).toLocaleString() + ' حبة' + (b.totals.weight_kg ? ' · ' + b.totals.weight_kg + ' كجم' : '') + (b.totals.complete ? '' : ' (جزئي)') + '</div>' : '') +
+                                '<td class="p-2">' + (i === 0 ? status + approvalHtml + (b.totals && b.totals.pieces ? '<div class="text-[10px] text-gray-500">≈ ' + Number(b.totals.pieces).toLocaleString() + ' حبة' + (b.totals.weight_kg ? ' · ' + b.totals.weight_kg + ' كجم' : '') + (b.totals.complete ? '' : ' (جزئي)') + '</div>' : '') +
                                     (b.totals && b.totals.value_omr !== null && b.totals.value_omr !== undefined ? '<div class="text-[10px] font-bold text-emerald-700">' + Number(b.totals.value_omr).toFixed(3) + ' ر.ع' + (b.totals.value_complete ? '' : ' (بعض الأصناف بلا سعر)') + '</div>' : '') : '') + '</td></tr>');
                         });
                     });
@@ -2040,6 +2071,86 @@
         window.setIssueStatus = async function(id, status) {
             await fetch('/api/issues/' + id + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
             loadIssues();
+        };
+
+        // ---------------- مسار الاعتماد: إدخال البيانات ← المالية ← اللوجستيك ----------------
+        const SUB_KIND = {new: 'طلب جديد', update: 'تحديث', cancel: 'إلغاء'};
+        const SUB_STATUS = {awaiting: 'بانتظار الإدخال', entered: 'مُدخل — بانتظار المالية'};
+        window.loadSubmissions = async function() {
+            try {
+                const res = await fetch('/api/orders/submissions');
+                const subs = res.ok ? await res.json() : [];
+                const card = document.getElementById('submissions-card');
+                const list = document.getElementById('submissions-list');
+                if (!card || !list) return;
+                const routing = await (await fetch('/api/system/order-routing')).json().catch(() => ({}));
+                card.classList.toggle('hidden', !routing.data_entry_target && subs.length === 0);
+                list.innerHTML = subs.map(sb => {
+                    const lines = (sb.lines || []).map(l => escHtml(l.branch) + ': ' + fmtQty(l.quantity) + ' ' + escHtml(l.unit) + ' ' + escHtml(l.product)).join('<br>');
+                    const hours = Math.floor((Date.now() - new Date(sb.created_at).getTime()) / 3600000);
+                    return '<div class="p-3 rounded-xl border border-purple-200 bg-purple-50/40 flex justify-between gap-3">' +
+                        '<div><div class="font-bold text-[#3A056A]"><span class="font-mono">FD-' + sb.id + '</span> · ' + escHtml(sb.company_name) + ' — تسليم ' + escHtml(sb.delivery_date) + '</div>' +
+                        '<div class="text-[10px] text-gray-600 mb-1">' + SUB_KIND[sb.kind] + ' · ' + (SUB_STATUS[sb.status] || sb.status) +
+                        (sb.erp_order_no ? ' · رقم الطلب <span class="font-mono font-bold">' + escHtml(sb.erp_order_no) + '</span>' : '') +
+                        ' · منذ ' + (hours < 1 ? 'أقل من ساعة' : hours + ' ساعة') + '</div>' +
+                        '<div class="font-mono text-[11px]">' + (lines || 'إلغاء الطلب كاملاً') + '</div></div>' +
+                        '<div class="flex flex-col gap-1 flex-shrink-0 w-36">' +
+                        (sb.kind === 'cancel' ? '' : '<input id="erp-' + sb.id + '" dir="ltr" value="' + escHtml(sb.erp_order_no || '') + '" placeholder="رقم الطلب" class="p-1.5 border rounded-lg text-[11px] font-mono">') +
+                        '<button onclick="decideSubmission(' + sb.id + ', true)" class="px-3 py-1.5 bg-[#3A056A] text-white rounded-lg font-bold">' + (sb.kind === 'cancel' ? 'تأكيد الإلغاء' : 'معتمد ← اللوجستيك') + '</button>' +
+                        (sb.kind === 'cancel' ? '' : '<button onclick="decideSubmission(' + sb.id + ', false)" class="px-3 py-1.5 bg-white text-red-600 border border-red-200 rounded-lg font-bold">لم تعتمده المالية</button>') +
+                        '</div></div>';
+                }).join('') || '<div class="text-gray-400">لا توجد طلبات بانتظار الاعتماد ✓</div>';
+            } catch (e) {}
+        };
+
+        window.decideSubmission = async function(id, approve) {
+            const erpEl = document.getElementById('erp-' + id);
+            const body = { erp_order_no: erpEl ? erpEl.value.trim() : '', reason: '' };
+            if (!approve) {
+                const reason = prompt('سبب عدم الاعتماد (اختياري) — سيُنبَّه المندوب/مسؤول النظام:');
+                if (reason === null) return;
+                body.reason = reason;
+            }
+            const res = await fetch('/api/orders/submissions/' + id + '/' + (approve ? 'approve' : 'reject'),
+                { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.detail || 'تعذر الحفظ');
+            if (data.already_resolved) alert('تم البت في هذا الطلب مسبقاً');
+            loadSmartOrders();
+        };
+
+        window.loadOrderRouting = async function() {
+            try {
+                const d = await (await fetch('/api/system/order-routing')).json();
+                const el = document.getElementById('data-entry-input');
+                if (el) el.value = d.data_entry_target || '';
+                const eff = document.getElementById('data-entry-effective');
+                if (eff) {
+                    eff.textContent = d.data_entry_target ? ('مفعّل: ' + d.data_entry_target) : 'غير مفعّل — الطلبات تذهب للوجستيك مباشرة';
+                    eff.className = 'text-[10px] font-mono mt-1 ' + (d.data_entry_target ? 'text-green-700' : 'text-gray-500');
+                }
+            } catch (e) {}
+        };
+
+        window.saveOrderRouting = async function() {
+            const el = document.getElementById('data-entry-input');
+            const res = await fetch('/api/system/order-routing', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data_entry_target: el ? el.value.trim() : '' }) });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.detail || 'تعذر الحفظ');
+            await loadOrderRouting();
+            alert(data.data_entry_target ? 'تم التفعيل ✓ — الطلبات الجديدة ستذهب لإدخال البيانات أولاً' : 'تم التعطيل — الطلبات تذهب للوجستيك مباشرة');
+        };
+
+        window.loadWhatsAppGroupsInto = async function(selectId) {
+            const sel = document.getElementById(selectId);
+            if (!sel) return;
+            try {
+                const groups = await (await fetch('/api/whatsapp/groups')).json();
+                if (!Array.isArray(groups) || groups.length === 0) return alert("لا توجد مجموعات — تأكد من ربط الواتساب أولاً");
+                sel.innerHTML = '<option value="">— اختر من مجموعات الواتساب —</option>' +
+                    groups.map(g => '<option value="' + escHtml(g.id) + '">' + escHtml((g.subject || g.id) + ' (' + (g.participants_count || 0) + ')') + '</option>').join('');
+            } catch (e) { alert("تعذر تحميل المجموعات"); }
         };
 
         // ---------------- مجموعة اللوجستيك ----------------

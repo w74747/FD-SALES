@@ -359,8 +359,7 @@ async function processIncomingMessage(sock, msg) {
           }, { timeout: 8000 });
           // إرسال تنبيه إلغاء الطلبية لمجموعة اللوجستيك (كان الرد يُتجاهل فلا يصل التنبيه)
           if (delResp.data && delResp.data.forward_to_logistics && delResp.data.logistics_text) {
-            let logJid = delResp.data.forward_to_logistics.trim();
-            if (!logJid.endsWith('@g.us') && !logJid.endsWith('@s.whatsapp.net')) logJid = `${logJid}@g.us`;
+            const logJid = toJid(delResp.data.forward_to_logistics);  // مجموعة أو رقم هاتف
             rememberBotMessage(await sock.sendMessage(logJid, { text: delResp.data.logistics_text }));
           }
           await runActions(sock, delResp.data && delResp.data.actions);
@@ -436,10 +435,7 @@ async function processIncomingMessage(sock, msg) {
         }
 
         if (resp.data && resp.data.forward_to_logistics && resp.data.logistics_text) {
-          let logJid = resp.data.forward_to_logistics.trim();
-          if (!logJid.endsWith('@g.us') && !logJid.endsWith('@s.whatsapp.net')) {
-            logJid = `${logJid}@g.us`;
-          }
+          const logJid = toJid(resp.data.forward_to_logistics);  // مجموعة أو رقم هاتف
           rememberBotMessage(await sock.sendMessage(logJid, { text: resp.data.logistics_text }));
         }
       }
