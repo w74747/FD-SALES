@@ -1844,7 +1844,7 @@ def get_assistant_settings():
                 "auto_reply_enabled": order_engine.get_setting(cur, "auto_reply_enabled", "false").lower() == "true",
                 "auto_reports_enabled": order_engine.get_setting(cur, "auto_reports_enabled", "true").lower() == "true",
                 "ai_enabled": ai_client.is_enabled(),
-                "ai_status": dict(ai_client.last_status),
+                "ai_status": ai_client.status_summary(),
                 "voice_enabled": bool(os.getenv("TOGETHER_API_KEY", "").strip()),
                 "direct_auto_reply_enabled": order_engine.get_setting(
                     cur, direct_chat.SETTING_KEY, "false").lower() == "true",

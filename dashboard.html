@@ -699,7 +699,7 @@
                         <div id="assistant-capabilities" class="text-[10px] text-gray-500"></div>
                         <div class="flex items-center gap-2">
                             <button onclick="saveAssistantSettings()" class="px-3.5 py-1.5 bg-[#3A056A] text-white font-bold rounded-lg text-xs">حفظ</button>
-                            <button onclick="checkAiConnection()" id="ai-check-btn" class="px-3 py-1.5 bg-white border border-purple-300 text-[#3A056A] font-bold rounded-lg text-xs">اختبار اتصال Claude</button>
+                            <button onclick="checkAiConnection()" id="ai-check-btn" class="px-3 py-1.5 bg-white border border-purple-300 text-[#3A056A] font-bold rounded-lg text-xs">اختبار مفاتيح الذكاء الاصطناعي</button>
                         </div>
                     </div>
 
@@ -2113,27 +2113,32 @@
                 document.getElementById('auto-reply-enabled').checked = !!d.auto_reply_enabled;
                 document.getElementById('auto-reports-enabled').checked = d.auto_reports_enabled !== false;
                 document.getElementById('direct-auto-reply-enabled').checked = !!d.direct_auto_reply_enabled;
+                const providers = ((d.ai_status || {}).providers || []).filter(p => p.configured);
                 document.getElementById('assistant-capabilities').textContent =
-                    'فهم الطلبات والصور (Claude): ' + aiStatusText(d.ai_enabled, d.ai_status) +
+                    'الذكاء الاصطناعي (بالترتيب): ' + (providers.length ? providers.map(p => p.label + ' ' + aiStatusText(p)).join(' ← ') : '✗ لا يوجد مفتاح') +
                     ' · الرسائل الصوتية (Together): ' + (d.voice_enabled ? '✓ المفتاح موجود' : '✗ يحتاج TOGETHER_API_KEY');
             } catch (e) {}
         };
-        // حالة Claude الفعلية: وجود المفتاح لا يعني أنه صالح، لذلك نعرض نتيجة آخر اتصال
-        window.aiStatusText = function(enabled, st) {
-            if (!enabled) return '✗ يحتاج ANTHROPIC_API_KEY';
-            if (!st || st.ok === null || st.ok === undefined) return 'المفتاح موجود — لم يُختبر بعد (اضغط "اختبار اتصال Claude")';
-            if (st.ok) return '✓ يعمل';
-            if (st.code === 401) return '✗ المفتاح غير صالح (401) — حدّث ANTHROPIC_API_KEY على Railway';
-            return '✗ آخر اتصال فشل' + (st.code ? ' (' + st.code + ')' : '');
+        // الحالة الفعلية لكل مزوّد: وجود المفتاح لا يعني أنه صالح، لذلك نعرض نتيجة آخر اتصال
+        window.aiStatusText = function(p) {
+            if (!p || p.ok === null || p.ok === undefined) return '(لم يُختبر)';
+            if (p.ok) return '✓';
+            if (p.code === 401 || p.code === 403) return '✗ مفتاح غير صالح';
+            if (p.code === 402) return '✗ الرصيد غير كافٍ';
+            return '✗ فشل' + (p.code ? ' (' + p.code + ')' : '');
         };
         window.checkAiConnection = async function() {
             const btn = document.getElementById('ai-check-btn');
             btn.disabled = true; btn.textContent = 'جاري الاختبار...';
             try {
-                const st = await (await fetch('/api/system/ai-check', { method: 'POST' })).json();
-                alert(st.ok ? 'Claude يعمل ✓' : ('فشل الاتصال بـ Claude: ' + aiStatusText(true, st) + (st.message ? '\n\n' + st.message.slice(0, 200) : '')));
+                const r = await (await fetch('/api/system/ai-check', { method: 'POST' })).json();
+                const lines = r.providers.map(p => (p.ok ? '✓ ' : '✗ ') + p.label + ' (' + p.model + ')' +
+                    (!p.configured ? ' — المفتاح غير مضبوط' : p.ok ? ' — يعمل' + (p.seconds ? ' في ' + p.seconds + ' ث' : '') :
+                     ' — ' + aiStatusText(p) + (p.message ? ': ' + p.message.slice(0, 120) : '')));
+                alert((r.ok ? 'المزوّد المستخدم الآن: ' + r.providers.find(p => p.provider === r.active).label : 'لا يعمل أي مزوّد للذكاء الاصطناعي') +
+                      '\n\n' + lines.join('\n'));
             } catch (e) { alert('تعذر الاختبار'); }
-            finally { btn.disabled = false; btn.textContent = 'اختبار اتصال Claude'; loadAssistantSettings(); }
+            finally { btn.disabled = false; btn.textContent = 'اختبار مفاتيح الذكاء الاصطناعي'; loadAssistantSettings(); }
         };
         window.saveAssistantSettings = async function() {
             const res = await fetch('/api/system/assistant-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },

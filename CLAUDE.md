@@ -9,11 +9,12 @@ Plus product catalogue, customer pricing, and management reports.
 - Python FastAPI backend (`main.py` is the app + most routes). Modules:
   - `order_engine.py` — smart order parsing / one-order-per-customer-per-date logic
   - `order_approval.py` — data entry → finance → logistics step
-  - `ai_client.py` — Claude (Anthropic Messages API, raw httpx), tool output. No `temperature`
-    (Haiku 5.5 / Sonnet 5.5 reject non-default sampling with 400); forced `tool_choice` only on
-    models that allow it (Haiku 5.5) — Sonnet/Opus 5.5 use `auto` + instruction + one retry.
-    System block and KB block carry `cache_control`. `last_status` feeds the dashboard;
-    `POST /api/system/ai-check` does a real test call.
+  - `ai_client.py` — LLM calls with provider fallback, in `AI_PROVIDERS` order (default
+    `deepseek,anthropic,together`): DeepSeek `deepseek-flash` (cheapest; text + images + tools,
+    OpenAI-compatible), then Claude (Messages API), then Together (Qwen). Callers pass
+    Anthropic-style content blocks; converted per provider. PDFs only go to Claude. No sampling
+    params (Claude 5.5 models 400 on them); Claude Sonnet/Opus 5.5 reject forced tool_choice →
+    auto + instruction + retry. `POST /api/system/ai-check` tests every configured key.
   - `media_tools.py` — Word/Excel/CSV/PDF text extraction; voice via Whisper on Together
   - `catalog.py` — Assortment Excel import, packing specs, unit conversion (pieces / kg)
   - `branch_import.py` — bulk branch import: Excel template, preview, apply (no auto-delete),
@@ -37,7 +38,7 @@ Plus product catalogue, customer pricing, and management reports.
   Manual messages typed from the company number (fromMe, not bot-sent) are forwarded to the
   webhook — in groups as context, in direct chats so the bot goes quiet.
 - PostgreSQL (Railway), connection pool
-- Claude for order parsing (text model + vision model); Whisper Large v3 via Together for voice notes
+- LLM for order parsing/KB answers: DeepSeek first, Claude/Together fallback; Whisper Large v3 via Together for voice notes
 - Auth: TOTP 2FA → server-signed cookie
 
 ## Environment variables (names only — never commit values)
@@ -45,7 +46,9 @@ Plus product catalogue, customer pricing, and management reports.
   `SESSION_TTL_HOURS`, `COOKIE_SECURE`, `ALLOWED_ORIGINS`
 - Database: `DATABASE_URL` (fallbacks: `DATABASE_PUBLIC_URL`, `POSTGRES_URL`),
   `DB_MAX_CONNECTIONS`, `DB_ACQUIRE_TIMEOUT`
-- AI: `ANTHROPIC_API_KEY`, `ANTHROPIC_TEXT_MODEL`, `ANTHROPIC_VISION_MODEL`,
+- AI: `AI_PROVIDERS`, `DEEPSEEK_API_KEY`, `DEEPSEEK_TEXT_MODEL`, `DEEPSEEK_VISION_MODEL`,
+  `DEEPSEEK_BASE_URL`, `TOGETHER_TEXT_MODEL`, `TOGETHER_VISION_MODEL`, `TOGETHER_BASE_URL`,
+  `ANTHROPIC_API_KEY`, `ANTHROPIC_TEXT_MODEL`, `ANTHROPIC_VISION_MODEL`,
   `TOGETHER_API_KEY`, `TRANSCRIBE_MODEL`, `PERPLEXITY_API_KEY` (optional, used in main.py)
 - Knowledge base: `KB_MAX_CHARS` (default 200000), `KB_MAX_DOC_CHARS` (default 150000)
 - App: `PORT`, `PUBLIC_BASE_URL`, `RAILWAY_PUBLIC_DOMAIN`, `BUSINESS_UTC_OFFSET`,
@@ -99,7 +102,8 @@ Plus product catalogue, customer pricing, and management reports.
 ## Known open issues
 - Test coverage is minimal (see Tests).
 - Claude has never worked in production: every call in the Railway logs up to 2026-11-19
-  returned 401 invalid x-api-key → `ANTHROPIC_API_KEY` must be replaced. Even with a valid key,
+  returned 401 invalid x-api-key. Since 2026-11-20 DeepSeek is tried first, so Claude is only a
+  fallback; DeepSeek/Together keys were never exercised before — verify with the dashboard test. Even with a valid key,
   the old code would have hit 400s (temperature / forced tool_choice) — fixed 2026-11-20.
 - Real Claude/Whisper calls still unverified end-to-end in production.
 - Products file: 29 items missing packing specs; conflict on SKU 0911;
