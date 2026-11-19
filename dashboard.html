@@ -540,6 +540,7 @@
                             <button onclick="addKnowledgeText()" class="w-full py-2 bg-white text-[#3A056A] border border-purple-300 rounded-lg text-xs font-bold">إضافة</button>
                         </div>
                     </div>
+                    <div id="kb-usage" class="text-xs"></div>
                     <div id="kb-list" class="space-y-2 text-xs"></div>
                 </div>
             </div>
@@ -692,8 +693,14 @@
                             <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="auto-reply-enabled"> الرد الآلي على الاستفسارات والشكاوى</label>
                         </div>
                         <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="auto-reports-enabled"> إعداد تقارير الإدارة تلقائياً (أول كل شهر/ربع/سنة) وإرسال ملخصها لهذا الرقم</label>
+                        <label class="flex items-start gap-2 text-xs font-bold"><input type="checkbox" id="direct-auto-reply-enabled" class="mt-0.5">
+                            <span>الرد الآلي على المحادثات المباشرة من أي رقم (من قاعدة المعرفة)
+                                <span class="block text-[10px] font-normal text-gray-500">لأي شخص يراسل رقم الشركة مباشرة خارج مجموعات العملاء. لا يذكر أسعاراً ولا يستلم طلبات؛ ما لا يعرفه يُحوَّل لهذا الرقم. يسكت 30 دقيقة إذا رد أحد من الفريق يدوياً. رسالة الترحيب (إن فُعّلت) تُرسل مرة واحدة فقط لكل شخص.</span></span></label>
                         <div id="assistant-capabilities" class="text-[10px] text-gray-500"></div>
-                        <button onclick="saveAssistantSettings()" class="px-3.5 py-1.5 bg-[#3A056A] text-white font-bold rounded-lg text-xs">حفظ</button>
+                        <div class="flex items-center gap-2">
+                            <button onclick="saveAssistantSettings()" class="px-3.5 py-1.5 bg-[#3A056A] text-white font-bold rounded-lg text-xs">حفظ</button>
+                            <button onclick="checkAiConnection()" id="ai-check-btn" class="px-3 py-1.5 bg-white border border-purple-300 text-[#3A056A] font-bold rounded-lg text-xs">اختبار اتصال Claude</button>
+                        </div>
                     </div>
 
                     <div class="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between">
@@ -2105,17 +2112,36 @@
                 document.getElementById('admin-language').value = d.admin_language || 'en';
                 document.getElementById('auto-reply-enabled').checked = !!d.auto_reply_enabled;
                 document.getElementById('auto-reports-enabled').checked = d.auto_reports_enabled !== false;
+                document.getElementById('direct-auto-reply-enabled').checked = !!d.direct_auto_reply_enabled;
                 document.getElementById('assistant-capabilities').textContent =
-                    'فهم الطلبات والصور (Claude): ' + (d.ai_enabled ? '✓ مفعّل' : '✗ يحتاج ANTHROPIC_API_KEY') +
-                    ' · الرسائل الصوتية (Together): ' + (d.voice_enabled ? '✓ مفعّل' : '✗ يحتاج TOGETHER_API_KEY');
+                    'فهم الطلبات والصور (Claude): ' + aiStatusText(d.ai_enabled, d.ai_status) +
+                    ' · الرسائل الصوتية (Together): ' + (d.voice_enabled ? '✓ المفتاح موجود' : '✗ يحتاج TOGETHER_API_KEY');
             } catch (e) {}
+        };
+        // حالة Claude الفعلية: وجود المفتاح لا يعني أنه صالح، لذلك نعرض نتيجة آخر اتصال
+        window.aiStatusText = function(enabled, st) {
+            if (!enabled) return '✗ يحتاج ANTHROPIC_API_KEY';
+            if (!st || st.ok === null || st.ok === undefined) return 'المفتاح موجود — لم يُختبر بعد (اضغط "اختبار اتصال Claude")';
+            if (st.ok) return '✓ يعمل';
+            if (st.code === 401) return '✗ المفتاح غير صالح (401) — حدّث ANTHROPIC_API_KEY على Railway';
+            return '✗ آخر اتصال فشل' + (st.code ? ' (' + st.code + ')' : '');
+        };
+        window.checkAiConnection = async function() {
+            const btn = document.getElementById('ai-check-btn');
+            btn.disabled = true; btn.textContent = 'جاري الاختبار...';
+            try {
+                const st = await (await fetch('/api/system/ai-check', { method: 'POST' })).json();
+                alert(st.ok ? 'Claude يعمل ✓' : ('فشل الاتصال بـ Claude: ' + aiStatusText(true, st) + (st.message ? '\n\n' + st.message.slice(0, 200) : '')));
+            } catch (e) { alert('تعذر الاختبار'); }
+            finally { btn.disabled = false; btn.textContent = 'اختبار اتصال Claude'; loadAssistantSettings(); }
         };
         window.saveAssistantSettings = async function() {
             const res = await fetch('/api/system/assistant-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ admin_alert_phone: document.getElementById('admin-alert-phone').value.trim(),
                                        admin_language: document.getElementById('admin-language').value,
                                        auto_reply_enabled: document.getElementById('auto-reply-enabled').checked,
-                                       auto_reports_enabled: document.getElementById('auto-reports-enabled').checked }) });
+                                       auto_reports_enabled: document.getElementById('auto-reports-enabled').checked,
+                                       direct_auto_reply_enabled: document.getElementById('direct-auto-reply-enabled').checked }) });
             const d = await res.json().catch(() => ({}));
             alert(res.ok ? 'تم الحفظ ✓' : (d.detail || 'تعذر الحفظ'));
         };
@@ -2136,6 +2162,26 @@
                     '<button onclick="deleteKnowledge(' + d.id + ')" class="px-2 py-1 border border-red-200 text-red-600 rounded">حذف</button></div></div>'
                 ).join('') || '<div class="text-gray-400">لا توجد معلومات بعد. ابدأ برفع قائمة المنتجات والأسعار.</div>';
             } catch (e) {}
+            loadKnowledgeUsage();
+        };
+        // كم من قاعدة المعرفة يراه البوت فعلاً، وتحذير واضح إذا تجاوزت الحد
+        window.loadKnowledgeUsage = async function() {
+            const box = document.getElementById('kb-usage');
+            try {
+                const r = await (await fetch('/api/knowledge/status')).json();
+                const pct = Math.min(100, Math.round(100 * r.used / r.limit));
+                const cut = r.sections.filter(s => s.status !== 'full');
+                box.innerHTML =
+                    '<div class="p-3 rounded-xl border ' + (cut.length ? 'border-red-300 bg-red-50' : 'border-purple-200 bg-white') + ' space-y-1.5">' +
+                    '<div class="flex justify-between font-bold text-[#3A056A]"><span>ما يقرؤه البوت من قاعدة المعرفة</span><span class="font-mono">' +
+                    r.used.toLocaleString() + ' / ' + r.limit.toLocaleString() + ' حرف</span></div>' +
+                    '<div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-2 ' + (cut.length ? 'bg-red-500' : (pct > 85 ? 'bg-yellow-500' : 'bg-[#3A056A]')) + '" style="width:' + pct + '%"></div></div>' +
+                    '<div class="text-[10px] text-gray-500">يشمل كتالوج المنتجات من النظام (' + ((r.sections.find(s => s.title.startsWith('Product catalog')) || {}).chars || 0).toLocaleString() + ' حرف) وكل الملفات المفعّلة.</div>' +
+                    (cut.length ? '<div class="text-[11px] text-red-700 font-bold">⚠ تجاوزت الحد: البوت لا يرى كامل هذه الملفات — ' +
+                        cut.map(s => escHtml(s.title) + (s.status === 'excluded' ? ' (لا يراه إطلاقاً)' : ' (يرى ' + s.included.toLocaleString() + ' من ' + s.chars.toLocaleString() + ')')).join('، ') +
+                        '. أوقف الملفات المكررة أو الأقل أهمية (مثلاً ملف المنتجات إذا كان الكتالوج مرفوعاً في النظام).</div>' : '') +
+                    '</div>';
+            } catch (e) { box.innerHTML = ''; }
         };
         window.uploadKnowledgeFile = async function() {
             const f = document.getElementById('kb-file').files[0];
@@ -2146,7 +2192,7 @@
             try {
                 const res = await fetch('/api/knowledge/upload', { method: 'POST', body: fd });
                 const d = await res.json().catch(() => ({}));
-                alert(res.ok ? ('تمت الإضافة ✓ (' + d.char_count + ' حرف)') : (d.detail || 'تعذر الرفع'));
+                alert(res.ok ? ('تمت الإضافة ✓ (' + d.char_count + ' حرف)' + (d.was_truncated ? '\n⚠ الملف طويل جداً: حُفظ أول ' + d.char_count + ' حرف فقط. قسّمه إلى ملفات أصغر.' : '')) : (d.detail || 'تعذر الرفع'));
                 if (res.ok) { document.getElementById('kb-file').value = ''; document.getElementById('kb-file-title').value = ''; }
             } finally { btn.disabled = false; btn.textContent = 'رفع واستخراج المعلومات'; loadKnowledge(); }
         };

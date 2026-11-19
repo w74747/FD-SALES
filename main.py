@@ -40,6 +40,7 @@ import order_engine
 import order_approval
 import i18n
 import knowledge
+import direct_chat
 import catalog
 import branch_import
 import reports
@@ -765,6 +766,7 @@ def init_database():
     run_isolated_ddl("ALTER TABLE customer_accounts ALTER COLUMN contact_person SET DEFAULT '';")
     order_engine.init_schema(run_isolated_ddl)
     knowledge.init_schema(run_isolated_ddl)
+    direct_chat.init_schema(run_isolated_ddl)
     catalog.init_schema(run_isolated_ddl)
     reports.init_schema(run_isolated_ddl)
     run_isolated_ddl("""
@@ -1432,6 +1434,7 @@ class AssistantSettingsPayload(BaseModel):
     admin_language: Optional[str] = None
     auto_reply_enabled: Optional[bool] = False
     auto_reports_enabled: Optional[bool] = True
+    direct_auto_reply_enabled: Optional[bool] = None  # None = لا تغيير
 
 
 class KnowledgeTextPayload(BaseModel):
@@ -1841,7 +1844,10 @@ def get_assistant_settings():
                 "auto_reply_enabled": order_engine.get_setting(cur, "auto_reply_enabled", "false").lower() == "true",
                 "auto_reports_enabled": order_engine.get_setting(cur, "auto_reports_enabled", "true").lower() == "true",
                 "ai_enabled": ai_client.is_enabled(),
+                "ai_status": dict(ai_client.last_status),
                 "voice_enabled": bool(os.getenv("TOGETHER_API_KEY", "").strip()),
+                "direct_auto_reply_enabled": order_engine.get_setting(
+                    cur, direct_chat.SETTING_KEY, "false").lower() == "true",
             }
     finally:
         conn.close()
@@ -1861,6 +1867,8 @@ def save_assistant_settings(payload: AssistantSettingsPayload):
                      ("auto_reports_enabled", "true" if payload.auto_reports_enabled else "false")]
             if payload.admin_language:
                 pairs.append(("admin_language", i18n.norm(payload.admin_language)))
+            if payload.direct_auto_reply_enabled is not None:
+                pairs.append((direct_chat.SETTING_KEY, "true" if payload.direct_auto_reply_enabled else "false"))
             for k, v in pairs:
                 cur.execute("""INSERT INTO system_config (key_name, key_value) VALUES (%s, %s)
                                ON CONFLICT (key_name) DO UPDATE SET key_value = EXCLUDED.key_value;""", (k, v))
@@ -1868,6 +1876,12 @@ def save_assistant_settings(payload: AssistantSettingsPayload):
         return {"status": "SUCCESS"}
     finally:
         conn.close()
+
+
+@app.post("/api/system/ai-check")
+async def check_ai_connection():
+    """اختبار فعلي للاتصال بـ Claude (يكشف المفتاح غير الصالح بدل الاكتفاء بوجوده)"""
+    return await ai_client.check_connection()
 
 
 MAX_KB_UPLOAD = 15 * 1024 * 1024
@@ -1884,6 +1898,19 @@ def list_knowledge():
                                   LENGTH(content_text) AS char_count, LEFT(content_text, 300) AS preview
                            FROM knowledge_documents ORDER BY id DESC;""")
             return cur.fetchall()
+    finally:
+        conn.close()
+
+
+@app.get("/api/knowledge/status")
+def knowledge_status():
+    """كم من قاعدة المعرفة يراه البوت فعلاً، وأي ملف قُصّ أو استُبعد بسبب الحد"""
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unreachable")
+    try:
+        with conn.cursor() as cur:
+            return knowledge.context_report(cur)
     finally:
         conn.close()
 
@@ -1930,7 +1957,9 @@ async def upload_knowledge(file: UploadFile = File(...), title: str = Form("")):
     text = await knowledge.extract_document_text(raw, mime, file.filename or "")
     if len(text) < 20:
         raise HTTPException(status_code=400, detail="تعذر استخراج نص من الملف. جرّب PDF نصياً أو Word أو Excel، أو الصق المحتوى كنص.")
-    return _save_knowledge(title.strip() or (file.filename or "ملف"), file.filename or "", mime, text)
+    saved = _save_knowledge(title.strip() or (file.filename or "ملف"), file.filename or "", mime, text)
+    saved["was_truncated"] = len(text) >= knowledge.MAX_DOC_CHARS
+    return saved
 
 
 @app.post("/api/knowledge/text")
@@ -2274,6 +2303,26 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                     return result
                 logger.warning("Smart order engine unavailable, falling back to legacy parser.")
 
+            # ---------- الرد الآلي على المحادثات المباشرة من أي رقم (من قاعدة المعرفة) ----------
+            admin_phone = re.sub(r"[^0-9]", "", order_engine.get_setting(cur, "admin_alert_phone") or "")
+            # أرقام داخلية (مسؤول النظام، اللوجستيات، إدخال البيانات) لا يرد عليها البوت آلياً
+            internal_numbers = [n for n in (admin_phone,
+                                            re.sub(r"[^0-9]", "", "" if "@g.us" in (logistics_group or "") else (logistics_group or "")),
+                                            re.sub(r"[^0-9]", "", "" if "@g.us" in entry_target else entry_target))
+                                if len(n) >= 8]
+            is_admin_chat = bool(clean_phone) and any(clean_phone.endswith(n[-8:]) for n in internal_numbers)
+            if (direct_chat.is_direct_chat(chat_id) and not customer and msg.event_type == "NORMAL"
+                    and conf.get(direct_chat.SETTING_KEY) == "true" and ai_client.is_enabled()
+                    and not is_admin_chat and (msg.is_from_me or not sender_is_staff)):
+                admin_lang = order_engine.admin_language(cur)
+                conn.commit()
+                result = await direct_chat.handle(
+                    conn, msg, conf, clean_phone, os.path.exists(CATALOG_FILE_PATH),
+                    knowledge.build_context, knowledge.answer_direct, admin_phone, admin_lang)
+                if result.get("send_catalog"):
+                    result["catalog_path"] = CATALOG_FILE_PATH
+                return result
+
             if sender_is_staff:
                 logger.info(f"Ignored message from internal sales representative: {msg.sender_name} ({clean_phone})")
                 return {"status": "IGNORED_INTERNAL_STAFF"}
@@ -2368,7 +2417,8 @@ async def handle_whatsapp_webhook(msg: IncomingWhatsAppMessage):
                         logger.info(f"Classified as DISCUSSION. Withheld from logistics: {text[:45]}")
 
             else:
-                if auto_welcome_enabled and not chat_id.endswith("@g.us"):
+                if auto_welcome_enabled and direct_chat.is_direct_chat(chat_id) and not is_admin_chat \
+                        and direct_chat.welcome_once(cur, chat_id, text, welcome_greeting):
                     reply_text = welcome_greeting
                     send_catalog = os.path.exists(CATALOG_FILE_PATH)
 

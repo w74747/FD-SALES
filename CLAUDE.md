@@ -9,12 +9,23 @@ Plus product catalogue, customer pricing, and management reports.
 - Python FastAPI backend (`main.py` is the app + most routes). Modules:
   - `order_engine.py` — smart order parsing / one-order-per-customer-per-date logic
   - `order_approval.py` — data entry → finance → logistics step
-  - `ai_client.py` — Claude (Anthropic Messages API), forced tool output
+  - `ai_client.py` — Claude (Anthropic Messages API, raw httpx), tool output. No `temperature`
+    (Haiku 5.5 / Sonnet 5.5 reject non-default sampling with 400); forced `tool_choice` only on
+    models that allow it (Haiku 5.5) — Sonnet/Opus 5.5 use `auto` + instruction + one retry.
+    System block and KB block carry `cache_control`. `last_status` feeds the dashboard;
+    `POST /api/system/ai-check` does a real test call.
   - `media_tools.py` — Word/Excel/CSV/PDF text extraction; voice via Whisper on Together
   - `catalog.py` — Assortment Excel import, packing specs, unit conversion (pieces / kg)
   - `branch_import.py` — bulk branch import: Excel template, preview, apply (no auto-delete),
     branch alternate names used by the bot's branch matching (DB-free, unit-tested)
-  - `knowledge.py` — knowledge base for bot auto-replies
+  - `knowledge.py` — knowledge base for bot auto-replies: product catalog first, then active
+    docs, up to `KB_MAX_CHARS` (default 200k chars, keeps Haiku 5.5 under its 100K-token price
+    tier). `GET /api/knowledge/status` reports what was cut — never cut silently.
+  - `direct_chat.py` — auto-reply to anyone messaging the company number directly (not a
+    customer group): KB-only answers, never prices/orders, welcome once per 30 days, hold message
+    + admin alert when unknown, silent 30 min after a manual staff reply, max 8 bot replies/hour.
+    Setting `direct_auto_reply_enabled` (off by default). Internal numbers (admin, logistics,
+    data entry) and sales reps are never auto-answered.
   - `reports.py`, `sales_reports_engine.py` — management reports (PDF/Excel + WhatsApp summary)
   - `i18n.py` — all bot-facing text
   - `security.py` — HMAC-signed HttpOnly session cookie, /api/* guard, internal token, 2FA rate limit
@@ -23,6 +34,8 @@ Plus product catalogue, customer pricing, and management reports.
 - `dashboard.html`: single-page admin dashboard
 - `whatsapp_service.js`: Node + Baileys WhatsApp service. It is started by `main.py`
   as a subprocess (`node whatsapp_service.js`); internal routes require `INTERNAL_API_TOKEN`.
+  Manual messages typed from the company number (fromMe, not bot-sent) are forwarded to the
+  webhook — in groups as context, in direct chats so the bot goes quiet.
 - PostgreSQL (Railway), connection pool
 - Claude for order parsing (text model + vision model); Whisper Large v3 via Together for voice notes
 - Auth: TOTP 2FA → server-signed cookie
@@ -34,6 +47,7 @@ Plus product catalogue, customer pricing, and management reports.
   `DB_MAX_CONNECTIONS`, `DB_ACQUIRE_TIMEOUT`
 - AI: `ANTHROPIC_API_KEY`, `ANTHROPIC_TEXT_MODEL`, `ANTHROPIC_VISION_MODEL`,
   `TOGETHER_API_KEY`, `TRANSCRIBE_MODEL`, `PERPLEXITY_API_KEY` (optional, used in main.py)
+- Knowledge base: `KB_MAX_CHARS` (default 200000), `KB_MAX_DOC_CHARS` (default 150000)
 - App: `PORT`, `PUBLIC_BASE_URL`, `RAILWAY_PUBLIC_DOMAIN`, `BUSINESS_UTC_OFFSET`,
   `ORDER_AUTO_CONFIRM_THRESHOLD`
 - WhatsApp service: `WA_MAX_QR_CYCLES`
@@ -48,8 +62,8 @@ Plus product catalogue, customer pricing, and management reports.
 
 ## Tests
 - Tests live in `test_*.py` at the repo root; run with `python -m pytest -q`.
-  Currently: `test_branch_import.py` only. The "199/199 tests" reported in the
-  claude.ai sessions were never committed.
+  Currently: `test_branch_import.py`, `test_ai_and_knowledge.py`, `test_direct_chat.py`.
+  The "199/199 tests" reported in the claude.ai sessions were never committed.
 - pytest is not in requirements.txt (dev-only); install it in the venv.
 - Local dev on this Windows ARM64 machine: `.venv` (git-ignored via .git/info/exclude).
   `psycopg2-binary` has no win-arm64 wheel, so modules importing psycopg2 (`main.py`,
@@ -84,7 +98,10 @@ Plus product catalogue, customer pricing, and management reports.
 
 ## Known open issues
 - Test coverage is minimal (see Tests).
-- Real Claude/Whisper calls untested in production.
+- Claude has never worked in production: every call in the Railway logs up to 2026-11-19
+  returned 401 invalid x-api-key → `ANTHROPIC_API_KEY` must be replaced. Even with a valid key,
+  the old code would have hit 400s (temperature / forced tool_choice) — fixed 2026-11-20.
+- Real Claude/Whisper calls still unverified end-to-end in production.
 - Products file: 29 items missing packing specs; conflict on SKU 0911;
   duplicate "Potato Bun 4pcs" (0122 / 0142).
 - Historical orders still to be imported.
