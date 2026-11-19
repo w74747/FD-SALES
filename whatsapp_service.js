@@ -326,8 +326,10 @@ async function processIncomingMessage(sock, msg) {
 
         const chatId = msg.key.remoteJid;
         const isFromMe = Boolean(msg.key.fromMe);
-        // رسائلنا من رقم الشركة: نهتم فقط بالمكتوبة يدوياً في المجموعات (سياق)، لا برسائل البوت نفسه
-        if (isFromMe && (!chatId.endsWith('@g.us') || botSentIds.has(msg.key.id))) return;
+        // رسائلنا من رقم الشركة: نهتم فقط بالمكتوبة يدوياً (في المجموعات كسياق، وفي المحادثات الخاصة
+        // حتى يعرف البوت أن أحداً من الفريق يتولى المحادثة فيسكت)، لا برسائل البوت نفسه
+        if (isFromMe && botSentIds.has(msg.key.id)) return;
+        if (isFromMe && (chatId.includes('@newsletter') || chatId.includes('@broadcast'))) return;
 
         let rawSender = isFromMe ? ((sock.user && sock.user.id) || '').split(':')[0] : (msg.key.participant || chatId);
         rawSender = rawSender.split('@')[0];
@@ -431,7 +433,7 @@ async function processIncomingMessage(sock, msg) {
             fileName: 'Food_Development_Catalog.pdf',
             caption: 'كتالوج منتجات شركة تنمية الغذاء'
           });
-          if (sentDoc && sentDoc.key && sentDoc.message) messageStore.set(sentDoc.key.id, sentDoc.message);
+          rememberBotMessage(sentDoc);
         }
 
         if (resp.data && resp.data.forward_to_logistics && resp.data.logistics_text) {
