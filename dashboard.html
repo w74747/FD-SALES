@@ -451,7 +451,10 @@
             <!-- الفريق -->
             <div id="tab-reps" class="tab-content hidden space-y-4">
                 <div class="bg-white p-5 rounded-xl border brand-border shadow-xs">
-                    <h3 class="font-bold text-sm brand-primary-text mb-4">دليل أعضاء فريق المبيعات</h3>
+                    <div class="flex justify-between items-center mb-4 no-print">
+                        <h3 class="font-bold text-sm brand-primary-text">دليل أعضاء فريق المبيعات</h3>
+                        <button onclick="openNewRepModal()" class="px-3.5 py-1.5 brand-primary-bg text-white text-xs font-bold rounded-lg shadow-sm">+ إضافة عضو</button>
+                    </div>
                     <div id="reps-grid-cards" class="grid grid-cols-3 gap-4"></div>
                 </div>
             </div>
@@ -649,7 +652,8 @@
                             <select id="data-entry-select" onchange="if (this.value) document.getElementById('data-entry-input').value = this.value" class="w-1/2 p-2 border rounded-lg text-xs">
                                 <option value="">— اختر مجموعة، أو اكتب رقم الموظف —</option>
                             </select>
-                            <input id="data-entry-input" type="text" dir="ltr" placeholder="96890000000 أو 120363...@g.us" class="w-1/2 p-2 border rounded-lg text-xs font-mono">
+                            <input id="data-entry-input" type="text" dir="ltr" placeholder="96890000000 أو 120363...@g.us" class="flex-1 min-w-0 p-2 border rounded-lg text-xs font-mono">
+                            <select id="data-entry-language" class="w-28 p-2 border rounded-lg text-xs bg-white" title="لغة رسائل البوت"><option value="en">English</option><option value="ar">العربية</option></select>
                         </div>
                     </div>
 
@@ -674,7 +678,8 @@
                             <select id="logistics-group-select" onchange="if (this.value) document.getElementById('logistics-group-input').value = this.value" class="w-1/2 p-2 border rounded-lg text-xs">
                                 <option value="">— اختر من مجموعات الواتساب —</option>
                             </select>
-                            <input id="logistics-group-input" type="text" dir="ltr" placeholder="120363...@g.us أو 96890000000" class="w-1/2 p-2 border rounded-lg text-xs font-mono">
+                            <input id="logistics-group-input" type="text" dir="ltr" placeholder="120363...@g.us أو 96890000000" class="flex-1 min-w-0 p-2 border rounded-lg text-xs font-mono">
+                            <select id="logistics-language" class="w-28 p-2 border rounded-lg text-xs bg-white" title="لغة رسائل البوت"><option value="en">English</option><option value="ar">العربية</option></select>
                         </div>
                     </div>
 
@@ -683,7 +688,7 @@
                         <div class="font-bold text-xs text-[#3A056A]">مسؤول النظام والرد الآلي</div>
                         <div class="text-[10px] text-gray-500">التنبيهات (اعتماد الطلبات، الشكاوى، الاستفسارات) تذهب لمندوب العميل إن رُبط به، وإلا لهذا الرقم.</div>
                         <div class="grid grid-cols-2 gap-2 items-center">
-                            <input id="admin-alert-phone" dir="ltr" placeholder="96890000000" class="p-2 border rounded-lg text-xs font-mono">
+                            <div class="flex gap-1.5"><input id="admin-alert-phone" dir="ltr" placeholder="96890000000" class="flex-1 min-w-0 p-2 border rounded-lg text-xs font-mono"><select id="admin-language" class="w-28 p-2 border rounded-lg text-xs bg-white" title="لغة رسائل البوت"><option value="en">English</option><option value="ar">العربية</option></select></div>
                             <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="auto-reply-enabled"> الرد الآلي على الاستفسارات والشكاوى</label>
                         </div>
                         <label class="flex items-center gap-2 text-xs font-bold"><input type="checkbox" id="auto-reports-enabled"> إعداد تقارير الإدارة تلقائياً (أول كل شهر/ربع/سنة) وإرسال ملخصها لهذا الرقم</label>
@@ -1023,6 +1028,14 @@
                 <label class="block font-bold mb-1">معرف مجموعة الواتساب (إن وجد):</label>
                 <input type="text" id="cust-group-input" class="w-full p-2 border rounded-lg font-mono text-xs" placeholder="1203630XXXXXXXX@g.us">
             </div>
+            <div>
+                <label class="block font-bold mb-1">لغة رسائل البوت في مجموعة العميل:</label>
+                <select id="cust-language-select" class="w-full p-2 border rounded-lg bg-gray-50">
+                    <option value="auto">تلقائي — بنفس لغة رسالة العميل</option>
+                    <option value="en">English</option>
+                    <option value="ar">العربية</option>
+                </select>
+            </div>
             <div class="flex justify-end gap-2 pt-2 border-t">
                 <button onclick="closeModal('customer-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
                 <button onclick="submitCustomerSave()" class="px-4 py-2 brand-primary-bg text-white font-bold rounded-lg">حفظ واعتماد العميل</button>
@@ -1245,7 +1258,7 @@
     <!-- نافذة تعديل بيانات المندوب -->
     <div id="rep-edit-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 no-print">
         <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 text-xs">
-            <h3 class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
+            <h3 id="rep-modal-title" class="font-bold text-sm brand-primary-text border-b pb-2">تعديل بيانات عضو فريق المبيعات</h3>
             <input type="hidden" id="edit-rep-id">
             <div>
                 <label class="block font-bold mb-1">الاسم الكامل:</label>
@@ -1274,6 +1287,13 @@
                         <option value="غير نشط">غير نشط</option>
                     </select>
                 </div>
+            </div>
+            <div>
+                <label class="block font-bold mb-1">لغة تنبيهات البوت لهذا العضو:</label>
+                <select id="edit-rep-language" class="w-full p-2 border rounded-lg bg-gray-50">
+                    <option value="en">English</option>
+                    <option value="ar">العربية</option>
+                </select>
             </div>
             <div class="flex justify-end gap-2 pt-2 border-t">
                 <button onclick="closeModal('rep-edit-modal')" class="px-4 py-2 border rounded-lg">إلغاء</button>
@@ -1969,6 +1989,7 @@
             try {
                 const d = await (await fetch('/api/system/assistant-settings')).json();
                 document.getElementById('admin-alert-phone').value = d.admin_alert_phone || '';
+                document.getElementById('admin-language').value = d.admin_language || 'en';
                 document.getElementById('auto-reply-enabled').checked = !!d.auto_reply_enabled;
                 document.getElementById('auto-reports-enabled').checked = d.auto_reports_enabled !== false;
                 document.getElementById('assistant-capabilities').textContent =
@@ -1979,6 +2000,7 @@
         window.saveAssistantSettings = async function() {
             const res = await fetch('/api/system/assistant-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ admin_alert_phone: document.getElementById('admin-alert-phone').value.trim(),
+                                       admin_language: document.getElementById('admin-language').value,
                                        auto_reply_enabled: document.getElementById('auto-reply-enabled').checked,
                                        auto_reports_enabled: document.getElementById('auto-reports-enabled').checked }) });
             const d = await res.json().catch(() => ({}));
@@ -2124,6 +2146,8 @@
                 const d = await (await fetch('/api/system/order-routing')).json();
                 const el = document.getElementById('data-entry-input');
                 if (el) el.value = d.data_entry_target || '';
+                const lg = document.getElementById('data-entry-language');
+                if (lg) lg.value = d.data_entry_language || 'en';
                 const eff = document.getElementById('data-entry-effective');
                 if (eff) {
                     eff.textContent = d.data_entry_target ? ('مفعّل: ' + d.data_entry_target) : 'غير مفعّل — الطلبات تذهب للوجستيك مباشرة';
@@ -2135,7 +2159,7 @@
         window.saveOrderRouting = async function() {
             const el = document.getElementById('data-entry-input');
             const res = await fetch('/api/system/order-routing', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data_entry_target: el ? el.value.trim() : '' }) });
+                body: JSON.stringify({ data_entry_target: el ? el.value.trim() : '', data_entry_language: document.getElementById('data-entry-language').value }) });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) return alert(data.detail || 'تعذر الحفظ');
             await loadOrderRouting();
@@ -2167,6 +2191,8 @@
                 const data = await res.json();
                 const el = document.getElementById('logistics-group-input');
                 if (el) el.value = data.group_id || '';
+                const lg = document.getElementById('logistics-language');
+                if (lg) lg.value = data.language || 'en';
                 renderLogisticsEffective(data.effective_target || '');
             } catch (e) {}
         };
@@ -2201,7 +2227,7 @@
             const res = await fetch('/api/system/logistics-group', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ group_id })
+                body: JSON.stringify({ group_id, language: document.getElementById('logistics-language').value })
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) return alert(data.detail || "تعذر الحفظ");
@@ -2455,6 +2481,7 @@
             document.getElementById('cust-region-input').value = "مسقط";
             document.getElementById('cust-phone-input').value = prefillPhone || "";
             document.getElementById('cust-group-input').value = "";
+            document.getElementById('cust-language-select').value = "auto";
 
             const sel = document.getElementById('cust-rep-select');
             if (sel) {
@@ -2474,6 +2501,7 @@
             document.getElementById('cust-region-input').value = c.region || 'مسقط';
             document.getElementById('cust-phone-input').value = c.phone || '';
             document.getElementById('cust-group-input').value = c.whatsapp_group_id || '';
+            document.getElementById('cust-language-select').value = c.language || 'auto';
 
             const sel = document.getElementById('cust-rep-select');
             if (sel) {
@@ -2489,6 +2517,7 @@
             const region = document.getElementById('cust-region-input').value.trim();
             const phone = document.getElementById('cust-phone-input').value.trim();
             const whatsapp_group_id = document.getElementById('cust-group-input').value.trim();
+            const language = document.getElementById('cust-language-select').value;
             
             const repSel = document.getElementById('cust-rep-select');
             const assigned_rep_id = parseInt(repSel.value) || null;
@@ -2500,7 +2529,7 @@
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ company_name, brand_name, region, phone, assigned_rep_id, assigned_rep_name, whatsapp_group_id })
+                body: JSON.stringify({ company_name, brand_name, region, phone, assigned_rep_id, assigned_rep_name, whatsapp_group_id, language })
             });
 
             if (res.ok) {
@@ -2755,6 +2784,18 @@
             document.getElementById('edit-rep-phone').value = r.phone_number || '';
             document.getElementById('edit-rep-target').value = r.monthly_target || 0;
             document.getElementById('edit-rep-status').value = r.status || 'نشط';
+            document.getElementById('edit-rep-language').value = r.language || 'en';
+            document.getElementById('rep-modal-title').innerText = 'تعديل بيانات عضو فريق المبيعات';
+            openModal('rep-edit-modal');
+        };
+
+        window.openNewRepModal = function() {
+            document.getElementById('edit-rep-id').value = '';
+            ['edit-rep-name', 'edit-rep-region', 'edit-rep-phone'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('edit-rep-target').value = 0;
+            document.getElementById('edit-rep-status').value = 'نشط';
+            document.getElementById('edit-rep-language').value = 'en';
+            document.getElementById('rep-modal-title').innerText = 'إضافة عضو لفريق المبيعات';
             openModal('rep-edit-modal');
         };
 
@@ -2765,17 +2806,21 @@
             const phone_number = document.getElementById('edit-rep-phone').value.trim();
             const monthly_target = parseFloat(document.getElementById('edit-rep-target').value) || 0.0;
             const status = document.getElementById('edit-rep-status').value;
+            const language = document.getElementById('edit-rep-language').value;
 
-            const res = await fetch('/api/reps/' + id + '/update', {
+            const res = await fetch(id ? ('/api/reps/' + id + '/update') : '/api/reps', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, region, phone_number, monthly_target, status })
+                body: JSON.stringify({ name, region, phone_number, monthly_target, status, language })
             });
 
             if (res.ok) {
                 closeModal('rep-edit-modal');
                 await loadAllData();
-                alert("تم تحديث بيانات المندوب بنجاح ✓");
+                alert(id ? "تم تحديث بيانات العضو ✓" : "تمت إضافة العضو ✓");
+            } else {
+                const d = await res.json().catch(() => ({}));
+                alert(d.detail || "تعذر الحفظ");
             }
         };
 
@@ -2901,7 +2946,7 @@
                                     '<span>' + r.name + '</span>' +
                                     '<span class="text-[10px] px-2 py-0.5 rounded ' + (r.status === 'نشط' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600') + '">' + r.status + '</span>' +
                                 '</div>' +
-                                '<div class="text-xs text-gray-500">' + r.region + ' | ' + r.phone_number + '</div>' +
+                                '<div class="text-xs text-gray-500">' + r.region + ' | ' + r.phone_number + ' | ' + (r.language === 'ar' ? 'العربية' : 'English') + '</div>' +
                                 '<div class="text-xs font-bold text-emerald-700">المبيعات: ' + (r.achieved_sales||0).toLocaleString() + ' ر.ع / المستهدف: ' + (r.monthly_target||0).toLocaleString() + ' ر.ع</div>' +
                                 '<div class="pt-2 border-t flex justify-end gap-2">' +
                                     '<button onclick="openEditRepModal(' + r.id + ')" class="px-2.5 py-1 bg-purple-50 text-[#3A056A] hover:bg-purple-100 rounded text-xs font-bold border border-purple-200">تعديل</button>' +

@@ -26,6 +26,7 @@ from typing import Optional
 
 import ai_client
 import catalog
+import i18n
 import knowledge
 import media_tools
 import security
@@ -130,6 +131,9 @@ SCHEMA = [
     );""",
     "CREATE INDEX IF NOT EXISTS idx_pending_chat ON pending_order_confirmations (chat_id, status, created_at DESC);",
     "ALTER TABLE customer_order_profiles ADD COLUMN IF NOT EXISTS products JSONB DEFAULT '[]'::jsonb;",
+    # لغة رسائل البوت: للعميل (auto = نفس لغة رسالته) ولكل عضو في فريق المبيعات
+    "ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS language VARCHAR(4) DEFAULT 'auto';",
+    "ALTER TABLE sales_executives ADD COLUMN IF NOT EXISTS language VARCHAR(2) DEFAULT 'en';",
     # مسار الاعتماد: العميل ← إدخال البيانات (رقم الطلب في النظام) ← اعتماد المالية ← اللوجستيك
     "ALTER TABLE order_batches ADD COLUMN IF NOT EXISTS erp_order_no VARCHAR(60);",
     "ALTER TABLE order_batches ADD COLUMN IF NOT EXISTS entry_snapshot JSONB;",
@@ -613,46 +617,45 @@ def _group_by_branch(lines: list) -> dict:
     return out
 
 
-def _totals(lines: list, metrics: Optional[dict] = None) -> str:
+def _totals(lines: list, metrics: Optional[dict] = None, lang: str = "en") -> str:
     totals = {}
     for ln in lines:
         totals[ln["unit"]] = totals.get(ln["unit"], 0) + ln["quantity"]
     text = " + ".join(f"{_qty(v)} {k}" for k, v in totals.items()) or "0"
     if metrics and metrics.get("complete") and metrics.get("pieces"):
-        text += f"  (≈ {metrics['pieces']:,} pcs" + (f" · {metrics['weight_kg']:,} kg" if metrics.get("weight_kg") else "") + ")"
+        text += (f"  (≈ {metrics['pieces']:,} {i18n.t('pcs', lang)}" +
+                 (f" · {metrics['weight_kg']:,} {i18n.t('kg', lang)}" if metrics.get("weight_kg") else "") + ")")
     return text
 
 
 def format_logistics_message(customer: dict, change: dict, ref: Optional[str] = None,
-                             extra_lines: Optional[list] = None, footer: str = "") -> str:
+                             extra_lines: Optional[list] = None, footer: str = "", lang: str = "en",
+                             cancel_note: str = "cancel_note_logistics") -> str:
     """
-    رسالة الطلب (جديد/تحديث/إلغاء). تُستخدم للوجستيك ولموظف إدخال البيانات:
+    رسالة الطلب (جديد/تحديث/إلغاء) بالإنجليزية أو العربية. تُستخدم للوجستيك ولموظف إدخال البيانات:
     ref = مرجع الرسالة (افتراضياً B-رقم الطلبية)، extra_lines = أسطر بعد التاريخ (رقم الطلب والحالة)،
-    footer = تعليمات في آخر الرسالة.
+    footer = تعليمات في آخر الرسالة، cancel_note = نص الإلغاء المناسب للمستلم.
     """
+    T = lambda key, **kw: i18n.t(key, lang, **kw)
     after, snapshot = change["after"], change["snapshot"] or []
     d: date = change["delivery_date"]
     header_name = customer["company_name"] + (f" ({customer['brand_name']})" if customer.get("brand_name") else "")
-    date_line = f"🗓 *Delivery:* {d.strftime('%a %d/%m/%Y')}" + "".join("\n" + x for x in (extra_lines or []))
-    ref_line = f"Ref: {ref or 'B-' + str(change['batch_id'])}" + (f"\n{footer}" if footer else "")
+    date_line = f"{T('delivery')} {i18n.fmt_date(d, lang)}" + "".join("\n" + x for x in (extra_lines or []))
+    ref_line = f"{T('ref')} {ref or 'B-' + str(change['batch_id'])}" + (f"\n{footer}" if footer else "")
+    sep = "----------------------------------------"
 
     if not after:
-        return (f"🚫 *ORDER CANCELLED* | {header_name}\n{date_line}\n"
-                f"----------------------------------------\n"
-                f"⚠️ The customer cancelled/removed this order. Please hold and do not dispatch.\n"
-                f"{ref_line}")
+        return f"{T('order_cancelled')} | {header_name}\n{date_line}\n{sep}\n{T(cancel_note)}\n{ref_line}"
 
     body = []
     for branch, items in _group_by_branch(after).items():
         body.append(f"📍 *{branch}*")
         body += [f"   • {i['product']}: {_qty(i['quantity'])} {i['unit']}" for i in items]
     current = "\n".join(body)
+    total = f"{T('total')} {_totals(after, change.get('totals'), lang)}"
 
     if not snapshot:
-        return (f"📦 *NEW ORDER* | {header_name}\n{date_line}\n"
-                f"----------------------------------------\n{current}\n"
-                f"----------------------------------------\n"
-                f"*Total:* {_totals(after, change.get('totals'))}\n{ref_line}")
+        return f"{T('new_order')} | {header_name}\n{date_line}\n{sep}\n{current}\n{sep}\n{total}\n{ref_line}"
 
     prev = {(l["branch"], l["product"]): l for l in snapshot}
     now = {(l["branch"], l["product"]): l for l in after}
@@ -664,11 +667,9 @@ def format_logistics_message(customer: dict, change: dict, ref: Optional[str] = 
             changes.append(f"   ✏️ {l['branch']} – {l['product']}: {_qty(float(prev[key]['quantity']))} → {_qty(l['quantity'])} {l['unit']}")
     for key, l in prev.items():
         if key not in now:
-            changes.append(f"   ❌ {l['branch']} – {l['product']}: removed")
-    return (f"🔄 *ORDER UPDATE* | {header_name}\n{date_line}\n"
-            f"----------------------------------------\n*Changes:*\n" + "\n".join(changes) +
-            f"\n----------------------------------------\n*Full order now:*\n{current}\n"
-            f"*Total:* {_totals(after, change.get('totals'))}\n{ref_line}")
+            changes.append(f"   ❌ {l['branch']} – {l['product']}: {T('removed')}")
+    return (f"{T('order_update')} | {header_name}\n{date_line}\n{sep}\n{T('changes')}\n" + "\n".join(changes) +
+            f"\n{sep}\n{T('full_now')}\n{current}\n{total}\n{ref_line}")
 
 
 def mark_dispatched(cur, change: dict):
@@ -762,6 +763,9 @@ Rules:
 def build_interpretation_request(customer: dict, profile: dict, branches: list, habitual: list, upcoming: list,
                                  context_rows: list, pending: Optional[dict], msg) -> tuple:
     now = now_local()
+    forced = (customer.get("language") or "auto")
+    forced_lang_note = (f"\nLANGUAGE: always write clarification_question for this customer in "
+                        f"{'Arabic' if forced == 'ar' else 'English'}." if forced in i18n.LANGS else "")
     aliases = product_map(profile)
     alias_txt = "\n".join(f'  "{a["alias"]}" => {a["product"]}' + (f' (code {a["sku"]})' if a.get("sku") else "")
                           + (f' [{a["unit"]}]' if a["unit"] else "")
@@ -785,7 +789,7 @@ PRODUCTS THIS CUSTOMER ORDERS (customer's name => our product [unit]):
 {alias_txt}
 HABITUAL PRODUCTS (most frequent first):
   {chr(10).join('  ' + h for h in habitual).strip() or '(no history)'}
-NOTES ABOUT THIS CUSTOMER: {profile.get('ai_notes') or '-'}
+NOTES ABOUT THIS CUSTOMER: {profile.get('ai_notes') or '-'}{forced_lang_note}
 UPCOMING ORDERS ALREADY RECORDED:
 {upcoming_txt}
 {pending_txt}
@@ -883,7 +887,7 @@ def _dispatch_change(cur, customer: dict, change: dict, logistics_target: str) -
         import order_approval
         return order_approval.submit_change(cur, customer, change, entry_target, logistics_target)
     if logistics_target:
-        actions.append(_action(logistics_target, format_logistics_message(customer, change)))
+        actions.append(_action(logistics_target, format_logistics_message(customer, change, lang=logistics_language(cur))))
     mark_dispatched(cur, change)
     return actions
 
@@ -894,23 +898,35 @@ def get_setting(cur, key: str, default: str = "") -> str:
     return (row["key_value"] if row and row["key_value"] is not None else default).strip()
 
 
+def data_entry_language(cur) -> str:
+    return i18n.norm(get_setting(cur, "data_entry_language"))
+
+
+def logistics_language(cur) -> str:
+    return i18n.norm(get_setting(cur, "logistics_language"))
+
+
+def admin_language(cur) -> str:
+    return i18n.norm(get_setting(cur, "admin_language"))
+
+
+def alert_target_lang(cur, customer: dict) -> tuple:
+    """(الرقم، اللغة) لمستلم التنبيهات: المندوب بلغته، وإلا مسؤول النظام بلغته"""
+    if customer.get("assigned_rep_id"):
+        cur.execute("SELECT phone_number, language FROM sales_executives WHERE id = %s;", (customer["assigned_rep_id"],))
+        row = cur.fetchone()
+        if row and row["phone_number"] and re.sub(r"[^0-9]", "", row["phone_number"]):
+            return re.sub(r"[^0-9]", "", row["phone_number"]), i18n.norm(row.get("language"))
+    return re.sub(r"[^0-9]", "", get_setting(cur, "admin_alert_phone")), admin_language(cur)
+
+
 def data_entry_target(cur) -> str:
     """مجموعة أو رقم موظف إدخال البيانات؛ فارغ = الطلبات تذهب مباشرة للوجستيك (السلوك السابق)"""
     return get_setting(cur, "data_entry_target")
 
 
 def alert_target(cur, customer: dict) -> str:
-    """
-    من يستلم التنبيهات الخاصة (اعتماد طلب، شكوى، استفسار يحتاج رداً):
-    المندوب المسؤول عن العميل إن وُجد وله رقم، وإلا مسؤول النظام (admin_alert_phone).
-    ربط المندوب اختياري.
-    """
-    if customer.get("assigned_rep_id"):
-        cur.execute("SELECT phone_number FROM sales_executives WHERE id = %s;", (customer["assigned_rep_id"],))
-        row = cur.fetchone()
-        if row and row["phone_number"] and re.sub(r"[^0-9]", "", row["phone_number"]):
-            return re.sub(r"[^0-9]", "", row["phone_number"])
-    return re.sub(r"[^0-9]", "", get_setting(cur, "admin_alert_phone"))
+    return alert_target_lang(cur, customer)[0]
 
 
 def staff_active_recently(cur, chat_id: str, minutes: int = STAFF_ACTIVE_MINUTES) -> bool:
@@ -929,9 +945,8 @@ def create_pending(cur, customer: dict, chat_id: str, source_message_id: str, pr
     if proposal.get("ambiguity") == "interpretation":
         question = (proposal.get("clarification_question") or "").strip()
         if not question:
-            summary = summarize_lines(proposal.get("lines") or [], proposal.get("customer_language", "ar"))
-            question = (f"هل تقصدون: {summary}؟" if proposal.get("customer_language") != "en"
-                        else f"Just to confirm, do you mean: {summary}?")
+            clang = i18n.customer_lang(customer, proposal.get("customer_language"))
+            question = i18n.t("cu_confirm_q", clang, summary=summarize_lines(proposal.get("lines") or [], clang))
     cur.execute("""
         UPDATE pending_order_confirmations SET status = 'superseded', resolved_at = NOW()
         WHERE chat_id = %s AND status = 'pending';
@@ -947,16 +962,14 @@ def create_pending(cur, customer: dict, chat_id: str, source_message_id: str, pr
         actions.append(_action(chat_id, question))
         record_bot_message(cur, chat_id, question)
 
-    rep = alert_target(cur, customer)
+    rep, rlang = alert_target_lang(cur, customer)
     if rep:
         link = f"{public_base_url()}/approve/{make_approval_token(pid)}" if public_base_url() else ""
-        reason = "العميل يطلب تأكيد التوفر" if proposal.get("ambiguity") == "availability" else "البوت غير متأكد من فهم الطلب وسأل العميل"
-        summary = summarize_lines(proposal.get("lines") or [], "ar") or "(بدون أصناف)"
-        rep_msg = (f"⚠️ *طلب يحتاج اعتمادك* — {customer['company_name']}\n"
-                   f"السبب: {reason}\n"
-                   f"التسليم: {proposal.get('delivery_date') or 'الموعد الافتراضي'}\n"
-                   f"الطلب كما فهمه البوت: {summary}\n"
-                   + (f"\n✅ للاعتماد أو الرفض بضغطة:\n{link}" if link else "\nافتح لوحة التحكم ← الطلبيات الذكية للاعتماد."))
+        rep_msg = i18n.t("al_pending", rlang, company=customer["company_name"],
+                         reason=i18n.t("al_reason_availability" if proposal.get("ambiguity") == "availability" else "al_reason_unsure", rlang),
+                         delivery=proposal.get("delivery_date") or i18n.t("al_default_delivery", rlang),
+                         summary=summarize_lines(proposal.get("lines") or [], rlang) or i18n.t("al_no_items", rlang),
+                         action="\n" + (i18n.t("al_link", rlang, link=link) if link else i18n.t("al_dashboard", rlang)))
         actions.append(_action(rep, rep_msg))
     return pid, actions
 
@@ -977,8 +990,7 @@ def resolve_pending(cur, pending: dict, approve: bool, resolved_by: str, custome
     change = apply_proposal(cur, customer, profile, proposal, pending.get("source_message_id") or f"pending-{pending['id']}")
     actions = _dispatch_change(cur, customer, change, logistics_target)
     if announce_in_group:
-        lang = proposal.get("customer_language", "ar")
-        note = "✅ تم اعتماد طلبكم، شكراً لكم." if lang != "en" else "✅ Your order is confirmed, thank you."
+        note = i18n.t("cu_order_confirmed", i18n.customer_lang(customer, proposal.get("customer_language")))
         actions.append(_action(pending["chat_id"], note))
         record_bot_message(cur, pending["chat_id"], note)
     return actions
@@ -1014,13 +1026,13 @@ async def handle_issue(conn, customer: dict, profile: dict, msg, kind: str, resu
     """
     chat_id = msg.chat_id.strip()
     text = (msg.message_text or "").strip()
-    lang = result.get("customer_language", "ar")
+    lang = i18n.customer_lang(customer, result.get("customer_language"))
     actions = []
     with conn.cursor() as cur:
         issue_id = record_issue(cur, customer, chat_id, msg.message_id, kind, result, text)
         auto = (get_setting(cur, "auto_reply_enabled", "false").lower() == "true"
                 and profile.get("auto_reply_enabled", True) and not staff_active_recently(cur, chat_id))
-        target = alert_target(cur, customer)
+        target, alang = alert_target_lang(cur, customer)
         kb_text = knowledge.build_context(cur) if (auto and kind == "inquiry") else ""
         # أسعار هذا العميل فقط (إن سمح المسؤول بذلك في ملفه) - لا تُكشف أسعار العملاء الآخرين أبداً
         if kb_text is not None and auto and kind == "inquiry" and profile.get("share_prices_with_bot"):
@@ -1031,19 +1043,17 @@ async def handle_issue(conn, customer: dict, profile: dict, msg, kind: str, resu
                     f": {a['price']:.3f} OMR per {a['price_unit'] or a['unit'] or 'unit'}" for a in prices)
     conn.commit()
 
-    category = CATEGORY_AR.get(result.get("issue_category") or "other", "أخرى")
+    category = i18n.category(result.get("issue_category"), alang)
     product = result.get("issue_product") or "-"
     summary = result.get("issue_summary") or text[:200]
     bot_reply, status, alert = "", "open", None
 
     if kind == "complaint":
-        alert = (f"🚨 *شكوى من عميل* — {customer['company_name']}\n"
-                 f"النوع: {category} · المنتج: {product} · الخطورة: {SEVERITY_AR.get(result.get('issue_severity'), 'متوسطة')}\n"
-                 f"الملخص: {summary}\nنص العميل ({msg.sender_name}): {text[:400]}")
+        alert = i18n.t("al_complaint", alang, company=customer["company_name"], category=category, product=product,
+                       severity=i18n.severity(result.get("issue_severity"), alang), summary=summary,
+                       sender=msg.sender_name, text=text[:400])
         if auto:
-            bot_reply = ("نعتذر عن ذلك 🙏 تم تحويل ملاحظتكم للفريق المختص وسيتواصل معكم في أقرب وقت."
-                         if lang != "en" else
-                         "We're sorry about this 🙏 Your feedback has been passed to the responsible team and they will contact you shortly.")
+            bot_reply = i18n.t("cu_complaint", lang)
     else:  # inquiry
         answer = None
         if auto:
@@ -1052,14 +1062,13 @@ async def handle_issue(conn, customer: dict, profile: dict, msg, kind: str, resu
         if answer and answer.get("can_answer") and (answer.get("answer") or "").strip():
             bot_reply, status = answer["answer"].strip(), "answered_by_bot"
         else:
-            reason = (answer or {}).get("escalation_reason") or ("الرد الآلي غير مفعّل" if not auto else "")
-            alert = (f"❓ *استفسار يحتاج ردكم* — {customer['company_name']}\n"
-                     f"الموضوع: {category} · المنتج: {product}\n"
-                     f"السؤال ({msg.sender_name}): {text[:400]}" + (f"\nسبب التحويل: {reason}" if reason else ""))
+            reason = (answer or {}).get("escalation_reason") or (i18n.t("al_autoreply_off", alang) if not auto else "")
+            alert = i18n.t("al_inquiry", alang, company=customer["company_name"], category=category, product=product,
+                           sender=msg.sender_name, text=text[:400],
+                           reason=i18n.t("al_escalation", alang, reason=reason) if reason else "")
             status = "escalated"
             if auto:
-                bot_reply = ("شكراً لتواصلكم 🌷 سيقوم أحد أعضاء فريقنا بالرد على استفساركم قريباً."
-                             if lang != "en" else "Thank you for reaching out 🌷 A member of our team will get back to you shortly.")
+                bot_reply = i18n.t("cu_inquiry_hold", lang)
 
     with conn.cursor() as cur:
         if bot_reply:
@@ -1127,6 +1136,8 @@ async def handle_customer_message(conn, customer: dict, msg, logistics_target: s
     content, use_vision = build_interpretation_request(customer, profile, branches, habitual, upcoming,
                                                        context_rows, pending, msg)
     result = await ai_client.call_tool(SYSTEM_PROMPT, content, INTERPRET_TOOL, use_vision=use_vision)
+    if result is not None and customer.get("language") in i18n.LANGS:
+        result["customer_language"] = customer["language"]  # لغة العميل المحددة في ملفه تتقدّم على المكتشفة
     if not result:
         logger.warning(f"Order interpretation failed for {customer['company_name']} msg {message_id}")
         return {"status": "SMART_AI_UNAVAILABLE", "actions": [], "fallback": True}
@@ -1209,6 +1220,17 @@ DEFAULT_REMINDER = ("صباح الخير 🌞 نذكركم بطلب {day} ({date
                     "Good morning, a kind reminder for {day_en}'s order ({date}).")
 
 
+def recent_customer_language(cur, chat_id: str) -> str:
+    """لغة العميل من آخر رسائله في المجموعة (للتذكير عند اختيار «تلقائي»)؛ فارغ = غير معروفة فيُرسل التذكير باللغتين"""
+    cur.execute("""SELECT body FROM group_messages WHERE chat_id = %s AND is_staff = FALSE AND COALESCE(body, '') <> ''
+                   ORDER BY created_at DESC LIMIT 10;""", (chat_id,))
+    bodies = [r["body"] for r in cur.fetchall()]
+    if not bodies:
+        return ""
+    arabic = sum(1 for b in bodies if i18n.has_arabic(b))
+    return "ar" if arabic * 2 > len(bodies) else "en"
+
+
 def due_reminders(cur) -> list:
     """
     التذكيرات المستحقة الآن: اليوم ضمن أيام التذكير، وتجاوزنا وقت التذكير، ولم يُرسل اليوم.
@@ -1217,7 +1239,7 @@ def due_reminders(cur) -> list:
     now = now_local()
     today = now.date()
     cur.execute("""
-        SELECT p.*, c.company_name, c.whatsapp_group_id FROM customer_order_profiles p
+        SELECT p.*, c.company_name, c.whatsapp_group_id, c.language FROM customer_order_profiles p
         JOIN customer_accounts c ON c.id = p.customer_id
         WHERE p.reminder_enabled = TRUE AND COALESCE(TRIM(c.whatsapp_group_id), '') <> ''
           AND (p.last_reminder_date IS NULL OR p.last_reminder_date < %s);
@@ -1248,7 +1270,9 @@ def due_reminders(cur) -> list:
             continue
         day_ar = "الغد" if delivery == today + timedelta(days=1) else WEEKDAYS_AR[delivery.weekday()]
         day_en = "tomorrow" if delivery == today + timedelta(days=1) else delivery.strftime("%A")
-        text = (p["reminder_text"] or DEFAULT_REMINDER).format(
+        lang = p.get("language") if p.get("language") in i18n.LANGS else recent_customer_language(cur, chat_id)
+        template = p["reminder_text"] or (i18n.t("cu_reminder", lang) if lang else DEFAULT_REMINDER)
+        text = template.format(
             day=day_ar, day_en=day_en, date=delivery.strftime("%d/%m"), company=p["company_name"])
         record_bot_message(cur, chat_id, text)
         due.append(_action(chat_id, text))

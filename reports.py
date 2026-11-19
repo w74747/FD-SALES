@@ -20,6 +20,7 @@ from typing import Optional
 
 import ai_client
 import catalog
+import i18n
 import order_engine
 
 logger = logging.getLogger("SalesCRM.reports")
@@ -947,16 +948,36 @@ async def generate(conn, kind: str, start: date, end: date, label: str, source: 
     return {"id": rid, "title": title, "metrics": metrics, "text": text}
 
 
-def whatsapp_summary(report: dict, link: str) -> str:
+def _en_label(period: dict) -> str:
+    start = date.fromisoformat(period["start"])
+    if period["kind"] == "month":
+        return start.strftime("%B %Y")
+    if period["kind"] == "quarter":
+        return f"Q{(start.month - 1) // 3 + 1} {start.year}"
+    return str(start.year)
+
+
+def whatsapp_summary(report: dict, link: str, lang: str = "en") -> str:
+    """ملخص التقرير على الواتساب بلغة مسؤول النظام (التقرير الكامل نفسه بالعربية)"""
+    lang = i18n.norm(lang)
     k = report["metrics"]["kpis"]
     t = report["text"]
+    T = lambda key, **kw: i18n.t(key, lang, **kw)
 
     def line(label, key, fmt):
         x = k[key]
         d = x["vs_previous_pct"]
         return f"• {label}: {fmt(x['current'])}" + (f" ({'+' if d > 0 else ''}{d:.1f}%)" if d is not None else "")
 
-    return (f"📊 *{report['title']}*\n" + (f"{t.get('headline')}\n" if t.get("headline") else "") + "\n"
-            + "\n".join([line("القيمة", "value", _omr), line("الكمية", "pieces", lambda v: f"{v:,.0f} حبة"),
-                         line("الطلبيات", "orders", lambda v: f"{v:,.0f}"), line("العملاء النشطون", "customers", lambda v: f"{v:,.0f}")])
-            + (f"\n\nالتقرير الكامل:\n{link}" if link else ""))
+    if lang == "ar":
+        title, headline = report["title"], t.get("headline")
+    else:
+        title = T("rp_title_" + report["metrics"]["period"]["kind"], label=_en_label(report["metrics"]["period"]))
+        headline = None  # السرد مكتوب بالعربية في التقرير
+    value_fmt = _omr if lang == "ar" else (lambda v: f"{v:,.3f} OMR")
+    return (f"📊 *{title}*\n" + (f"{headline}\n" if headline else "") + "\n"
+            + "\n".join([line(T("rp_value"), "value", value_fmt),
+                         line(T("rp_pieces"), "pieces", lambda v: f"{v:,.0f} {T('rp_pieces_unit')}"),
+                         line(T("rp_orders"), "orders", lambda v: f"{v:,.0f}"),
+                         line(T("rp_customers"), "customers", lambda v: f"{v:,.0f}")])
+            + (f"\n\n{T('rp_full')}\n{link}" if link else ""))
